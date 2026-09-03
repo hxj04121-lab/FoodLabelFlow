@@ -7,24 +7,24 @@
 - The `security` job contains Trivy filesystem scanning and OWASP
   Dependency-Check. It is enabled only when the repository variable
   `SECURITY_SCANS_ENABLED` is explicitly set to `true`.
-- `sonar-project.properties` records source/test mapping for a later connected
-  SonarQube run.
+- The backend now uses Spring Boot `3.5.16`, which centrally resolves the
+  Spring Framework, Jackson, and Tomcat dependency line.
+- `sonar-project.properties` records source/test mapping, and the workflow has
+  a SonarQube job gated by `SONARQUBE_ENABLED=true`.
 
 ## Truthful status at this stop
 
 | Check | Status | Reason |
 |---|---|---|
-| Backend local verification | PASS | `mvn -B -ntp -f backend/pom.xml verify`, Java 21, Testcontainers MySQL |
-| Frontend local build | PASS | `npm ci && npm run build` |
-| Compose build | PASS | `docker-compose config --quiet` and `docker-compose build` |
-| GitHub workflow upload | PASS | Workflow is pushed at commit `c636bf18aa77905161b5e35e71b3ea93d6f90fb7` |
-| Remote frontend job | PASS | PR-bound GitHub Actions run `33737625412` |
-| Remote backend job | PASS | PR-bound GitHub Actions run `33737625412` |
-| Remote Compose/container job | PASS | PR-bound GitHub Actions run `33737625412` |
-| OWASP Dependency-Check | IN_PROGRESS | PR-bound security job `100591836623`; first NVD data update is still running |
-| Trivy | PASS | PR-bound security job `100591836623` completed the filesystem scan |
-| SonarQube | NOT_CONFIGURED | server/token/project binding not supplied |
+| Backend compile/package | PASS | `mvn -B -ntp -f backend/pom.xml -DskipTests package` |
+| Backend full verification | BLOCKED_LOCALLY | Testcontainers integration test needs a running Docker environment; non-container CI remains the authoritative check |
+| Resolved security dependencies | PASS | Boot `3.5.16` resolves Spring `6.2.19`, Jackson `2.21.4`, and Tomcat `10.1.55` |
+| OWASP Dependency-Check workflow | PENDING_REMOTE | Next PR run will use scanner `13.0.0`, CVSS threshold `7`, and optional `NVD_API_KEY` |
+| SonarQube workflow | READY_NOT_ENABLED | Enable only after adding `SONAR_HOST_URL` repository variable and `SONAR_TOKEN` repository secret |
+| Shared staging | DEFERRED | Explicitly deferred by the user |
+| Jira assignment | USER_MANAGED | Explicitly left for the user |
 
 The security variable `SECURITY_SCANS_ENABLED=true` is configured on the
-repository. The current security run is bound to the pushed PR head, not an
-accepted commit; independent review and merge remain pending.
+repository. SonarQube is intentionally fail-closed: the job is skipped until
+`SONARQUBE_ENABLED=true` is added together with the host URL and token. Never
+commit or paste the token into the repository or chat.
