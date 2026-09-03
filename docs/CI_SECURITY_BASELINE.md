@@ -18,7 +18,7 @@
 |---|---|---|
 | Backend compile/package | PASS | `mvn -B -ntp -f backend/pom.xml -DskipTests package` |
 | Backend full verification | BLOCKED_LOCALLY | Testcontainers integration test needs a running Docker environment; non-container CI remains the authoritative check |
-| Resolved security dependencies | PASS | Boot `3.5.16` resolves Spring `6.2.19`, Jackson `2.21.4`, and Tomcat `10.1.55` |
+| Resolved security dependencies | PASS | Boot `3.5.16` resolves Spring `6.2.19`, Jackson `2.21.4`, and the explicitly patched Tomcat `10.1.59` |
 | OWASP Dependency-Check workflow | PENDING_REMOTE | Next PR run will use scanner `12.2.2`, CVSS threshold `7`, an optional `NVD_API_KEY`, and a cached NVD data directory |
 | SonarQube workflow | READY_NOT_ENABLED | Enable only after adding `SONAR_HOST_URL` repository variable and `SONAR_TOKEN` repository secret |
 | Shared staging | DEFERRED | Explicitly deferred by the user |
