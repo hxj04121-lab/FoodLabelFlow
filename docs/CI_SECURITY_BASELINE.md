@@ -17,14 +17,13 @@
 | Backend local verification | PASS | `mvn -B -ntp -f backend/pom.xml verify`, Java 21, Testcontainers MySQL |
 | Frontend local build | PASS | `npm ci && npm run build` |
 | Compose build | PASS | `docker-compose config --quiet` and `docker-compose build` |
-| GitHub workflow upload | PASS | Workflow uploaded and executed in run `33733331526` |
-| Remote frontend job | PASS | GitHub Actions run `33733331526` |
-| Remote backend job | PASS | GitHub Actions run `33733331526` |
-| Remote Compose/container job | PASS | GitHub Actions run `33733331526` |
+| GitHub workflow upload | PASS | Workflow uploaded and executed in PR run `33734960192` |
+| Remote frontend job | PASS | PR-bound GitHub Actions run `33734960192` |
+| Remote backend job | PASS | PR-bound GitHub Actions run `33734960192` |
+| Remote Compose/container job | PASS | PR-bound GitHub Actions run `33734960192` |
 | OWASP Dependency-Check | DEFINED_NOT_RUN | security job is conditional on `SECURITY_SCANS_ENABLED=true` |
 | Trivy | DEFINED_NOT_RUN | security job is conditional on `SECURITY_SCANS_ENABLED=true` |
 | SonarQube | NOT_CONFIGURED | server/token/project binding not supplied |
 
 No security scan result is claimed until a real run is bound to an accepted
-commit. The green CI run is bound to the pushed bootstrap branch; a PR-bound
-check remains pending because the empty remote has no `main` base branch.
+commit. The green CI run is bound to PR #1; review and merge remain pending.

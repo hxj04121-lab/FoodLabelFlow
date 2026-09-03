@@ -2,11 +2,12 @@
   "project": "SpecTrace",
   "repository": "hxj04121-lab/FoodLabelFlow",
   "stage": "Stage 0",
-  "status": "REMOTE_BASELINE_PUSHED_CI_PASS_PR_BASE_GATE",
+  "status": "PR_CREATED_CI_PASS_REVIEW_GATE",
   "branch": "chore/stage0-bootstrap",
   "base_branch": "main",
   "bootstrap_commit_sha": "5ef1e3f6caac144bd287934c246db75308e7e88e",
-  "latest_commit_sha": "26d84a0d92b29bad5a38274edc4206ab4ba409a6",
+  "latest_commit_sha": "34ed97a8554218a32716ef81cf12f73eaba91d51",
+  "main_seed_commit_sha": "c964b83cadf7bdebeab82f0863d2d9444aa7f517",
   "accepted_commit_sha": null,
   "pm_contract_sha256": "2aafb403c3e437dd9f4d896c74504348f0aec50b7bdd0b171185605a0a1fdb41",
   "db0": {
@@ -24,10 +25,14 @@
   "local_staging": "PASS",
   "jira": "DELTA_REQUIRED",
   "remote_ci": {
-    "run_id": "33733331526",
+    "run_id": "33734960192",
     "status": "PASS",
-    "url": "https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/33733331526"
+    "url": "https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/33734960192"
   },
-  "pr": "BLOCKED_NO_MAIN_BASE_BRANCH",
-  "last_updated": "2026-09-03T16:29:09+08:00"
+  "pr": {
+    "number": 1,
+    "status": "OPEN",
+    "url": "https://github.com/hxj04121-lab/FoodLabelFlow/pull/1"
+  },
+  "last_updated": "2026-09-03T16:46:50+08:00"
 }

@@ -13,10 +13,9 @@ Present artifacts:
 - merge queue metadata
 - global lease policy
 
-Current status is `REMOTE_BASELINE_PUSHED_CI_PASS_PR_BASE_GATE`. The local
-bootstrap commits are
+Current status is `PR_CREATED_CI_PASS_REVIEW_GATE`. The local bootstrap commits
+are
 `5ef1e3f6caac144bd287934c246db75308e7e88e`; the accepted commit is not known
-until a PR is created, independently reviewed, and merged. The branch is
-pushed and remote CI run `33733331526` passed, but PR creation is blocked by the
-missing `main` base branch in the initially empty remote. Credentials
+until PR #1 is independently reviewed and merged. The branch is pushed, PR #1
+is open, and PR-bound CI run `33734960192` passed. Credentials
 are intentionally absent from all control-plane files.

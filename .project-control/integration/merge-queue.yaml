@@ -2,8 +2,9 @@ merge_queue:
   policy: one-bootstrap-pr-at-a-time
   base_branch: main
   current_branch: chore/stage0-bootstrap
-  status: BLOCKED_NO_MAIN_BASE_BRANCH
-  remote_ci_run: 33733331526
+  status: PR_OPEN_REVIEW_GATE
+  pr_number: 1
+  remote_ci_run: 33734960192
   remote_ci_status: PASS
   required_checks:
     - backend-maven-verify
