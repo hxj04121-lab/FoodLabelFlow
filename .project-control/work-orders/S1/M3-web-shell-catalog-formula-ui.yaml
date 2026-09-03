@@ -1,0 +1,26 @@
+work_order_id: S1-M3
+story_id: ST-S1-M3
+owner: M3 Xu Feiyang
+status: READY_AFTER_STAGE0_ACCEPTANCE
+scope:
+  - web shell
+  - catalog/formula UI
+  - browser acceptance
+acceptance_criteria:
+  - expose navigation from the existing React/Ant Design shell to the S1 slice
+  - display supplier/material/product/formula traceability states without inventing data
+  - complete browser smoke for create/release/history path
+required_tests:
+  - TypeScript build
+  - browser smoke against local staging
+  - accessibility and validation checks
+architecture_impact: frontend presentation only; consume versioned APIs
+db_impact: none directly
+shared_file_domain: frontend/src and browser evidence
+base_contract:
+  pm_contract_sha256: 2aafb403c3e437dd9f4d896c74504348f0aec50b7bdd0b171185605a0a1fdb41
+  baseline_branch: chore/stage0-bootstrap
+  accepted_baseline_commit: null
+dependencies: [S1-M1, S1-M2]
+evidence_required: browser URL/screenshot, build log, API mapping
+human_acceptance: required

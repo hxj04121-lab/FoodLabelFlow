@@ -1,0 +1,27 @@
+work_order_id: S1-M1
+story_id: ST-S1-M1
+owner: M1 Huang Xiangjia
+status: READY_AFTER_STAGE0_ACCEPTANCE
+scope:
+  - supplier
+  - material
+  - specification
+  - formula main slice
+acceptance_criteria:
+  - create and retrieve supplier/material/specification records through the agreed API
+  - create and release a versioned formula without mutating prior history
+  - trace the formula back to supplier material and specification evidence
+required_tests:
+  - unit tests for application rules
+  - repository/integration tests against MySQL 8.x
+  - API contract evidence
+architecture_impact: catalog and label traceability interfaces only; preserve module boundaries
+db_impact: use existing V3 tables and append-only migrations only
+shared_file_domain: backend catalog/formula application and API files
+base_contract:
+  pm_contract_sha256: 2aafb403c3e437dd9f4d896c74504348f0aec50b7bdd0b171185605a0a1fdb41
+  baseline_branch: chore/stage0-bootstrap
+  accepted_baseline_commit: null
+dependencies: [S1-M2, S1-M5]
+evidence_required: API response, test output, traceability screenshot or equivalent human evidence
+human_acceptance: required

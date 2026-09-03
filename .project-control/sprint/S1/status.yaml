@@ -1,0 +1,13 @@
+sprint: S1
+status: HANDOFF_PENDING_STAGE0_ACCEPTANCE
+planned_work_orders: 5
+completed_work_orders: 0
+feature_work_started: false
+baseline_commit: null
+owners:
+  - M1 Huang Xiangjia
+  - M2 Cai Runchen
+  - M3 Xu Feiyang
+  - M4 Zhu Wenyu
+  - M5 Sun Huajian
+human_acceptance: PENDING

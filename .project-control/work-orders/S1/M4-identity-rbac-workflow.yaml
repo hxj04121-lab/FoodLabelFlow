@@ -1,0 +1,26 @@
+work_order_id: S1-M4
+story_id: ST-S1-M4
+owner: M4 Zhu Wenyu
+status: READY_AFTER_STAGE0_ACCEPTANCE
+scope:
+  - identity and external authentication integration seam
+  - RBAC enforcement
+  - workflow scaffold
+acceptance_criteria:
+  - define authenticated user and role mapping against the seeded RBAC model
+  - enforce maker-checker separation for label workflow actions
+  - expose workflow state transitions with audit evidence
+required_tests:
+  - authorization unit tests
+  - negative tests for self-approval and invalid transitions
+  - MySQL integration tests for workflow helpers
+architecture_impact: identity owns authentication boundary; workflow owns lifecycle transitions
+db_impact: use seeded RBAC and workflow tables; additive migrations require review
+shared_file_domain: identity/workflow security and authorization files
+base_contract:
+  pm_contract_sha256: 2aafb403c3e437dd9f4d896c74504348f0aec50b7bdd0b171185605a0a1fdb41
+  baseline_branch: chore/stage0-bootstrap
+  accepted_baseline_commit: null
+dependencies: [S1-M2, S1-M5]
+evidence_required: authorization matrix, negative test output, audit event evidence
+human_acceptance: required

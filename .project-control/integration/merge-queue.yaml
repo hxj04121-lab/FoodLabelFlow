@@ -1,0 +1,15 @@
+merge_queue:
+  policy: one-bootstrap-pr-at-a-time
+  base_branch: main
+  current_branch: chore/stage0-bootstrap
+  status: PR_OPEN_SECURITY_RUNNING_REVIEW_GATE
+  pr_number: 1
+  remote_ci_run: 33737625412
+  remote_ci_status: IN_PROGRESS_TRIVY_PASS_OWASP_RUNNING
+  required_checks:
+    - backend-maven-verify
+    - frontend-npm-build
+    - container-compose-build
+  required_review: one-approve-from-other-developer
+  self_approval_allowed: false
+  accepted_commit: null

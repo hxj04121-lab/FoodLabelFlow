@@ -1,0 +1,25 @@
+work_order_id: S1-M2
+story_id: ST-S1-M2
+owner: M2 Cai Runchen
+status: READY_AFTER_STAGE0_ACCEPTANCE
+scope:
+  - software architecture decision records
+  - acceptance criteria refinement
+  - implementation support for shared contracts
+acceptance_criteria:
+  - publish SAD/API/AC decisions with links to the PM contract
+  - keep error semantics and evidence identifiers consistent across modules
+  - review cross-module changes before integration
+required_tests:
+  - architecture rule review
+  - API contract and negative-path review
+architecture_impact: governs cross-module contracts; no bypass of module ownership
+db_impact: no schema change unless separately approved by PM change control
+shared_file_domain: architecture docs, API contracts, acceptance evidence
+base_contract:
+  pm_contract_sha256: 2aafb403c3e437dd9f4d896c74504348f0aec50b7bdd0b171185605a0a1fdb41
+  baseline_branch: chore/stage0-bootstrap
+  accepted_baseline_commit: null
+dependencies: [S1-M1, S1-M4, S1-M5]
+evidence_required: ADR/contract diff, review record, test mapping
+human_acceptance: required

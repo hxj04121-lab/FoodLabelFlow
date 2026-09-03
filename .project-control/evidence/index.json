@@ -1,0 +1,69 @@
+{
+  "evidence_version": "1.0",
+  "generated_at": "2026-09-03T17:32:23+08:00",
+  "items": [
+    {
+      "id": "EVID-DB0-V3-001",
+      "kind": "db0_runtime_validation",
+      "path": ".stage0/evidence/DB0_RUNTIME_VALIDATION.json",
+      "status": "PASS",
+      "binding": "SpecTrace_PORTABLE_DATABASE_PACKAGE_v3 / MySQL 8.4.11"
+    },
+    {
+      "id": "EVID-DB0-GATE-001",
+      "kind": "database_requirement_gate",
+      "path": ".stage0/evidence/V3_REQUIREMENT_GATE.json",
+      "status": "PASS",
+      "binding": "SpecTrace_PORTABLE_DATABASE_PACKAGE_v3"
+    },
+    {
+      "id": "EVID-PM-CONTRACT-001",
+      "kind": "pm_contract_hash",
+      "path": ".project-control/pm-contract.sha256",
+      "status": "RECORDED",
+      "binding": "2aafb403c3e437dd9f4d896c74504348f0aec50b7bdd0b171185605a0a1fdb41"
+    },
+    {
+      "id": "EVID-CI-BASELINE-001",
+      "kind": "ci_security_run",
+      "path": ".github/workflows/ci.yml",
+      "status": "PASS",
+      "binding": "GitHub Actions PR run 33737625412 / Trivy PASS / OWASP in progress / PR #1"
+    },
+    {
+      "id": "EVID-LOCAL-SMOKE-001",
+      "kind": "local_staging_smoke",
+      "path": ".stage0/evidence/LOCAL_STAGING_SMOKE.json",
+      "status": "PASS",
+      "binding": "docker-compose / localhost / Codex In-app Browser"
+    },
+    {
+      "id": "EVID-GITHUB-PUSH-001",
+      "kind": "github_push_attempt",
+      "path": ".stage0/evidence/GITHUB_PUSH_ATTEMPT.json",
+      "status": "PASS_PUSHED",
+      "binding": "chore/stage0-bootstrap / commit c636bf18aa77905161b5e35e71b3ea93d6f90fb7"
+    },
+    {
+      "id": "EVID-GITHUB-CI-001",
+      "kind": "github_actions_ci",
+      "path": "https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/33733331526",
+      "status": "PASS",
+      "binding": "PR #1 frontend/backend/containers jobs"
+    },
+    {
+      "id": "EVID-GITHUB-PR-001",
+      "kind": "pull_request_creation",
+      "path": ".stage0/evidence/GITHUB_PR_ATTEMPT.json",
+      "status": "OPEN_CI_PASS_REVIEW_PENDING",
+      "binding": "PR #1 / base main / head chore/stage0-bootstrap"
+    },
+    {
+      "id": "EVID-JIRA-SYNC-001",
+      "kind": "jira_authenticated_ui_sync",
+      "path": ".stage0/evidence/JIRA_SYNC.json",
+      "status": "SCRUM_6_TO_11_CREATED_M2_TO_M5_UNASSIGNED",
+      "binding": "https://hxj04121.atlassian.net / SCRUM / TEAM 16"
+    }
+  ]
+}
