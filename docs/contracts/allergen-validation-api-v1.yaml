@@ -1,0 +1,250 @@
+openapi: 3.1.0
+info:
+  title: SpecTrace Allergen and Validation API
+  version: 0.1.0-draft
+  description: >-
+    Prepared M2 shared contract. It is not an assertion that these endpoints are
+    implemented or integrated. Reconcile it with accepted main and obtain cross-module
+    review before implementation.
+tags:
+  - name: allergen
+  - name: validation
+paths:
+  /api/v1/allergens:
+    get:
+      tags: [allergen]
+      operationId: listAllergens
+      summary: List canonical allergens for a jurisdiction.
+      parameters:
+        - name: jurisdictionCode
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        '200':
+          description: Canonical allergen catalogue entries.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Allergen'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '403':
+          $ref: '#/components/responses/AuthorizationDenied'
+  /api/v1/label-versions/{labelVersionId}/validation-runs:
+    post:
+      tags: [validation]
+      operationId: validateCurrentLabelVersion
+      summary: Validate the exact current label version against an active rule-set version.
+      description: >-
+        The request is rejected if the label version is not current (BR-05). A successful
+        response is returned only after a ValidationRun and its results are persisted.
+      parameters:
+        - $ref: '#/components/parameters/LabelVersionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidationRunRequest'
+      responses:
+        '201':
+          description: Persisted validation run and attributable results.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationRun'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '403':
+          $ref: '#/components/responses/AuthorizationDenied'
+        '404':
+          $ref: '#/components/responses/ResourceNotFound'
+        '409':
+          $ref: '#/components/responses/LabelVersionNotCurrent'
+        '422':
+          $ref: '#/components/responses/ValidationPreconditionFailed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/validation-runs/{validationRunId}:
+    get:
+      tags: [validation]
+      operationId: getValidationRun
+      summary: Retrieve a persisted validation run and its results.
+      parameters:
+        - name: validationRunId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        '200':
+          description: Persisted validation run.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationRun'
+        '403':
+          $ref: '#/components/responses/AuthorizationDenied'
+        '404':
+          $ref: '#/components/responses/ResourceNotFound'
+components:
+  parameters:
+    LabelVersionId:
+      name: labelVersionId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+  responses:
+    InvalidRequest:
+      description: Invalid request shape or required value.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            code: INVALID_REQUEST
+            message: ruleSetVersionId must be supplied.
+            traceId: trace-example-001
+            evidenceId: null
+    AuthorizationDenied:
+      description: Authenticated actor lacks the M4-defined permission.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            code: AUTHORIZATION_DENIED
+            message: The actor is not permitted to validate this label.
+            traceId: trace-example-002
+            evidenceId: null
+    ResourceNotFound:
+      description: Requested canonical resource is absent.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            code: RESOURCE_NOT_FOUND
+            message: The requested label version was not found.
+            traceId: trace-example-003
+            evidenceId: null
+    LabelVersionNotCurrent:
+      description: BR-05 forbids validation of a historical or superseded label version.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            code: LABEL_VERSION_NOT_CURRENT
+            message: Validation is permitted only for the current label version.
+            traceId: trace-example-004
+            evidenceId: null
+    ValidationPreconditionFailed:
+      description: Canonical data required to evaluate the current label is incomplete.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            code: VALIDATION_PRECONDITION_FAILED
+            message: The current label has no active rule-set available for evaluation.
+            traceId: trace-example-005
+            evidenceId: null
+    InternalError:
+      description: Unexpected failure; no implementation detail is exposed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            code: INTERNAL_ERROR
+            message: An unexpected error occurred.
+            traceId: trace-example-006
+            evidenceId: null
+  schemas:
+    Allergen:
+      type: object
+      required: [allergenId, allergenCode, displayName, jurisdictionCode]
+      properties:
+        allergenId:
+          type: string
+        allergenCode:
+          type: string
+        displayName:
+          type: string
+        jurisdictionCode:
+          type: string
+    ValidationRunRequest:
+      type: object
+      additionalProperties: false
+      required: [ruleSetVersionId]
+      properties:
+        ruleSetVersionId:
+          type: string
+          minLength: 1
+    ValidationRun:
+      type: object
+      required:
+        - validationRunId
+        - labelVersionId
+        - ruleSetVersionId
+        - status
+        - ranAt
+        - results
+      properties:
+        validationRunId:
+          type: string
+        labelVersionId:
+          type: string
+        ruleSetVersionId:
+          type: string
+        status:
+          type: string
+          description: Persisted lifecycle state defined by the validation module.
+        ranAt:
+          type: string
+          format: date-time
+        summary:
+          type: string
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationResult'
+    ValidationResult:
+      type: object
+      required: [resultCode, severity, passed, blocking, message]
+      properties:
+        ruleDefinitionId:
+          type: [string, 'null']
+        resultCode:
+          type: string
+        severity:
+          type: string
+        passed:
+          type: boolean
+        blocking:
+          type: boolean
+        message:
+          type: string
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [code, message, traceId, evidenceId]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        traceId:
+          type: [string, 'null']
+        evidenceId:
+          type: [string, 'null']
+          description: Present only when a real evidence record exists.
