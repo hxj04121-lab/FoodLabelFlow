@@ -101,8 +101,14 @@ jobs:
         working-directory: backend
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        run: >-
-          mvn -B -ntp
-          org.owasp:dependency-check-maven:13.0.0:check
-          -DnvdApiKeyEnvironmentVariable=NVD_API_KEY
-          -DfailBuildOnCVSS=7
+        run: |
+          dependency_check_args=(
+            -B
+            -ntp
+            org.owasp:dependency-check-maven:13.0.0:check
+            -DfailBuildOnCVSS=7
+          )
+          if [[ -n "${NVD_API_KEY}" ]]; then
+            dependency_check_args+=("-DnvdApiKeyEnvironmentVariable=NVD_API_KEY")
+          fi
+          mvn "${dependency_check_args[@]}"
