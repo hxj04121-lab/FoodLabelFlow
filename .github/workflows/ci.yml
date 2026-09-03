@@ -110,5 +110,7 @@ jobs:
           )
           if [[ -n "${NVD_API_KEY}" ]]; then
             dependency_check_args+=("-DnvdApiKeyEnvironmentVariable=NVD_API_KEY")
+          else
+            unset NVD_API_KEY
           fi
           mvn "${dependency_check_args[@]}"
