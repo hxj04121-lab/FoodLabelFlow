@@ -8,6 +8,8 @@ This Stage 0 stop adds evidence needed to support later progress reporting:
 - Defined CI/security paths with unrun/not-configured states explicit.
 - Five S1 work-order ownership and acceptance records.
 - Jira delta because direct synchronization was unavailable.
+- GitHub push rejection is recorded as an OAuth `workflow`-scope gate; no PR or
+  CI URL is claimed before authorization succeeds.
 
 Still missing for a complete Stage 0 pass: an accepted merged commit, a real
 green CI run, independent developer approval, direct Jira or administrator

@@ -17,6 +17,7 @@
 | Backend local verification | PASS | `mvn -B -ntp -f backend/pom.xml verify`, Java 21, Testcontainers MySQL |
 | Frontend local build | PASS | `npm ci && npm run build` |
 | Compose build | PASS | `docker-compose config --quiet` and `docker-compose build` |
+| GitHub workflow upload | BLOCKED | GitHub CLI token needs the `workflow` scope |
 | OWASP Dependency-Check | DEFINED_NOT_RUN | no real CI run yet |
 | Trivy | DEFINED_NOT_RUN | no real CI run yet |
 | SonarQube | NOT_CONFIGURED | server/token/project binding not supplied |

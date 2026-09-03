@@ -13,6 +13,8 @@ Present artifacts:
 - merge queue metadata
 - global lease policy
 
-Current status is `BOOTSTRAP_BASELINE_IN_PROGRESS`. The accepted commit is not
-known until the initial commit is pushed and independently reviewed. Credentials
+Current status is `LOCAL_BASELINE_VERIFIED_GITHUB_AUTH_SCOPE_GATE`. The local
+bootstrap commit is
+`5ef1e3f6caac144bd287934c246db75308e7e88e`; the accepted commit is not known
+until the branch is pushed, independently reviewed, and merged. Credentials
 are intentionally absent from all control-plane files.
