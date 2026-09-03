@@ -17,13 +17,14 @@
 | Backend local verification | PASS | `mvn -B -ntp -f backend/pom.xml verify`, Java 21, Testcontainers MySQL |
 | Frontend local build | PASS | `npm ci && npm run build` |
 | Compose build | PASS | `docker-compose config --quiet` and `docker-compose build` |
-| GitHub workflow upload | PASS | Workflow uploaded and executed in PR run `33734960192` |
-| Remote frontend job | PASS | PR-bound GitHub Actions run `33734960192` |
-| Remote backend job | PASS | PR-bound GitHub Actions run `33734960192` |
-| Remote Compose/container job | PASS | PR-bound GitHub Actions run `33734960192` |
-| OWASP Dependency-Check | DEFINED_NOT_RUN | security job is conditional on `SECURITY_SCANS_ENABLED=true` |
-| Trivy | DEFINED_NOT_RUN | security job is conditional on `SECURITY_SCANS_ENABLED=true` |
+| GitHub workflow upload | PASS | Workflow is pushed at commit `c636bf18aa77905161b5e35e71b3ea93d6f90fb7` |
+| Remote frontend job | PASS | PR-bound GitHub Actions run `33737625412` |
+| Remote backend job | PASS | PR-bound GitHub Actions run `33737625412` |
+| Remote Compose/container job | PASS | PR-bound GitHub Actions run `33737625412` |
+| OWASP Dependency-Check | IN_PROGRESS | PR-bound security job `100591836623`; first NVD data update is still running |
+| Trivy | PASS | PR-bound security job `100591836623` completed the filesystem scan |
 | SonarQube | NOT_CONFIGURED | server/token/project binding not supplied |
 
-No security scan result is claimed until a real run is bound to an accepted
-commit. The green CI run is bound to PR #1; review and merge remain pending.
+The security variable `SECURITY_SCANS_ENABLED=true` is configured on the
+repository. The current security run is bound to the pushed PR head, not an
+accepted commit; independent review and merge remain pending.

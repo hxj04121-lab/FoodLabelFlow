@@ -14,6 +14,8 @@ Completed or recorded:
 
 Not claimed yet:
 
-- shared staging, Jira write synchronization, SonarQube execution;
+- shared staging and SonarQube execution;
+- assignment of M2–M5 to named Jira accounts (the authenticated picker exposed
+  only the current user and Unassigned);
 - independent human review/approval, merge, or browser acceptance;
 - Sprint 1 feature completion.

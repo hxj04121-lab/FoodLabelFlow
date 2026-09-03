@@ -1,6 +1,6 @@
 project: SpecTrace
 stage: STAGE0
-state: PR_CREATED_CI_PASS_REVIEW_GATE
+state: PR_CREATED_SECURITY_RUNNING_REVIEW_GATE
 branch: chore/stage0-bootstrap
 base_branch: main
 bootstrap_commit_sha: 5ef1e3f6caac144bd287934c246db75308e7e88e
@@ -12,11 +12,11 @@ react_baseline: GENERATED
 flyway_baseline: COPIED_EXACT_V1_V2_V3
 local_staging: PASS
 github_push: PASS
-github_remote_ci: PASS_RUN_33734960192
+github_remote_ci: IN_PROGRESS_RUN_33737625412_TRIVY_PASS_OWASP_RUNNING
 github_pr: OPEN_PR_1
 shared_staging: NOT_CONFIGURED
-jira_sync: DELTA_REQUIRED
+jira_sync: SYNCED_SCRUM_6_TO_11_M2_TO_M5_UNASSIGNED
 sonar: NOT_CONFIGURED
 human_gate: PR_REVIEW_AND_MERGE_REQUIRED
 feature_work: NOT_STARTED
-last_updated: 2026-09-03T16:46:50+08:00
+last_updated: 2026-09-03T17:32:23+08:00

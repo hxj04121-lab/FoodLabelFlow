@@ -5,13 +5,15 @@ This Stage 0 stop adds evidence needed to support later progress reporting:
 - DB0 runtime validation bound to MySQL 8.4.11 and the exact v3 package.
 - PM contract hash and control-plane metadata.
 - Environment capability matrix.
-- Defined CI/security paths with unrun/not-configured states explicit.
+- Enabled the repository security variable and bound the current PR security
+  run; Trivy passed and OWASP Dependency-Check was still running at this
+  checkpoint.
 - Five S1 work-order ownership and acceptance records.
-- Jira delta because direct synchronization was unavailable.
-- GitHub push rejection is recorded as an OAuth `workflow`-scope gate; no PR or
-  CI URL is claimed before authorization succeeds.
+- Authenticated Jira synchronization created SCRUM-6 through SCRUM-11; M2–M5
+  remain unassigned because only the current account was available.
+- GitHub Workflow OAuth authorization is recorded and the current branch head
+  is pushed to the open PR.
 
-Still missing for a complete Stage 0 pass: an accepted merged commit, a real
-green CI run, independent developer approval, direct Jira or administrator
-application of this delta, Sonar connection evidence, and human browser
-acceptance.
+Still missing for a complete Stage 0 pass: an accepted merged commit, final
+completion of the current OWASP scan, independent developer approval, Sonar
+connection evidence, shared staging evidence, and human browser acceptance.

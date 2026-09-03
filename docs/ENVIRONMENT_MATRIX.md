@@ -15,7 +15,7 @@ Generated: 2026-09-03 (Asia/Shanghai)
 | Docker | Docker CLI 29.3.1 with Colima context | AVAILABLE | local image/compose smoke |
 | Compose | `docker-compose` 5.1.1 | AVAILABLE | CLI plugin not installed; legacy command used locally |
 | PowerShell | 7.6.5 | AVAILABLE | executed package self-review |
-| Jira | site URL known, direct API/connector unavailable | DELTA_REQUIRED | see `JIRA_DELTA.md` |
+| Jira | authenticated UI at `https://hxj04121.atlassian.net`, project SCRUM/TEAM 16 | PARTIAL_SYNC | SCRUM-6 through SCRUM-11 created; M2–M5 Unassigned; see `JIRA_DELTA.md` |
 | Shared staging | URL/credentials not configured | NOT_CONFIGURED | no remote staging claim |
 | SonarQube | server/token not configured | NOT_CONFIGURED | path documented; no result claimed |
 | Independent developer review | not yet available | HUMAN_GATE | required before merge |

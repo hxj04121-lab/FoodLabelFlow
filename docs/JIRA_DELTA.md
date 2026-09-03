@@ -1,29 +1,28 @@
 # Jira bootstrap delta
 
-Target site: `https://huangxiangjia.atlassian.net`
-Target project: `SCRUM`
+Target site: `https://hxj04121.atlassian.net`
+Target project: `SCRUM` (displayed as TEAM 16)
 
-Direct Jira synchronization was not available in the current local tool
-context. This exact delta is ready for an authenticated project administrator
-to apply; no issue IDs are invented.
+The authenticated Jira UI was used to create the Stage 0 item and the five
+Sprint 1 work items. All six were created as `Feature` with the default `Idea`
+status. The descriptions carry the PM hash, branch, work-order scope,
+acceptance criteria, dependencies, and the current human-gate state.
 
-## Project bootstrap actions
+## Created items
 
-1. Confirm or create the SCRUM project under the agreed project owner.
-2. Create the Stage 0 bootstrap item for repository
-   `hxj04121-lab/FoodLabelFlow`, branch `chore/stage0-bootstrap`, and PM
-   contract SHA256
-   `2aafb403c3e437dd9f4d896c74504348f0aec50b7bdd0b171185605a0a1fdb41`.
-3. Create five S1 work items and assign them to M1 Huang Xiangjia, M2 Cai
-   Runchen, M3 Xu Feiyang, M4 Zhu Wenyu, and M5 Sun Huajian according to the
-   YAML files under `.project-control/work-orders/S1/`.
-4. Link the five S1 items to the accepted Stage 0 baseline commit after the
-   PR is independently reviewed and merged.
-5. Attach DB0, CI/security, local smoke, and human acceptance evidence URLs
-   only after those runs exist.
+| Scope | Jira item | Status | Assignee |
+|---|---|---|---|
+| Stage 0 bootstrap | [SCRUM-6](https://hxj04121.atlassian.net/browse/SCRUM-6) | Idea | 黄翔嘉 |
+| S1-M1 supplier/material/formula main slice | [SCRUM-7](https://hxj04121.atlassian.net/browse/SCRUM-7) | Idea | 黄翔嘉 |
+| S1-M2 supplier/material architecture contracts | [SCRUM-11](https://hxj04121.atlassian.net/browse/SCRUM-11) | Idea | Unassigned |
+| S1-M3 web shell/catalog/formula UI | [SCRUM-8](https://hxj04121.atlassian.net/browse/SCRUM-8) | Idea | Unassigned |
+| S1-M4 identity/RBAC/workflow | [SCRUM-9](https://hxj04121.atlassian.net/browse/SCRUM-9) | Idea | Unassigned |
+| S1-M5 integration test/API support | [SCRUM-10](https://hxj04121.atlassian.net/browse/SCRUM-10) | Idea | Unassigned |
 
-## Non-fabrication note
+The Jira account exposed only the current user (`hxj04121@gmail.com`) and
+Unassigned in the assignee picker. M2–M5 therefore remain unassigned rather
+than being assigned to unverified accounts; their intended owners remain in
+the item descriptions and source YAML work orders.
 
-Because no authenticated Jira write was performed, there are no claimed Jira
-issue keys, status transitions, estimates, worklogs, or assignee changes in
-this bundle.
+The items are not linked to an accepted baseline commit yet because PR #1 has
+no independent approval and has not been merged.

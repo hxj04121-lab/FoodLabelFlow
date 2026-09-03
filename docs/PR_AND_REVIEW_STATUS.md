@@ -10,13 +10,16 @@
   the `workflow` scope required to create/update `.github/workflows/ci.yml`.
 - GitHub CLI Workflow authorization was completed by the user.
 - Push: PASS. `chore/stage0-bootstrap` is present on `origin` at
-  `34ed97a8554218a32716ef81cf12f73eaba91d51`.
+  `c636bf18aa77905161b5e35e71b3ea93d6f90fb7`.
 - Pull Request: OPEN, [PR #1](https://github.com/hxj04121-lab/FoodLabelFlow/pull/1),
   base `main`, head `chore/stage0-bootstrap`.
-- PR-bound CI: PASS for run
-  `33734960192` ([GitHub Actions run](https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/33734960192)); frontend, backend, and containers jobs passed.
+- PR-bound CI: run `33737625412` is in progress
+  ([GitHub Actions run](https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/33737625412));
+  Trivy, frontend, backend, and containers steps have passed, while OWASP
+  Dependency-Check is still running. The earlier non-security jobs passed in
+  full.
 - Required independent developer approval: PENDING.
-- Required green CI bound to the PR: PASS.
+- Required green CI bound to the PR: PENDING until run `33737625412` completes.
 - Merge: NOT PERFORMED.
 
 The manager must not self-approve. If GitHub cannot create the PR because the

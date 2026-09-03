@@ -1,6 +1,6 @@
 {
   "evidence_version": "1.0",
-  "generated_at": "2026-09-03T16:46:50+08:00",
+  "generated_at": "2026-09-03T17:32:23+08:00",
   "items": [
     {
       "id": "EVID-DB0-V3-001",
@@ -25,10 +25,10 @@
     },
     {
       "id": "EVID-CI-BASELINE-001",
-      "kind": "ci_security_definition",
+      "kind": "ci_security_run",
       "path": ".github/workflows/ci.yml",
       "status": "PASS",
-      "binding": "GitHub Actions PR run 33734960192 / PR #1"
+      "binding": "GitHub Actions PR run 33737625412 / Trivy PASS / OWASP in progress / PR #1"
     },
     {
       "id": "EVID-LOCAL-SMOKE-001",
@@ -42,7 +42,7 @@
       "kind": "github_push_attempt",
       "path": ".stage0/evidence/GITHUB_PUSH_ATTEMPT.json",
       "status": "PASS_PUSHED",
-      "binding": "chore/stage0-bootstrap / commit 34ed97a8554218a32716ef81cf12f73eaba91d51"
+      "binding": "chore/stage0-bootstrap / commit c636bf18aa77905161b5e35e71b3ea93d6f90fb7"
     },
     {
       "id": "EVID-GITHUB-CI-001",
@@ -57,6 +57,13 @@
       "path": ".stage0/evidence/GITHUB_PR_ATTEMPT.json",
       "status": "OPEN_CI_PASS_REVIEW_PENDING",
       "binding": "PR #1 / base main / head chore/stage0-bootstrap"
+    },
+    {
+      "id": "EVID-JIRA-SYNC-001",
+      "kind": "jira_authenticated_ui_sync",
+      "path": ".stage0/evidence/JIRA_SYNC.json",
+      "status": "SCRUM_6_TO_11_CREATED_M2_TO_M5_UNASSIGNED",
+      "binding": "https://hxj04121.atlassian.net / SCRUM / TEAM 16"
     }
   ]
 }
