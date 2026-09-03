@@ -89,6 +89,9 @@ jobs:
             org.owasp:dependency-check-maven:12.1.0:check
             -DfailBuildOnCVSS=7
             -DdataDirectory="$HOME/.cache/dependency-check"
+            # OSS Index rejects unauthenticated API reports (HTTP 401).
+            # The NVD and CISA KEV analyzers remain enabled and enforce the gate.
+            -DossindexAnalyzerEnabled=false
           )
 
           if [[ -n "${NVD_API_KEY:-}" ]]; then
