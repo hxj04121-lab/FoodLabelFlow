@@ -1,6 +1,6 @@
 project: SpecTrace
 stage: STAGE0
-state: LOCAL_BASELINE_VERIFIED_GITHUB_AUTH_SCOPE_GATE
+state: REMOTE_BASELINE_PUSHED_CI_PASS_PR_BASE_GATE
 branch: chore/stage0-bootstrap
 base_branch: main
 bootstrap_commit_sha: 5ef1e3f6caac144bd287934c246db75308e7e88e
@@ -11,10 +11,12 @@ spring_boot_baseline: GENERATED
 react_baseline: GENERATED
 flyway_baseline: COPIED_EXACT_V1_V2_V3
 local_staging: PASS
-github_push: BLOCKED_OAUTH_WORKFLOW_SCOPE
+github_push: PASS
+github_remote_ci: PASS_RUN_33733331526
+github_pr: BLOCKED_NO_MAIN_BASE_BRANCH
 shared_staging: NOT_CONFIGURED
 jira_sync: DELTA_REQUIRED
 sonar: NOT_CONFIGURED
 human_gate: PR_REVIEW_AND_MERGE_REQUIRED
 feature_work: NOT_STARTED
-last_updated: 2026-09-03T16:04:41+08:00
+last_updated: 2026-09-03T16:29:09+08:00

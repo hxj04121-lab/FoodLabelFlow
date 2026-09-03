@@ -1,6 +1,6 @@
 {
   "evidence_version": "1.0",
-  "generated_at": "2026-09-03T15:44:55+08:00",
+  "generated_at": "2026-09-03T16:29:09+08:00",
   "items": [
     {
       "id": "EVID-DB0-V3-001",
@@ -27,8 +27,8 @@
       "id": "EVID-CI-BASELINE-001",
       "kind": "ci_security_definition",
       "path": ".github/workflows/ci.yml",
-      "status": "DEFINED_NOT_YET_RUN",
-      "binding": "bootstrap branch commit pending"
+      "status": "PASS",
+      "binding": "GitHub Actions run 33733331526 / pushed branch"
     },
     {
       "id": "EVID-LOCAL-SMOKE-001",
@@ -36,6 +36,27 @@
       "path": ".stage0/evidence/LOCAL_STAGING_SMOKE.json",
       "status": "PASS",
       "binding": "docker-compose / localhost / Codex In-app Browser"
+    },
+    {
+      "id": "EVID-GITHUB-PUSH-001",
+      "kind": "github_push_attempt",
+      "path": ".stage0/evidence/GITHUB_PUSH_ATTEMPT.json",
+      "status": "PASS_PUSHED_PR_BASE_GATE",
+      "binding": "chore/stage0-bootstrap / commit 26d84a0d92b29bad5a38274edc4206ab4ba409a6"
+    },
+    {
+      "id": "EVID-GITHUB-CI-001",
+      "kind": "github_actions_ci",
+      "path": "https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/33733331526",
+      "status": "PASS",
+      "binding": "frontend/backend/containers jobs"
+    },
+    {
+      "id": "EVID-GITHUB-PR-001",
+      "kind": "pull_request_creation",
+      "path": ".stage0/evidence/GITHUB_PR_ATTEMPT.json",
+      "status": "BLOCKED_NO_MAIN_BASE_BRANCH",
+      "binding": "empty remote has no main base branch"
     }
   ]
 }

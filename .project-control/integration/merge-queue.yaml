@@ -2,7 +2,9 @@ merge_queue:
   policy: one-bootstrap-pr-at-a-time
   base_branch: main
   current_branch: chore/stage0-bootstrap
-  status: PENDING_INITIAL_COMMIT
+  status: BLOCKED_NO_MAIN_BASE_BRANCH
+  remote_ci_run: 33733331526
+  remote_ci_status: PASS
   required_checks:
     - backend-maven-verify
     - frontend-npm-build
