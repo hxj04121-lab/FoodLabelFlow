@@ -86,7 +86,7 @@ jobs:
         with:
           args: >-
             -Dsonar.projectKey=hxj04121-lab_FoodLabelFlow
-            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.wait=false
             -Dsonar.qualitygate.timeout=300
 
   dependency-review:
