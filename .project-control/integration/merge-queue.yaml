@@ -1,0 +1,12 @@
+merge_queue:
+  policy: one-bootstrap-pr-at-a-time
+  base_branch: main
+  current_branch: chore/stage0-bootstrap
+  status: PENDING_INITIAL_COMMIT
+  required_checks:
+    - backend-maven-verify
+    - frontend-npm-build
+    - container-compose-build
+  required_review: one-approve-from-other-developer
+  self_approval_allowed: false
+  accepted_commit: null

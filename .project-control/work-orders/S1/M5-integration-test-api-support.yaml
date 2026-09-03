@@ -1,0 +1,26 @@
+work_order_id: S1-M5
+story_id: ST-S1-M5
+owner: M5 Sun Huajian
+status: READY_AFTER_STAGE0_ACCEPTANCE
+scope:
+  - integration-test scaffold
+  - API/integration support
+  - CI evidence binding
+acceptance_criteria:
+  - provide reusable MySQL/Testcontainers fixtures for S1 APIs
+  - bind test, CI, and evidence identifiers to the accepted baseline commit
+  - verify the end-to-end traceability path across backend and frontend
+required_tests:
+  - Testcontainers MySQL integration suite
+  - API integration tests
+  - CI run linked to commit and PR
+architecture_impact: test infrastructure and integration contracts; no hidden fallback database
+db_impact: use canonical Flyway V1-V3 and approved additive migrations
+shared_file_domain: backend test fixtures, CI evidence, integration docs
+base_contract:
+  pm_contract_sha256: 2aafb403c3e437dd9f4d896c74504348f0aec50b7bdd0b171185605a0a1fdb41
+  baseline_branch: chore/stage0-bootstrap
+  accepted_baseline_commit: null
+dependencies: [S1-M1, S1-M2, S1-M4]
+evidence_required: test report, CI URL/run id, integration smoke output
+human_acceptance: required

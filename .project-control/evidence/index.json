@@ -1,0 +1,41 @@
+{
+  "evidence_version": "1.0",
+  "generated_at": "2026-09-03T15:44:55+08:00",
+  "items": [
+    {
+      "id": "EVID-DB0-V3-001",
+      "kind": "db0_runtime_validation",
+      "path": ".stage0/evidence/DB0_RUNTIME_VALIDATION.json",
+      "status": "PASS",
+      "binding": "SpecTrace_PORTABLE_DATABASE_PACKAGE_v3 / MySQL 8.4.11"
+    },
+    {
+      "id": "EVID-DB0-GATE-001",
+      "kind": "database_requirement_gate",
+      "path": ".stage0/evidence/V3_REQUIREMENT_GATE.json",
+      "status": "PASS",
+      "binding": "SpecTrace_PORTABLE_DATABASE_PACKAGE_v3"
+    },
+    {
+      "id": "EVID-PM-CONTRACT-001",
+      "kind": "pm_contract_hash",
+      "path": ".project-control/pm-contract.sha256",
+      "status": "RECORDED",
+      "binding": "2aafb403c3e437dd9f4d896c74504348f0aec50b7bdd0b171185605a0a1fdb41"
+    },
+    {
+      "id": "EVID-CI-BASELINE-001",
+      "kind": "ci_security_definition",
+      "path": ".github/workflows/ci.yml",
+      "status": "DEFINED_NOT_YET_RUN",
+      "binding": "bootstrap branch commit pending"
+    },
+    {
+      "id": "EVID-LOCAL-SMOKE-001",
+      "kind": "local_staging_smoke",
+      "path": ".stage0/evidence/LOCAL_STAGING_SMOKE.json",
+      "status": "PASS",
+      "binding": "docker-compose / localhost / Codex In-app Browser"
+    }
+  ]
+}

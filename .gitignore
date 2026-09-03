@@ -1,0 +1,9 @@
+bootstrap_inputs/
+.stage0/
+.env
+.env.*
+!.env.example
+target/
+node_modules/
+dist/
+*.log
