@@ -102,6 +102,12 @@ jobs:
               exit 0
             fi
 
+            # A generated report means Dependency-Check completed its analysis
+            # and found a policy failure. Retrying cannot remediate a CVE.
+            if [[ -f target/dependency-check-report.html ]]; then
+              exit 1
+            fi
+
             if [[ "$attempt" -eq 2 ]]; then
               exit 1
             fi
@@ -110,7 +116,7 @@ jobs:
             sleep 90
           done
       - name: Save Dependency-Check data cache
-        if: ${{ success() }}
+        if: ${{ always() && hashFiles('backend/target/dependency-check-report.html') != '' }}
         uses: actions/cache/save@v4
         with:
           path: ~/.cache/dependency-check
