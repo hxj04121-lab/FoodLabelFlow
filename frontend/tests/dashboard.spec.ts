@@ -1,0 +1,80 @@
+import { test, expect } from '@playwright/test'
+
+test('overview, chart switching and CSV export', async ({ page }) => {
+  const errors: string[] = []
+  page.on('pageerror', e => errors.push(e.message))
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: '工作概览', exact: true })).toBeVisible()
+  await expect(page.getByText('非实时业务数据', { exact: false })).toBeVisible()
+  await page.getByRole('button', { name: '按分组', exact: true }).click()
+  await expect(page.getByRole('img', { name: /已声明大豆: 20/ })).toBeVisible()
+  await page.getByRole('button', { name: '按物料', exact: true }).click()
+  await expect(page.getByRole('img', { name: /Chocolate: 40/ })).toBeVisible()
+  const downloading = page.waitForEvent('download')
+  await page.getByRole('button', { name: '导出基线', exact: true }).click()
+  expect((await downloading).suggestedFilename()).toBe('spectrace-seed-preview.csv')
+  expect(errors).toEqual([])
+  await page.screenshot({ path: 'test-results/overview.png', fullPage: true })
+})
+
+test('product search, group filter, pagination and traceability tabs', async ({ page }) => {
+  await page.goto('/products')
+  await page.getByRole('button', { name: '下一页' }).click()
+  await expect(page.getByText('第 2 / 8 页', { exact: false })).toBeVisible()
+  await page.getByRole('combobox', { name: '筛选基线分组' }).selectOption('REVIEW_REQUIRED_BASELINE_NO_SOY')
+  await expect(page.getByText('20 个产品', { exact: true })).toBeVisible()
+  await page.getByRole('combobox').selectOption('all')
+  await page.getByRole('textbox', { name: '搜索产品' }).fill('1106285')
+  await expect(page.locator('tbody tr')).toHaveCount(1)
+  await page.getByRole('button', { name: '查看 PLAIN BREAD CRUMBS, PLAIN', exact: true }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expect(page.getByText('spec_chocolate_v1', { exact: true })).toBeVisible()
+  await page.getByRole('tab', { name: '版本历史' }).click()
+  await expect(page.getByText('实时版本历史尚未接入', { exact: false })).toBeVisible()
+  await page.getByRole('tab', { name: '数据来源' }).click()
+  await expect(page.getByText('不代表该品牌的真实供应链', { exact: false })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await page.getByRole('textbox', { name: '搜索产品' }).fill('no-such-product-xyz')
+  await expect(page.getByRole('heading', { name: '没有匹配的产品' })).toBeVisible()
+})
+
+test('all routes, material details and honest unavailable states', async ({ page }) => {
+  for (const [route, heading] of [['/suppliers','供应商'],['/materials','物料与规格'],['/formulas','配方版本'],['/labels','标签管理'],['/impact','变更影响'],['/reviews','审核工作台']]) {
+    await page.goto(route)
+    await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible()
+  }
+  await page.goto('/materials')
+  await page.getByRole('textbox', { name: '搜索物料' }).fill('CHOC_BASE')
+  await expect(page.locator('tbody tr')).toHaveCount(1)
+  await page.getByRole('button', { name: '查看 Chocolate Base', exact:true }).click()
+  await expect(page.getByText('Cocoa', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: '关闭弹窗' }).click()
+  await page.goto('/formulas')
+  await expect(page.getByText('创建与发布暂未开放')).toBeVisible()
+  await page.screenshot({ path:'test-results/formulas.png', fullPage:true })
+})
+
+test('mobile navigation and no page-wide overflow', async ({ page }) => {
+  await page.setViewportSize({ width:390, height:844 })
+  await page.goto('/')
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy()
+  await page.getByRole('button', { name:'展开导航' }).click()
+  await page.getByRole('link', { name:'产品目录', exact:true }).click()
+  await expect(page.getByRole('heading', { name:'产品目录', exact:true })).toBeVisible()
+  await expect(page.getByRole('button', { name:'关闭导航遮罩' })).toHaveCount(0)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy()
+  await page.goto('/')
+  await page.screenshot({ path:'test-results/mobile.png', fullPage:true })
+})
+
+test('health success, error and retry states', async ({ page }) => {
+  // Explicit HTTP test fixtures, not live-backend acceptance evidence.
+  await page.route('**/api/health', route => route.fulfill({ json:{ status:'ok', database:'ok' } }))
+  await page.goto('/health')
+  await expect(page.getByText('运行正常')).toHaveCount(2)
+  await page.unroute('**/api/health')
+  await page.route('**/api/health', route => route.fulfill({ status:503, body:'Unavailable' }))
+  await page.getByRole('button', { name:'重新检查' }).click()
+  await expect(page.getByRole('alert')).toContainText('503')
+})

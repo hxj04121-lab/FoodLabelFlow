@@ -1,5 +1,7 @@
 # FoodLabelFlow / SpecTrace
 
+Frontend (local implementation, 2026-09-07): React + TypeScript + Tailwind CSS + shadcn/ui. The redesigned dashboard provides read-only seed-data browsing; business write APIs are not connected. See [the frontend decision](docs/FRONTEND_STACK_DECISION.md) and [UI validation](docs/evidence/M3-dashboard-design.md).
+
 This repository contains the Java 21 Spring Boot modular-monolith baseline and
 React/TypeScript web shell for SpecTrace. The canonical database baseline is
 the supplied `SpecTrace_PORTABLE_DATABASE_PACKAGE_v3` and is installed through

@@ -7,3 +7,5 @@ target/
 node_modules/
 dist/
 *.log
+frontend/test-results/
+frontend/playwright-report/
