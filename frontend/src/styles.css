@@ -1,4 +1,25 @@
 @import "tailwindcss";
+.formula-entry { display:flex; justify-content:flex-end; margin:0 0 18px; }
+.formula-creator { max-width:min(820px,calc(100vw - 32px))!important; max-height:90dvh; overflow:auto; }
+.formula-title { display:flex; gap:10px; align-items:center; }
+.formula-section { margin:16px 0; }
+.formula-section h3 { margin-bottom:15px; }
+.formula-section label { display:block; font-size:14px; margin-bottom:7px; color:#61546f; }
+.formula-section select { width:100%; min-width:0; border:1px solid #ded8e8; border-radius:8px; padding:9px 12px; background:white; font-size:14px; }
+.formula-section select:disabled { background:#f4f2f8; color:#8e8598; }
+.formula-section [aria-invalid=true] { border-color:#c73e4b; }
+.formula-section-heading,.formula-item-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.formula-section-heading span { font-size:12px; color:#80748c; }
+.formula-item { min-width:0; padding:15px; background:#faf9fd; border:1px solid #e7e1f0; border-radius:12px; margin-bottom:16px; }
+.formula-item legend { font-size:12px; color:#837190; padding:0 5px; }
+.formula-item-heading { margin-bottom:10px; color:#77608c; }
+.formula-fields { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:18px; }
+.formula-actions { display:flex; justify-content:flex-end; gap:12px; border-top:1px solid #eee8f4; padding-top:18px; margin-top:18px; }
+.field-error { color:#b12d42; font-size:13px; margin-top:6px; }
+.error-jump { text-align:left; text-decoration:underline; text-underline-offset:3px; padding:4px 0; font-size:13px; }
+.discard-box p { margin-top:10px; color:#796a89; }
+.discard-symbol { display:grid; place-items:center; width:48px; height:48px; border-radius:14px; background:#f0eafa; color:#805bc6; margin-bottom:18px; }
+@media(max-width:560px) { .formula-fields { grid-template-columns:minmax(0,1fr); }.formula-section-heading { flex-wrap:wrap; }.formula-creator { padding:18px; } }
 
 @theme inline {
   --color-background: var(--background);
