@@ -7,14 +7,14 @@ scope:
   - catalog/formula UI
   - browser acceptance
 acceptance_criteria:
-  - expose navigation from the existing React/Ant Design shell to the S1 slice
+  - expose navigation from the React/TypeScript shell using Tailwind CSS and shadcn/ui to the S1 slice
   - display supplier/material/product/formula traceability states without inventing data
   - complete browser smoke for create/release/history path
 required_tests:
   - TypeScript build
   - browser smoke against local staging
   - accessibility and validation checks
-architecture_impact: frontend presentation only; consume versioned APIs
+architecture_impact: frontend presentation only; React + TypeScript + Tailwind CSS + shadcn/ui; retain Vite and React Router; consume versioned APIs
 db_impact: none directly
 shared_file_domain: frontend/src and browser evidence
 base_contract:
@@ -24,3 +24,13 @@ base_contract:
 dependencies: [S1-M1, S1-M2]
 evidence_required: browser URL/screenshot, build log, API mapping
 human_acceptance: required
+frontend_stack_change:
+  date: '2026-09-07'
+  requested_by: M3 Xu Feiyang
+  status: MEMBER_BRANCH_REVISION_PENDING_TEAM_INTEGRATION
+  replaces: Ant Design
+  target: React + TypeScript + Tailwind CSS + shadcn/ui
+  branch: XFY
+  business_scope_changed: false
+  baseline_pm_hash_policy: retained as original contract identity; does not certify this frontend revision
+  implementation_status: local UI migration and read-only seed preview complete; live create/release/history acceptance pending

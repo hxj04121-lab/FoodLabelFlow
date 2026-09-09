@@ -1,5 +1,7 @@
 # SWE5006 course compliance delta
 
+Historical Stage 0 record. For the frontend target selected on 2026-09-07 (React + TypeScript + Tailwind CSS + shadcn/ui), see [Frontend stack decision](FRONTEND_STACK_DECISION.md). The original stack named below describes the baseline at that time, not completed migration evidence.
+
 The supplied PM package is treated as the controlling course specification.
 This stop preserves the required Java 21, Spring Boot, React/TypeScript,
 Ant Design, MySQL, Flyway, Testcontainers, ArchUnit, CI/security, Jira, and
