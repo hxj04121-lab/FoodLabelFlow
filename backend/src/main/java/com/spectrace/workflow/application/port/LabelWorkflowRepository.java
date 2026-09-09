@@ -1,6 +1,10 @@
 package com.spectrace.workflow.application.port;
 
+import java.util.Optional;
+
 public interface LabelWorkflowRepository {
+
+    Optional<String> findCreatorUserId(String labelVersionId);
 
     void submitForReview(
             String labelVersionId,

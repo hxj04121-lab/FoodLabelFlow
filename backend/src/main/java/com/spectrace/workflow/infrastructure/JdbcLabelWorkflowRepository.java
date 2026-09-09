@@ -4,6 +4,8 @@ import com.spectrace.workflow.application.port.LabelWorkflowRepository;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public class JdbcLabelWorkflowRepository implements LabelWorkflowRepository {
 
@@ -11,6 +13,21 @@ public class JdbcLabelWorkflowRepository implements LabelWorkflowRepository {
 
     public JdbcLabelWorkflowRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+    }
+
+    @Override
+    public Optional<String> findCreatorUserId(String labelVersionId) {
+        return jdbcTemplate.query(
+                """
+                SELECT created_by_user_id
+                FROM label_version
+                WHERE label_version_id = ?
+                """,
+                rs -> rs.next()
+                        ? Optional.ofNullable(rs.getString("created_by_user_id"))
+                        : Optional.empty(),
+                labelVersionId
+        );
     }
 
     @Override
