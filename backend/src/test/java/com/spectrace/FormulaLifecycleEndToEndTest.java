@@ -16,7 +16,10 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "spectrace.dev-external-auth.enabled=true"
+)
 class FormulaLifecycleEndToEndTest extends MySqlIntegrationTestSupport {
 
     private static final String PRODUCT_ID = "prod_usda_1106285";
