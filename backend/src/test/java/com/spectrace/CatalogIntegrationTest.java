@@ -180,14 +180,25 @@ class CatalogIntegrationTest {
             assertThat(response.body()).contains("spec_chocolate_v1", "Demo Chocolate Supplier", "specificationEvidence");
             var invalid = HttpRequest.newBuilder(URI.create(base + "/suppliers")).header("Content-Type","application/json")
                     .POST(HttpRequest.BodyPublishers.ofString("{\"code\":\"\",\"name\":\"test\",\"provenanceId\":\"prov_project_seed\"}")).build();
-            assertThat(client.send(invalid,HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(400);
+            var invalidResponse = client.send(invalid, HttpResponse.BodyHandlers.ofString());
+            assertThat(invalidResponse.statusCode()).isEqualTo(400);
+            assertThat(invalidResponse.body()).contains(
+                    "\"code\":\"INVALID_REQUEST\"", "\"message\":", "\"traceId\":null", "\"evidenceId\":null");
             var create = HttpRequest.newBuilder(URI.create(base + "/suppliers")).header("Content-Type","application/json")
                     .POST(HttpRequest.BodyPublishers.ofString("{\"code\":\"HTTP-" + UUID.randomUUID() + "\",\"name\":\"HTTP supplier\",\"provenanceId\":\"prov_project_seed\"}")).build();
             adapter.deny = true;
-            try { assertThat(client.send(create,HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(403); }
+            try {
+                var forbidden = client.send(create, HttpResponse.BodyHandlers.ofString());
+                assertThat(forbidden.statusCode()).isEqualTo(403);
+                assertThat(forbidden.body()).contains(
+                        "\"code\":\"AUTHORIZATION_DENIED\"", "\"traceId\":null", "\"evidenceId\":null");
+            }
             finally { adapter.deny = false; }
             assertThat(client.send(create,HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(201);
-            assertThat(client.send(create,HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(409);
+            var duplicate = client.send(create, HttpResponse.BodyHandlers.ofString());
+            assertThat(duplicate.statusCode()).isEqualTo(409);
+            assertThat(duplicate.body()).contains(
+                    "\"code\":\"DATA_CONFLICT\"", "\"traceId\":null", "\"evidenceId\":null");
         }
     }
 }
