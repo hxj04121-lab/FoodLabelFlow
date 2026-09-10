@@ -10,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -53,7 +54,7 @@ class CatalogIntegrationTest {
 
     /** Test-only identity/audit adapter. Never loaded in the deployable application. */
     @TestConfiguration static class Adapters {
-        @Bean TestAdapter catalogAdapter(JdbcTemplate jdbc) { return new TestAdapter(jdbc); }
+        @Bean @Primary TestAdapter catalogAdapter(JdbcTemplate jdbc) { return new TestAdapter(jdbc); }
     }
     static class TestAdapter implements CatalogIntegration {
         private final JdbcTemplate jdbc;

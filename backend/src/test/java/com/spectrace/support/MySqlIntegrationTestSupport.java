@@ -2,6 +2,7 @@ package com.spectrace.support;
 
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.annotation.DirtiesContext;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -13,6 +14,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * canonical Flyway migrations before a test uses the database.</p>
  */
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public abstract class MySqlIntegrationTestSupport {
 
     @Container

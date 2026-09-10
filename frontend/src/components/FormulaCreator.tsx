@@ -1,4 +1,11 @@
 import data from '@/data/seed-preview.json'
+import {
+  createFormula,
+  getCatalogProduct,
+  getFormulaHistory,
+  releaseFormula,
+  type FormulaVersion,
+} from '@/api/client'
 import { ArrowLeft, FlaskConical, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useBlocker } from 'react-router-dom'
@@ -37,10 +44,16 @@ export function FormulaCreator() {
   const [discard, setDiscard] = useState(false)
   const [attempted, setAttempted] = useState(false)
   const [feedback, setFeedback] = useState('')
+  const [created, setCreated] = useState<FormulaVersion | null>(null)
+  const [expectedCurrentFormulaId, setExpectedCurrentFormulaId] = useState<string | null>(null)
+  const [history, setHistory] = useState<FormulaVersion[]>([])
+  const [submitting, setSubmitting] = useState(false)
+  const [released, setReleased] = useState(false)
   const dirty =
-    !!product ||
-    items.length !== 1 ||
-    items.some((i) => i.material || i.specification || i.quantity || i.unit)
+    !released &&
+    (!!product ||
+      items.length !== 1 ||
+      items.some((i) => i.material || i.specification || i.quantity || i.unit))
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       open && !!dirty && currentLocation.pathname !== nextLocation.pathname,
@@ -71,6 +84,11 @@ export function FormulaCreator() {
     setDiscard(false)
     setAttempted(false)
     setFeedback('')
+    setCreated(null)
+    setExpectedCurrentFormulaId(null)
+    setHistory([])
+    setSubmitting(false)
+    setReleased(false)
   }
   function close() {
     if (dirty) setDiscard(true)
@@ -133,6 +151,50 @@ export function FormulaCreator() {
     setPreview(true)
     setFeedback('本地校验通过，配方预览已生成；尚未保存到服务器。')
   }
+  async function saveDraft() {
+    setSubmitting(true)
+    setFeedback('正在将配方保存到服务器……')
+    try {
+      const currentProduct = await getCatalogProduct(product)
+      const formula = await createFormula({
+        productId: product,
+        provenanceId: 'prov_project_seed',
+        items: items.map((item) => ({
+          materialId: item.material,
+          specificationId: item.specification,
+          quantity: item.quantity.trim() ? Number(item.quantity) : null,
+          unit: item.unit.trim() || null,
+        })),
+      })
+      setExpectedCurrentFormulaId(currentProduct.current_formula_version_id)
+      setCreated(formula)
+      setFeedback(`草稿 V${formula.version_number} 已保存到服务器。`)
+    } catch (error) {
+      setFeedback(`保存失败：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+  async function publish() {
+    if (!created) return
+    setSubmitting(true)
+    setFeedback('正在发布配方并读取历史……')
+    try {
+      const formula = await releaseFormula(
+        created.formula_version_id,
+        expectedCurrentFormulaId,
+      )
+      const versions = await getFormulaHistory(product)
+      setCreated(formula)
+      setHistory(versions)
+      setReleased(true)
+      setFeedback(`配方 V${formula.version_number} 已发布，历史版本已从数据库加载。`)
+    } catch (error) {
+      setFeedback(`发布失败：${error instanceof Error ? error.message : '未知错误'}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
   const selectedProduct = data.product.find((p) => p.product_id === product)
   const error = (key: string) =>
     errors[key] ? (
@@ -148,7 +210,7 @@ export function FormulaCreator() {
     <>
       <Button onClick={() => setOpen(true)}>
         <Plus size={16} />
-        创建配方预览
+        创建配方
       </Button>
       <Dialog open={open} onOpenChange={(value) => !value && close()}>
         <DialogContent className="formula-creator">
@@ -160,12 +222,12 @@ export function FormulaCreator() {
               </span>
             </DialogTitle>
             <DialogDescription>
-              本地交互预览 · 选项来自数据库基线，未提交服务器
+              配方创建 · 服务端校验 · 版本发布与历史
             </DialogDescription>
           </DialogHeader>
           <>
             <div className="source-notice">
-              本页面不会保存或发布配方。版本号、创建人和发布状态由未来后端接口确定。
+              配方会写入 MySQL；版本号、创建人和发布状态由后端分配。
             </div>
             <p role="status" aria-live="polite" className="muted">
               {feedback}
@@ -410,7 +472,8 @@ export function FormulaCreator() {
               <section className="formula-section">
                 <h3>{selectedProduct?.product_description}</h3>
                 <p className="muted">
-                  {selectedProduct?.product_id} · 新版本号待服务器分配
+                  {selectedProduct?.product_id} ·{' '}
+                  {created ? `服务器版本 V${created.version_number}` : '新版本号待服务器分配'}
                 </p>
                 <div className="trace-list">
                   {items.map((i, index) => (
@@ -434,15 +497,39 @@ export function FormulaCreator() {
                   ))}
                 </div>
                 <p className="muted">
-                  输入已通过本地基础检查，尚未保存、发布或通过服务端业务校验。
+                  {released
+                    ? '已通过服务端校验、写入数据库并发布为当前版本。'
+                    : created
+                      ? '草稿已写入数据库，可继续发布。'
+                      : '输入已通过本地基础检查，点击保存后由服务端再次校验。'}
                 </p>
+                {history.length > 0 && (
+                  <section aria-label="配方历史" className="formula-history">
+                    <h3>配方历史</h3>
+                    {history.map((version) => (
+                      <div className="history-entry" key={version.formula_version_id}>
+                        <span className="history-dot" />
+                        <div>
+                          <strong>V{version.version_number} · {version.lifecycle_status}</strong>
+                          <p>{version.formula_version_id}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </section>
+                )}
                 <div className="formula-actions">
-                  <Button variant="outline" onClick={() => setPreview(false)}>
+                  {!created && <Button variant="outline" onClick={() => setPreview(false)}>
                     <ArrowLeft size={16} />
                     返回编辑
-                  </Button>
+                  </Button>}
+                  {!created && <Button disabled={submitting} onClick={saveDraft}>
+                    {submitting ? '保存中……' : '保存草稿'}
+                  </Button>}
+                  {created && !released && <Button disabled={submitting} onClick={publish}>
+                    {submitting ? '发布中……' : '发布配方'}
+                  </Button>}
                   <Button variant="outline" onClick={close}>
-                    关闭预览
+                    {released ? '完成' : '关闭预览'}
                   </Button>
                 </div>
               </section>
