@@ -9,7 +9,7 @@ test('multiple items remain validated independently, optional values can stay em
       writes.push(request.url())
   })
   await page.goto('/formulas')
-  await page.getByRole('button', { name: '创建配方预览' }).click()
+  await page.getByRole('button', { name: '创建配方', exact: true }).click()
   await page
     .getByLabel('产品 *', { exact: true })
     .selectOption('prod_usda_1106285')
@@ -30,7 +30,7 @@ test('confirmation keeps keyboard focus inside and restores editable form', asyn
   page,
 }) => {
   await page.goto('/formulas')
-  await page.getByRole('button', { name: '创建配方预览' }).click()
+  await page.getByRole('button', { name: '创建配方', exact: true }).click()
   await page.getByLabel('数量（选填）').fill('10')
   await page.keyboard.press('Escape')
   const confirmation = page.getByRole('alertdialog')

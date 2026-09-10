@@ -3,7 +3,7 @@ test('formula validation, dependent options, preview and discard', async ({
   page,
 }) => {
   await page.goto('/formulas')
-  await page.getByRole('button', { name: '创建配方预览' }).click()
+  await page.getByRole('button', { name: '创建配方', exact: true }).click()
   await page.getByRole('button', { name: '预览配方', exact: true }).click()
   await expect(page.getByRole('alert')).toBeVisible()
   await page
@@ -49,7 +49,7 @@ test('errors persist independently and storage limits are enforced', async ({
   page,
 }) => {
   await page.goto('/formulas')
-  await page.getByRole('button', { name: '创建配方预览' }).click()
+  await page.getByRole('button', { name: '创建配方', exact: true }).click()
   await page.getByRole('button', { name: '预览配方', exact: true }).click()
   await page
     .getByLabel('产品 *', { exact: true })
