@@ -19,10 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {
-                "spectrace.dev-external-auth.enabled=true",
-                "spectrace.catalog-identity-integration.enabled=true"
-        }
+        properties = "spectrace.dev-external-auth.enabled=true"
 )
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class CatalogIdentityIntegrationTest extends MySqlIntegrationTestSupport {
@@ -70,7 +67,11 @@ class CatalogIdentityIntegrationTest extends MySqlIntegrationTestSupport {
         }
 
         String supplierId = jdbcTemplate.queryForObject(
-                "SELECT supplier_id FROM supplier WHERE supplier_code = ?",
+                """
+                SELECT supplier_id
+                FROM supplier
+                WHERE supplier_code = ?
+                """,
                 String.class,
                 code
         );
@@ -132,7 +133,11 @@ class CatalogIdentityIntegrationTest extends MySqlIntegrationTestSupport {
         }
 
         Integer supplierCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM supplier WHERE supplier_code = ?",
+                """
+                SELECT COUNT(*)
+                FROM supplier
+                WHERE supplier_code = ?
+                """,
                 Integer.class,
                 code
         );
@@ -172,12 +177,16 @@ class CatalogIdentityIntegrationTest extends MySqlIntegrationTestSupport {
 
             assertApiErrorContract(
                     response.body(),
-                    "AUTHORIZATION_DENIED"
+                    "AUTHENTICATION_REQUIRED"
             );
         }
 
         Integer supplierCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM supplier WHERE supplier_code = ?",
+                """
+                SELECT COUNT(*)
+                FROM supplier
+                WHERE supplier_code = ?
+                """,
                 Integer.class,
                 code
         );
@@ -222,12 +231,16 @@ class CatalogIdentityIntegrationTest extends MySqlIntegrationTestSupport {
 
             assertApiErrorContract(
                     response.body(),
-                    "AUTHORIZATION_DENIED"
+                    "AUTHENTICATION_REQUIRED"
             );
         }
 
         Integer supplierCount = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM supplier WHERE supplier_code = ?",
+                """
+                SELECT COUNT(*)
+                FROM supplier
+                WHERE supplier_code = ?
+                """,
                 Integer.class,
                 code
         );

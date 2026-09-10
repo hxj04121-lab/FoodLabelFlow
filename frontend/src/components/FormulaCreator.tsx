@@ -1,4 +1,4 @@
-import data from '@/data/seed-preview.json'
+import { data } from '@/data/catalog'
 import { ArrowLeft, FlaskConical, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useBlocker } from 'react-router-dom'
@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from './ui/dialog'
 import { Input } from './ui/input'
+import { FormulaPersistence } from './FormulaPersistence'
 
 type Item = {
   id: number
@@ -20,6 +21,7 @@ type Item = {
   quantity: string
   unit: string
 }
+const eligible = (s: typeof data.ingredient_specification_version[number]) => s.lifecycle_status === "RELEASED" && s.effective_date.slice(0,10) <= new Date().toLocaleDateString("en-CA")
 const blank = (id: number): Item => ({
   id,
   material: '',
@@ -37,32 +39,36 @@ export function FormulaCreator() {
   const [discard, setDiscard] = useState(false)
   const [attempted, setAttempted] = useState(false)
   const [feedback, setFeedback] = useState('')
+  const [saved,setSaved]=useState(false)
+  const [busy,setBusy]=useState(false)
   const dirty =
-    !!product ||
+    !saved && (!!product ||
     items.length !== 1 ||
-    items.some((i) => i.material || i.specification || i.quantity || i.unit)
+    items.some((i) => i.material || i.specification || i.quantity || i.unit))
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
-      open && !!dirty && currentLocation.pathname !== nextLocation.pathname,
+      open && (!!dirty || busy) && currentLocation.pathname !== nextLocation.pathname,
   )
   function continueEditing() {
     setDiscard(false)
     if (blocker.state === 'blocked') blocker.reset()
   }
   function discardChanges() {
+    if(busy)return
     reset()
     if (blocker.state === 'blocked') blocker.proceed()
   }
   useEffect(() => {
-    if (!open || !dirty) return
+    if (!open || (!dirty && !busy)) return
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault()
       e.returnValue = ''
     }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
-  }, [open, dirty])
+  }, [open, dirty, busy])
   function reset() {
+    if(saved) window.dispatchEvent(new Event('catalog-updated'))
     setOpen(false)
     setProduct('')
     setItems([blank(1)])
@@ -71,8 +77,10 @@ export function FormulaCreator() {
     setDiscard(false)
     setAttempted(false)
     setFeedback('')
+    setSaved(false);setBusy(false)
   }
   function close() {
+    if(busy)return
     if (dirty) setDiscard(true)
     else reset()
   }
@@ -80,39 +88,41 @@ export function FormulaCreator() {
     setItems((old) => old.map((i) => (i.id === id ? { ...i, ...patch } : i)))
     setPreview(false)
     setFeedback(
-      'material' in patch ? '物料已变更，请重新选择对应规格版本。' : '',
+      'material' in patch ? 'Material changed. Select a matching specification version.' : '',
     )
   }
   function collectErrors() {
     const next: Record<string, string> = {}
     if (!data.product.some((p) => p.product_id === product))
-      next.product = '请选择所属产品。'
+      next.product = 'Select a product.'
     items.forEach((i) => {
-      if (!i.material) next[`material-${i.id}`] = '请选择供应商物料。'
+      if (!i.material) next[`material-${i.id}`] = 'Select a supplier material.'
       if (
         !data.ingredient_specification_version.some(
           (s) =>
             s.specification_version_id === i.specification &&
-            s.supplier_material_id === i.material,
+            s.supplier_material_id === i.material && eligible(s),
         )
       )
-        next[`specification-${i.id}`] = '请选择该物料对应的规格版本。'
+        next[`specification-${i.id}`] = 'Select a released, effective specification for this material.'
       if (
         i.quantity.trim() &&
         (!/^\d+(\.\d+)?$/.test(i.quantity.trim()) ||
-          !Number.isFinite(Number(i.quantity)))
+            !Number.isFinite(Number(i.quantity)) || Number(i.quantity) <= 0)
       )
         next[`quantity-${i.id}`] =
-          '请输入非负数，例如 12.5；不接受负数或非数字。'
+            'Enter a positive number, such as 12.5. Zero, negatives and non-numeric values are not allowed.'
       else if (
         i.quantity.trim() &&
         (i.quantity.trim().split('.')[0].replace(/^0+/, '').length > 8 ||
           (i.quantity.trim().split('.')[1]?.length ?? 0) > 4)
       )
         next[`quantity-${i.id}`] =
-          '数据库最多支持 8 位整数和 4 位小数，请调整数量。'
+          'Use at most 8 integer digits and 4 decimal places.'
+      if (i.quantity.trim() && !i.unit.trim()) next[`unit-${i.id}`] = 'Enter a unit when a quantity is provided.'
+      if (i.unit.trim() && !i.quantity.trim()) next[`quantity-${i.id}`] = 'Enter a quantity when a unit is provided.'
       if (Array.from(i.unit.trim()).length > 40)
-        next[`unit-${i.id}`] = '单位最多 40 个字符，请缩短内容。'
+        next[`unit-${i.id}`] = 'Unit must be at most 40 characters.'
     })
     return next
   }
@@ -131,7 +141,7 @@ export function FormulaCreator() {
       return
     }
     setPreview(true)
-    setFeedback('本地校验通过，配方预览已生成；尚未保存到服务器。')
+    setFeedback('Local checks passed. Preview ready; not saved to the server.')
   }
   const selectedProduct = data.product.find((p) => p.product_id === product)
   const error = (key: string) =>
@@ -148,7 +158,7 @@ export function FormulaCreator() {
     <>
       <Button onClick={() => setOpen(true)}>
         <Plus size={16} />
-        创建配方预览
+        Create formula preview
       </Button>
       <Dialog open={open} onOpenChange={(value) => !value && close()}>
         <DialogContent className="formula-creator">
@@ -156,16 +166,16 @@ export function FormulaCreator() {
             <DialogTitle>
               <span className="formula-title">
                 <FlaskConical size={22} />
-                {preview ? '配方内容预览' : '创建配方'}
+                {preview ? 'Formula preview' : 'Create formula'}
               </span>
             </DialogTitle>
             <DialogDescription>
-              本地交互预览 · 选项来自数据库基线，未提交服务器
+              Local preview · Options loaded from the database; nothing submitted
             </DialogDescription>
           </DialogHeader>
           <>
             <div className="source-notice">
-              本页面不会保存或发布配方。版本号、创建人和发布状态由未来后端接口确定。
+              Review your entries first. Saving and publishing require explicit actions and the local demo identity.
             </div>
             <p role="status" aria-live="polite" className="muted">
               {feedback}
@@ -179,9 +189,9 @@ export function FormulaCreator() {
                 }}
               >
                 <section className="formula-section">
-                  <h3>01 · 所属产品</h3>
+                  <h3>01 · Product</h3>
                   <label htmlFor="product">
-                    产品 <span aria-hidden="true">*</span>
+                    Product <span aria-hidden="true">*</span>
                   </label>
                   <select
                     id="product"
@@ -192,7 +202,7 @@ export function FormulaCreator() {
                       setProduct(e.target.value)
                     }}
                   >
-                    <option value="">选择一个产品</option>
+                    <option value="">Select a product</option>
                     {data.product.map((p) => (
                       <option key={p.product_id} value={p.product_id}>
                         {p.product_description} · FDC {p.fdc_id}
@@ -209,30 +219,30 @@ export function FormulaCreator() {
                 </section>
                 <section className="formula-section">
                   <div className="formula-section-heading">
-                    <h3>02 · 配方物料</h3>
-                    <span>{items.length} 项 · 按列表顺序排列</span>
+                    <h3>02 · Formula items</h3>
+                    <span>{items.length} items · in listed order</span>
                   </div>
                   {items.map((item, index) => {
                     const material = data.supplier_material.find(
                       (m) => m.supplier_material_id === item.material,
                     )
                     const specs = data.ingredient_specification_version.filter(
-                      (s) => s.supplier_material_id === item.material,
+                      (s) => s.supplier_material_id === item.material && eligible(s),
                     )
                     return (
                       <fieldset className="formula-item" key={item.id}>
-                        <legend>物料 {index + 1}</legend>
+                        <legend>Item {index + 1}</legend>
                         <div className="formula-item-heading">
-                          <span>配方项 {index + 1}</span>
+                          <span>Item {index + 1}</span>
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
                             disabled={items.length === 1}
-                            aria-label={`删除物料 ${index + 1}`}
+                            aria-label={`Remove material ${index + 1}`}
                             onClick={() => {
                               setItems(items.filter((i) => i.id !== item.id))
-                              setFeedback(`已删除物料 ${index + 1}。`)
+                              setFeedback(`Removed material ${index + 1}.`)
                             }}
                           >
                             <Trash2 size={16} />
@@ -241,7 +251,7 @@ export function FormulaCreator() {
                         <div className="formula-fields">
                           <div>
                             <label htmlFor={`material-${item.id}`}>
-                              供应商物料 *
+                              Supplier material *
                             </label>
                             <select
                               id={`material-${item.id}`}
@@ -255,7 +265,7 @@ export function FormulaCreator() {
                                 })
                               }
                             >
-                              <option value="">选择物料</option>
+                              <option value="">Select a material</option>
                               {data.supplier_material.map((m) => (
                                 <option
                                   key={m.supplier_material_id}
@@ -269,7 +279,7 @@ export function FormulaCreator() {
                           </div>
                           <div>
                             <label htmlFor={`specification-${item.id}`}>
-                              规格版本 *
+                              Specification version *
                             </label>
                             <select
                               id={`specification-${item.id}`}
@@ -285,8 +295,8 @@ export function FormulaCreator() {
                             >
                               <option value="">
                                 {item.material
-                                  ? '选择具体版本'
-                                  : '请先选择物料'}
+                                  ? 'Select a version'
+                                  : 'Select a material first'}
                               </option>
                               {specs.map((s) => (
                                 <option
@@ -302,13 +312,13 @@ export function FormulaCreator() {
                           </div>
                           <div>
                             <label htmlFor={`quantity-${item.id}`}>
-                              数量（选填）
+                              Quantity (optional)
                             </label>
                             <Input
                               id={`quantity-${item.id}`}
                               {...a11y(`quantity-${item.id}`)}
                               inputMode="decimal"
-                              placeholder="例如 12.5"
+                              placeholder="e.g. 12.5"
                               value={item.quantity}
                               onChange={(e) =>
                                 update(item.id, { quantity: e.target.value })
@@ -318,12 +328,12 @@ export function FormulaCreator() {
                           </div>
                           <div>
                             <label htmlFor={`unit-${item.id}`}>
-                              单位（选填）
+                              Unit (optional)
                             </label>
                             <Input
                               id={`unit-${item.id}`}
                               {...a11y(`unit-${item.id}`)}
-                              placeholder="例如 kg、g、%"
+                              placeholder="e.g. kg, g, %"
                               value={item.unit}
                               onChange={(e) =>
                                 update(item.id, { unit: e.target.value })
@@ -334,7 +344,7 @@ export function FormulaCreator() {
                         </div>
                         {material && (
                           <p className="muted">
-                            供应商：
+                            Supplier: {' '}
                             {
                               data.supplier.find(
                                 (s) => s.supplier_id === material.supplier_id,
@@ -357,17 +367,16 @@ export function FormulaCreator() {
                     }
                   >
                     <Plus size={16} />
-                    添加物料
+                    Add material
                   </Button>
                   <p className="muted">
-                    数量和单位暂为选填；不限定单位列表、不计算 100%
-                    合计。业务规则待接口约定后补充。
+                    Current M1 rules: provide both quantity and unit, or leave both blank. Quantity must be positive. No unit whitelist or 100% total is required. Pending M2 confirmation.
                   </p>
                 </section>
                 {Object.keys(errors).length > 0 && (
                   <div role="alert" className="error-notice">
                     <strong>
-                      还有 {Object.keys(errors).length} 项需要修正
+                      Please fix {Object.keys(errors).length} fields
                     </strong>
                     <ul>
                       {Object.entries(errors).map(([key, message]) => (
@@ -390,9 +399,9 @@ export function FormulaCreator() {
                             }}
                           >
                             {key === 'product'
-                              ? '产品'
-                              : `物料 ${items.findIndex((i) => String(i.id) === key.split('-')[1]) + 1}`}
-                            ：{message}
+                              ? 'Product'
+                              : `Item ${items.findIndex((i) => String(i.id) === key.split('-')[1]) + 1}`}
+                            : {message}
                           </button>
                         </li>
                       ))}
@@ -401,16 +410,16 @@ export function FormulaCreator() {
                 )}
                 <div className="formula-actions">
                   <Button type="button" variant="outline" onClick={close}>
-                    取消
+                    Cancel
                   </Button>
-                  <Button type="submit">预览配方</Button>
+                  <Button type="submit">Preview formula</Button>
                 </div>
               </form>
             ) : (
               <section className="formula-section">
                 <h3>{selectedProduct?.product_description}</h3>
                 <p className="muted">
-                  {selectedProduct?.product_id} · 新版本号待服务器分配
+                  {selectedProduct?.product_id} · Version number assigned by the server
                 </p>
                 <div className="trace-list">
                   {items.map((i, index) => (
@@ -426,25 +435,26 @@ export function FormulaCreator() {
                         </strong>
                         <p>{i.specification}</p>
                         <p>
-                          数量：{i.quantity.trim() || '未填写'} · 单位：
-                          {i.unit.trim() || '未填写'}
+                          Quantity: {i.quantity.trim() || 'Not provided'} · Unit: {' '}
+                          {i.unit.trim() || 'Not provided'}
                         </p>
                       </div>
                     </div>
                   ))}
                 </div>
                 <p className="muted">
-                  输入已通过本地基础检查，尚未保存、发布或通过服务端业务校验。
+                  {saved ? 'This draft is stored on the server. Published versions retain their original content.' : 'Local checks passed. Review the content before saving to the server.'}
                 </p>
                 <div className="formula-actions">
-                  <Button variant="outline" onClick={() => setPreview(false)}>
+                  <Button variant="outline" disabled={saved||busy} onClick={() => setPreview(false)}>
                     <ArrowLeft size={16} />
-                    返回编辑
+                    Back to editor
                   </Button>
-                  <Button variant="outline" onClick={close}>
-                    关闭预览
+                  <Button variant="outline" disabled={busy} onClick={close}>
+                    Close preview
                   </Button>
                 </div>
+                <FormulaPersistence request={{productId:product,provenanceId:'prov_project_seed',items:items.map(i=>({materialId:i.material,specificationId:i.specification,quantity:i.quantity.trim()?Number(i.quantity):null,unit:i.unit.trim()||null}))}} onSaved={()=>{setSaved(true);setFeedback('Draft saved to the server.')}} onBusy={setBusy}/>
               </section>
             )}
           </>

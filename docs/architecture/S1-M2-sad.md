@@ -1,8 +1,8 @@
 # S1-M2 SAD — shared allergen and validation contracts
 
-Status: **prepared on `prep/s1-m2-sad-contracts`; not integrated**. This document is a
-Sprint 1 M2 design decision, not a claim that the described endpoints or M2's Sprint 2
-validation slice are implemented.
+Status: **S1 design baseline merged in PR #3; reconciled with M1/M4/M5 runtime on
+`a3bb498bb565e4f53d8161ba837f833d6bb9167b`.** This document is not a claim that the
+described allergen/validation endpoints or M2's Sprint 2 validation slice are implemented.
 
 ## Decision context
 
@@ -53,11 +53,18 @@ free-text message.
 | HTTP status | Stable code | Meaning |
 | --- | --- | --- |
 | 400 | `INVALID_REQUEST` | request syntax or required field is invalid |
+| 401 | `AUTHENTICATION_REQUIRED` | credentials are absent, invalid, or not mapped to an active M5 identity |
 | 403 | `AUTHORIZATION_DENIED` | authenticated actor lacks the M4-defined permission |
 | 404 | `RESOURCE_NOT_FOUND` | requested label version or validation run is absent |
-| 409 | `LABEL_VERSION_NOT_CURRENT` | BR-05 prevents validation of a non-current label |
+| 409 | domain-specific conflict code | stale current pointer, duplicate submission, or immutable/non-current version |
 | 422 | `VALIDATION_PRECONDITION_FAILED` | the current label cannot be evaluated from canonical inputs |
 | 500 | `INTERNAL_ERROR` | an unexpected failure; no internal details are exposed |
+
+The shared runtime DTO contains exactly `code`, `message`, `traceId`, and `evidenceId`.
+The first two fields are mandatory. The latter two are present and nullable so an HTTP
+adapter never fabricates observability or evidence identifiers. M1 codes such as
+`CURRENT_FORMULA_CHANGED`, `VERSION_IMMUTABLE`, and `DATA_CONFLICT` remain valid
+domain-specific 409 codes; shared consistency does not erase useful domain semantics.
 
 The reserved evidence naming convention is `EVID-M2-S1-<KIND>-<NNN>`. It is a naming
 rule only: no identifier in this document represents already-collected evidence.
@@ -87,17 +94,19 @@ retry semantics.
 
 ## Cross-module integration checkpoints
 
-1. M1 confirms which label/formula snapshot fields are exposed and that the current
-   label relation is authoritative.
-2. M4 supplies permission names and maps `AUTHORIZATION_DENIED` to its identity/RBAC
-   contract; M2 does not implement RBAC in this preparation branch.
-3. M5 agrees the Testcontainers fixture, API contract test location, and CI evidence
-   binding to the actual integration commit.
+1. M1's merged catalog/formula API uses server-assigned IDs, version-specific resource
+   keys, `limit`/`offset`, and domain-specific 400/403/404/409/422 codes. Its legacy
+   success rows intentionally retain database `snake_case` for M3 compatibility; M2
+   cross-module DTOs and request bodies use `camelCase`.
+2. M4 supplies permission names and raises `AuthorizationDeniedException`; the shared
+   web mapping returns 403 `AUTHORIZATION_DENIED` without changing workflow policy.
+3. M5 supplies active-identity lookup and the reusable MySQL integration fixture;
+   unmapped identities map to 401 `AUTHENTICATION_REQUIRED`.
 4. Any new rule-set lifecycle, async execution, database change, or contract-breaking
    error code reopens this SAD for cross-module review.
 
 ## Decision review state
 
-This decision has not yet received the required cross-module review or human
-acceptance. It must be rebased/reconciled against the actual accepted `main` commit
-after PR #2 merges before being presented as an M2 S1 deliverable.
+PR #3 integrated the original SAD. The contract-closure change reconciles it with the
+actual M1/M4/M5 code now on main and is subject to the normal independent PR review and
+human-acceptance gate; no review is claimed by this text.

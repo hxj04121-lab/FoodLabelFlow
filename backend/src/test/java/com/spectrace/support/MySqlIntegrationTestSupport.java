@@ -1,5 +1,6 @@
 package com.spectrace.support;
 
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.MySQLContainer;
@@ -11,6 +12,7 @@ import org.testcontainers.containers.MySQLContainer;
  * Spring application contexts never retain a JDBC URL for a container that
  * Testcontainers has already stopped.</p>
  */
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public abstract class MySqlIntegrationTestSupport {
 
     protected static final MySQLContainer<?> MYSQL =

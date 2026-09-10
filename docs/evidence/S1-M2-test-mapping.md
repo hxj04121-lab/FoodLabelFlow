@@ -1,7 +1,8 @@
 # S1-M2 acceptance criteria, negative paths, and evidence mapping
 
-Status: **prepared; no planned item below is passing evidence until an actual command,
-review, or CI run is recorded against the integrated commit.**
+Status: **PR #3 design baseline is merged. Cross-module runtime reconciliation is
+implemented on the M2 contract-closure branch; independent review, CI, and integration
+remain required before the coordination status can be closed.**
 
 PM contract source: [`.project-control/pm-contract.sha256`](../../.project-control/pm-contract.sha256).
 M2 work order: [`.project-control/work-orders/S1/M2-sad-acceptance-support.yaml`](../../.project-control/work-orders/S1/M2-sad-acceptance-support.yaml).
@@ -10,11 +11,11 @@ M2 work order: [`.project-control/work-orders/S1/M2-sad-acceptance-support.yaml`
 
 | ID | Acceptance criterion | Verification target | Status now |
 | --- | --- | --- | --- |
-| AC-M2-S1-001 | The SAD names owning modules, BR-02/03/05/07/10 implications, no new schema, and the PM contract binding. | SAD review and contract diff | Prepared, unreviewed |
-| AC-M2-S1-002 | The shared contract defines allergen lookup, validation-run request/read models, stable HTTP statuses, and a common error envelope. | OpenAPI structural/peer review | Prepared, unreviewed |
-| AC-M2-S1-003 | The Strategy decision compares a brute-force conditional design with relevant alternatives and explains the selected per-rule evaluator registry. | SAD/design review | Prepared, unreviewed |
-| AC-M2-S1-004 | Cross-module assumptions are assigned to M1/M4/M5; no implementation claims integration before those owners review. | Review record | Pending |
-| AC-M2-S1-005 | Negative API cases are mapped to stable error codes before endpoint implementation. | Contract/negative-path tests | Prepared, not run |
+| AC-M2-S1-001 | The SAD names owning modules, BR-02/03/05/07/10 implications, no new schema, and the PM contract binding. | SAD review and contract diff | Implemented; closure review pending |
+| AC-M2-S1-002 | The shared contract defines allergen lookup, validation-run request/read models, stable HTTP statuses, and a common error envelope. | OpenAPI structural/peer review | Automated contract test passes locally; peer review pending |
+| AC-M2-S1-003 | The Strategy decision compares a brute-force conditional design with relevant alternatives and explains the selected per-rule evaluator registry. | SAD/design review | Merged in PR #3 |
+| AC-M2-S1-004 | Cross-module assumptions are assigned to M1/M4/M5; no implementation claims integration before those owners review. | Review record | Runtime reconciled; independent closure review pending |
+| AC-M2-S1-005 | Negative API cases are mapped to stable error codes before endpoint implementation. | Contract/negative-path tests | Shared handler tests pass locally; CI pending |
 
 ## Required negative-path test matrix
 
@@ -27,6 +28,14 @@ M2 work order: [`.project-control/work-orders/S1/M2-sad-acceptance-support.yaml`
 | TEST-M2-S1-API-005 | Current label lacks canonical input or active rule-set | 422 `VALIDATION_PRECONDITION_FAILED` | M1 + M5 fixture | Planned |
 | TEST-M2-S1-ARCH-001 | Validation accesses a foreign repository or SQL directly | Architecture test fails | M2 implementation | Planned |
 | TEST-M2-S1-ARCH-002 | Identity depends on business modules | Existing architecture rule remains green | M4/M2 integration | Existing baseline test; re-run after integration |
+
+Implemented closure tests:
+
+- `SharedApiErrorContractTest`: M1 400/404/409 and M4/M5 401/403 mappings share the
+  exact four-field envelope without invented evidence identifiers.
+- `OpenApiContractTest`: required statuses, authentication/authorization codes,
+  validation status enum, and all local component references are present.
+- `ArchitectureTest`: the existing identity dependency boundary remains green.
 
 ## Evidence lifecycle
 
@@ -52,8 +61,9 @@ When actual work is integrated, record only factual identifiers in the evidence 
 
 ## Pre-integration checklist
 
-- [ ] PR #2 is independently approved, merged, and latest `main` is green.
-- [ ] The preparatory branch is rebased/reconciled onto that exact main commit.
+- [x] PR #2 is merged; its historical approval/evidence record is not restated here.
+- [x] The closure branch is based on `a3bb498bb565e4f53d8161ba837f833d6bb9167b`,
+      which includes merged M1 PR #4 and M4/M5 changes.
 - [ ] M1, M4, and M5 review the shared assumptions relevant to their scope.
 - [ ] Any real endpoint implementation has API, negative-path, architecture, and
   MySQL/Testcontainers coverage appropriate to the accepted fixture convention.

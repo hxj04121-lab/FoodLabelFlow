@@ -14,9 +14,9 @@ export function HealthPage() {
     setHealth(null)
     try {
       setHealth(await getHealth())
-      setChecked(new Date().toLocaleTimeString('zh-CN'))
+      setChecked(new Date().toLocaleTimeString('en-GB'))
     } catch (e) {
-      setError(e instanceof Error ? e.message : '连接失败')
+      setError(e instanceof Error ? e.message : 'Connection failed')
     } finally {
       setLoading(false)
     }
@@ -29,43 +29,43 @@ export function HealthPage() {
       <div className="page-title">
         <div>
           <div className="eyebrow">LIVE SYSTEM STATUS</div>
-          <h1>系统状态</h1>
-          <p>实时检查应用服务与数据库连接。</p>
+          <h1>System status</h1>
+          <p>Check the application and database connection in real time.</p>
         </div>
         <Button variant="outline" disabled={loading} onClick={refresh}>
           <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          重新检查
+          Check again
         </Button>
       </div>
       <div aria-live="polite">
-        {loading && <div className="source-notice">正在检查后端服务…</div>}
+        {loading && <div className="source-notice">Checking backend services…</div>}
         {error && (
           <div className="error-notice" role="alert">
-            连接失败：{error}。请确认后端和数据库已经启动。
+            Connection failed: {error}. Check that the backend and database are running.
           </div>
         )}
       </div>
       <div className="health-grid">
         {[
-          { label: '应用服务', icon: Activity, value: health?.status },
-          { label: '数据库连接', icon: Database, value: health?.database },
+          { label: 'Application', icon: Activity, value: health?.status },
+          { label: 'Database', icon: Database, value: health?.database },
         ].map((item) => (
           <section className="panel health-card" key={item.label}>
             <item.icon size={27} />
             <h2>{item.label}</h2>
             <strong className={item.value === 'ok' ? 'health-ok' : ''}>
               {loading
-                ? '检查中'
+                ? 'Checking'
                 : item.value === 'ok'
-                  ? '运行正常'
-                  : (item.value ?? '未连接')}
+                  ? 'Healthy'
+                  : (item.value ?? 'Disconnected')}
             </strong>
             <p>{item.value === 'ok' ? 'ok' : '—'}</p>
           </section>
         ))}
       </div>
       {checked && !error && (
-        <p className="muted">最近检查：{checked} · /api/health</p>
+        <p className="muted">Last checked: {checked} · /api/health</p>
       )}
     </>
   )
