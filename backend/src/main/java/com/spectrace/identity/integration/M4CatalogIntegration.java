@@ -3,6 +3,7 @@ package com.spectrace.identity.integration;
 import com.spectrace.catalog.application.CatalogIntegration;
 import com.spectrace.identity.application.AuthorizationService;
 import com.spectrace.identity.application.IdentityService;
+import com.spectrace.identity.application.UnknownIdentityException;
 import com.spectrace.identity.domain.AuthenticatedActor;
 import com.spectrace.identity.interfaces.web.RequestIdentityContext;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -33,8 +34,8 @@ public class M4CatalogIntegration implements CatalogIntegration {
     @Override
     public String requireActor(String permission) {
         if (!requestIdentityContext.isPresent()) {
-            throw new IllegalArgumentException(
-                    "Authenticated external identity headers are required"
+            throw new UnknownIdentityException(
+                    "Authenticated external identity is required"
             );
         }
 
@@ -43,7 +44,10 @@ public class M4CatalogIntegration implements CatalogIntegration {
                 requestIdentityContext.externalSubject()
         );
 
-        authorizationService.requirePermission(actor, permission);
+        authorizationService.requirePermission(
+                actor,
+                permission
+        );
 
         return actor.userId();
     }
@@ -70,11 +74,27 @@ public class M4CatalogIntegration implements CatalogIntegration {
                     correlation_id,
                     data_provenance_id
                 )
-                VALUES (?, ?, 'CATALOG', ?, NOW(), ?, NULL, NULL,
-                        JSON_OBJECT('source', 'M4CatalogIntegration'),
-                        ?, ?)
+                VALUES (
+                    ?,
+                    ?,
+                    'CATALOG',
+                    ?,
+                    NOW(),
+                    ?,
+                    NULL,
+                    NULL,
+                    JSON_OBJECT(
+                        'source',
+                        'M4CatalogIntegration'
+                    ),
+                    ?,
+                    ?
+                )
                 """,
-                "audit_catalog_" + UUID.randomUUID().toString().replace("-", ""),
+                "audit_catalog_"
+                        + UUID.randomUUID()
+                        .toString()
+                        .replace("-", ""),
                 action,
                 entityId,
                 actorId,

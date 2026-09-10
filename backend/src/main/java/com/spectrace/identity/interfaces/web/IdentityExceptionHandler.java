@@ -2,37 +2,40 @@ package com.spectrace.identity.interfaces.web;
 
 import com.spectrace.identity.application.AuthorizationDeniedException;
 import com.spectrace.identity.application.UnknownIdentityException;
+import com.spectrace.shared.web.ApiError;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.Map;
-
 @RestControllerAdvice
 public class IdentityExceptionHandler {
 
     @ExceptionHandler(AuthorizationDeniedException.class)
-    public ResponseEntity<Map<String, String>> handleAuthorizationDenied(
+    public ResponseEntity<ApiError> handleAuthorizationDenied(
             AuthorizationDeniedException exception
     ) {
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
-                .body(Map.of(
-                        "code", "AUTHORIZATION_DENIED",
-                        "message", exception.getMessage()
+                .body(new ApiError(
+                        "AUTHORIZATION_DENIED",
+                        exception.getMessage(),
+                        null,
+                        null
                 ));
     }
 
     @ExceptionHandler(UnknownIdentityException.class)
-    public ResponseEntity<Map<String, String>> handleUnknownIdentity(
+    public ResponseEntity<ApiError> handleUnknownIdentity(
             UnknownIdentityException exception
     ) {
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of(
-                        "code", "UNKNOWN_IDENTITY",
-                        "message", exception.getMessage()
+                .body(new ApiError(
+                        "AUTHORIZATION_DENIED",
+                        exception.getMessage(),
+                        null,
+                        null
                 ));
     }
 }
