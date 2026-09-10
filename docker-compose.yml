@@ -21,6 +21,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/spectrace?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-stage0-local-only}
+      SPECTRACE_DEV_EXTERNAL_AUTH_ENABLED: "true"
     depends_on:
       mysql:
         condition: service_healthy

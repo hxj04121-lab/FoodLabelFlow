@@ -1,5 +1,6 @@
 package com.spectrace.catalog.infrastructure;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import com.spectrace.audit.application.AuditApplicationService;
 import com.spectrace.catalog.application.CatalogIntegration;
 import com.spectrace.catalog.domain.CatalogFailure;
@@ -12,9 +13,11 @@ import org.springframework.stereotype.Component;
 
 /** Connects catalog writes to the M4 identity seam and transactional audit log. */
 @Component
-public class RequestCatalogIntegration implements CatalogIntegration {
-
-    public static final String AUTH_PROVIDER_HEADER = "X-Auth-Provider";
+@ConditionalOnProperty(
+        name = "spectrace.dev-external-auth.enabled",
+        havingValue = "true"
+)
+public class RequestCatalogIntegration implements CatalogIntegration {    public static final String AUTH_PROVIDER_HEADER = "X-Auth-Provider";
     public static final String AUTH_SUBJECT_HEADER = "X-External-Subject";
 
     private final HttpServletRequest request;
