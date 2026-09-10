@@ -25,19 +25,19 @@ export function DiscardChangesDialog({
             <FileWarning size={25} />
           </div>
           <AlertDialog.Title className="text-lg font-semibold">
-            放弃尚未保存的内容？
+            Discard unsaved changes?
           </AlertDialog.Title>
           <AlertDialog.Description className="mt-3 text-sm leading-7 text-muted-foreground">
-            本次填写的配方尚未保存。继续编辑可保留所有输入；放弃后无法恢复本次内容。
+            Your formula has not been saved. Keep editing to retain your entries, or discard them permanently.
           </AlertDialog.Description>
           <div className="formula-actions">
             <AlertDialog.Cancel asChild>
               <Button variant="outline" onClick={onContinue}>
-                继续编辑
+                Keep editing
               </Button>
             </AlertDialog.Cancel>
             <Button variant="destructive" onClick={onDiscard}>
-              放弃并关闭
+              Discard changes
             </Button>
           </div>
         </AlertDialog.Content>

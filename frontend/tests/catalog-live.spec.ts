@@ -1,0 +1,28 @@
+import {test,expect} from '@playwright/test'
+test('M1 real read-only product and formula integration',async({page,request})=>{
+  test.skip(process.env.LIVE_CATALOG!=='1','Requires independently started M1 backend')
+  const response=await request.get('/api/catalog/products?limit=100&offset=0')
+  expect(response.ok()).toBeTruthy()
+  const products=await response.json()
+  expect(products.length).toBeGreaterThan(0)
+  const product=products[0]
+  const trace=await request.get(`/api/catalog/formulas/${product.current_formula_version_id}/trace`)
+  expect(trace.ok()).toBeTruthy()
+  const traceBody=await trace.json()
+  expect(traceBody.formula.product_id).toBe(product.product_id)
+  await page.goto('/products')
+  await expect(page.getByText('Connected to the M1 read-only API',{exact:false})).toBeVisible({timeout:30000})
+  await page.getByRole('textbox',{name:'Search products'}).fill(String(product.fdc_id))
+  await page.getByRole('button',{name:`View ${product.product_description}`,exact:true}).click()
+  await expect(page.getByRole('dialog')).toContainText(traceBody.trace[0].specification.specification_version_id)
+  await page.getByRole('tab',{name:'Version history'}).click()
+  await expect(page.getByRole('tabpanel')).toContainText(product.current_formula_version_id)
+  await page.screenshot({path:'test-results/live-catalog.png',fullPage:true})
+})
+test('backend failure never falls back to seed data',async({page})=>{
+  await page.route('**/api/catalog/**',r=>r.fulfill({status:503,json:{code:'UNAVAILABLE',message:'Read service unavailable'}}))
+  await page.goto('/products')
+  await expect(page.getByRole('alert')).toContainText('UNAVAILABLE')
+  await expect(page.getByRole('button',{name:'Retry connection'})).toBeVisible()
+  await expect(page.locator('tbody tr')).toHaveCount(0)
+})

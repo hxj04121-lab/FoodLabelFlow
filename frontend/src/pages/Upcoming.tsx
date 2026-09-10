@@ -6,31 +6,31 @@ import { useNavigate } from 'react-router-dom'
 export function Upcoming({ kind }: { kind: 'labels' | 'impact' | 'reviews' }) {
   const content = {
     labels: {
-      title: '标签管理',
-      subtitle: '让每一份声明，都对应准确的配方版本。',
+      title: 'Labels',
+      subtitle: 'Connect every declaration to the correct formula version.',
       icon: FileText,
-      steps: ['关联配方版本', '编辑标签声明', '校验与提交'],
+      steps: ['Link a formula version', 'Edit label declarations', 'Validate and submit'],
       stage: 'Sprint 2',
       link: '/formulas',
-      cta: '查看配方版本',
+      cta: 'Browse formulas',
     },
     impact: {
-      title: '变更影响',
-      subtitle: '识别原料变化影响的产品，区分无需操作和待复核。',
+      title: 'Change impact',
+      subtitle: 'Find affected products and distinguish no-action results from required reviews.',
       icon: GitBranch,
-      steps: ['选择变更来源', '分析受影响产品', '创建必要的审查任务'],
+      steps: ['Select a change', 'Analyze affected products', 'Create required reviews'],
       stage: 'Sprint 3',
       link: '/materials',
-      cta: '查看物料与规格',
+      cta: 'Browse materials',
     },
     reviews: {
-      title: '审核工作台',
-      subtitle: '让标签经过校验、独立审核和受控发布。',
+      title: 'Review workspace',
+      subtitle: 'Move labels through validation, independent review and controlled publication.',
       icon: ClipboardCheck,
-      steps: ['接收审查任务', '独立审核与批准', '发布并保留旧版本'],
+      steps: ['Receive a review task', 'Review independently', 'Publish and retain history'],
       stage: 'Sprint 3',
       link: '/products',
-      cta: '查看产品档案',
+      cta: 'Browse products',
     },
   }[kind]
   const navigate = useNavigate()
@@ -48,9 +48,9 @@ export function Upcoming({ kind }: { kind: 'labels' | 'impact' | 'reviews' }) {
         <span className="upcoming-icon">
           <content.icon size={35} />
         </span>
-        <h2>工作区已规划，业务接口尚未接入</h2>
+        <h2>This workflow is not connected yet</h2>
         <p>
-          这里暂不显示任务数量或处理结果。你可以先浏览已经提供的产品与配方基线。
+          Task counts and results will appear when the workflow is connected. Explore products and formulas in the meantime.
         </p>
         <div className="workflow-steps">
           {content.steps.map((s, i) => (

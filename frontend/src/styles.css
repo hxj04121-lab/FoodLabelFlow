@@ -213,6 +213,17 @@ th,.source-notice,.results-count,.pagination,.detail-summary,.trace-row p,.bar-l
 .product-cell { max-width:310px; }
 .overview-bottom .product-cell { max-width:260px; }
 .main-shell,main { min-width:0; }
+.nav-item svg { flex-shrink:0; }
+.nav-item { gap:10px; padding-inline:12px; }
+.nav-item span:not(.nav-dot) { min-width:0; }
+.quick-search { width:230px; }
+.formula-actions { flex-wrap:wrap; }
+.formula-section-heading { flex-wrap:wrap; }
+.page-title { flex-wrap:wrap; }
+.section-head { flex-wrap:wrap; }
+.trace-row { flex-wrap:wrap; }
+.trace-row>div { min-width:0; overflow-wrap:anywhere; }
+@media(max-width:800px) { .quick-search { width:auto; }.nav-item { font-size:13px; } }
 th { position:relative; }
 @media(max-width:800px) { .table-scroll table { min-width:720px; }.product-cell { min-width:220px; } }
 .detail-dialog { overflow-wrap:anywhere; }

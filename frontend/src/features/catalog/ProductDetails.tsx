@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { type Product } from '@/data/catalog'
-import data from '@/data/seed-preview.json'
+import { data } from '@/data/catalog'
 export function ProductDetails({
   product,
   close,
@@ -19,7 +19,7 @@ export function ProductDetails({
   close: () => void
 }) {
   const formula = data.formula_version.find(
-    (f) => f.product_id === product?.product_id,
+    (f) => f.formula_version_id === product?.current_formula_version_id,
   )
   const items = data.formula_item.filter(
     (f) => f.formula_version_id === formula?.formula_version_id,
@@ -28,9 +28,9 @@ export function ProductDetails({
     <Dialog open={!!product} onOpenChange={(open) => !open && close()}>
       <DialogContent className="detail-dialog">
         <DialogHeader>
-          <DialogTitle>产品与配方追溯</DialogTitle>
+          <DialogTitle>Product and formula traceability</DialogTitle>
           <DialogDescription>
-            种子数据快照 · 历史与版本只读展示
+            API snapshot · Read-only versions and history
           </DialogDescription>
         </DialogHeader>
         {product && (
@@ -45,17 +45,17 @@ export function ProductDetails({
             </div>
             <Tabs defaultValue="formula">
               <TabsList>
-                <TabsTrigger value="formula">配方与物料</TabsTrigger>
-                <TabsTrigger value="history">版本历史</TabsTrigger>
-                <TabsTrigger value="source">数据来源</TabsTrigger>
+                <TabsTrigger value="formula">Formula & materials</TabsTrigger>
+                <TabsTrigger value="history">Version history</TabsTrigger>
+                <TabsTrigger value="source">Data sources</TabsTrigger>
               </TabsList>
               <TabsContent value="formula">
                 <div className="detail-summary">
-                  <span>配方 V{formula?.version_number ?? '—'}</span>
+                  <span>Formula V{formula?.version_number ?? '—'}</span>
                   <Badge variant="outline">
-                    {formula?.lifecycle_status ?? '未知'}
+                    {formula?.lifecycle_status ?? 'Unknown'}
                   </Badge>
-                  <span>基线当前版本</span>
+                  <span>Current formula</span>
                 </div>
                 <div className="trace-list">
                   {items.map((item, i) => {
@@ -75,7 +75,7 @@ export function ProductDetails({
                           <code>{item.specification_version_id}</code>
                         </div>
                         <Badge variant="outline">
-                          规格 V
+                          Spec V
                           {
                             data.ingredient_specification_version.find(
                               (s) =>
@@ -90,35 +90,25 @@ export function ProductDetails({
                 </div>
               </TabsContent>
               <TabsContent value="history">
-                <div className="history-entry">
-                  <span className="history-dot" />
-                  <div>
-                    <h3>V{formula?.version_number} · 已发布</h3>
-                    <p>
-                      {formula?.released_at} · {formula?.released_by_user_id}
-                    </p>
-                    <code>{formula?.formula_version_id}</code>
-                    <p>基线快照只有此版本。实时版本历史尚未接入。</p>
-                  </div>
-                </div>
+                {data.formula_version.filter(f=>f.product_id===product?.product_id).map(f=><div className="history-entry" key={f.formula_version_id}><span className="history-dot"/><div><h3>V{f.version_number} · {f.lifecycle_status}{f.formula_version_id===product?.current_formula_version_id?' · Current':''}</h3><p>{f.released_at ?? 'Not released'} · {f.released_by_user_id ?? '—'}</p><code>{f.formula_version_id}</code></div></div>)}
               </TabsContent>
               <TabsContent value="source">
                 <div className="source-detail">
-                  <h3>公开产品记录</h3>
+                  <h3>Public product record</h3>
                   <p>USDA FoodData Central · FDC ID {product.fdc_id}</p>
-                  <p>来源标识：{product.data_provenance_id}</p>
-                  <h3>原始配料文本</h3>
+                  <p>Source ID: {product.data_provenance_id}</p>
+                  <h3>Original ingredient text</h3>
                   <p>{product.source_ingredients_text}</p>
                   <p>
-                    供应商、物料和配方关联为课程项目构造的演示关系，不代表该品牌的真实供应链。
+                    Supplier, material and formula links are course fixtures, not the actual supply chain of the brand.
                   </p>
                 </div>
               </TabsContent>
             </Tabs>
             <div className="dialog-bottom">
-              <span>只读基线 · V3__baseline_seed.sql</span>
+              <span>Read-only API data · /api/catalog</span>
               <Button variant="outline" onClick={close}>
-                关闭
+                Close
               </Button>
             </div>
           </>
