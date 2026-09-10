@@ -4,7 +4,9 @@ Evidence date: 2026-09-10 (Asia/Shanghai)
 
 Owner: M2 Cai Runchen
 
-Audited `origin/main`: `a3bb498bb565e4f53d8161ba837f833d6bb9167b`
+Audited pre-closure `origin/main`: `a3bb498bb565e4f53d8161ba837f833d6bb9167b`
+
+Integrated current main: `fcf968647c3c10ec180ede41224f1db1661403b1`
 
 ## Scope and sources checked
 
@@ -70,15 +72,18 @@ security gate, or test expectation was weakened.
 | `docker compose config --quiet` | PASS |
 | Full `mvn verify` on local JDK 25 targeting Java 21 | Environment-blocked — all non-container tests passed; 5 Testcontainers classes could not start because the local Docker engine was unavailable |
 | Frontend build | Environment-blocked — `npm ci` made no progress while existing Node processes were active, leaving the dependency tree incomplete; no M3 code was changed |
+| GitHub Actions main run [`34430168402`](https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/34430168402) on `fcf968647c3c10ec180ede41224f1db1661403b1` | PASS — backend with MySQL Testcontainers, frontend, security (Trivy + OWASP), and container build |
 
 The GitHub Actions backend job is the authoritative Java 21 + Docker execution for the
 closure commit; frontend, security, and container jobs are also required before merge.
 
 ## Final status and blockers
 
-The code and contract are locally aligned on the closure branch. No unresolved
-cross-member business-design decision was found. The only remaining gate is integration:
-the exact closure commit must have green required CI, independent human approval, and
-be merged to `main`; current-main checks must then remain green.
+The code and contract are aligned and integrated on current main, and all current-main
+checks are green. No unresolved cross-member business-design decision was found. PR #9
+was merged by `hxj04121-lab` with no review or comment recorded; merge permission alone
+is not fabricated into the work order's required review/human-acceptance evidence. The
+post-merge review request is recorded at
+[`issuecomment-5611850925`](https://github.com/hxj04121-lab/FoodLabelFlow/pull/9#issuecomment-5611850925).
 
-`M2_S1_CONTRACT_COORDINATION = PENDING_CLOSURE_PR_INTEGRATION`
+`M2_S1_CONTRACT_COORDINATION = PENDING_INDEPENDENT_HUMAN_ACCEPTANCE_RECORD`
