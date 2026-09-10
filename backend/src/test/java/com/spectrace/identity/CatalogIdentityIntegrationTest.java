@@ -19,7 +19,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "spectrace.dev-external-auth.enabled=true"
+        properties = {
+                "spectrace.dev-external-auth.enabled=true",
+                "spectrace.catalog-identity-integration.enabled=true"
+        }
 )
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class CatalogIdentityIntegrationTest extends MySqlIntegrationTestSupport {
@@ -121,6 +124,7 @@ class CatalogIdentityIntegrationTest extends MySqlIntegrationTestSupport {
             );
 
             assertEquals(403, response.statusCode());
+
             assertApiErrorContract(
                     response.body(),
                     "AUTHORIZATION_DENIED"
@@ -165,6 +169,7 @@ class CatalogIdentityIntegrationTest extends MySqlIntegrationTestSupport {
             );
 
             assertEquals(401, response.statusCode());
+
             assertApiErrorContract(
                     response.body(),
                     "AUTHORIZATION_DENIED"
@@ -214,6 +219,7 @@ class CatalogIdentityIntegrationTest extends MySqlIntegrationTestSupport {
             );
 
             assertEquals(401, response.statusCode());
+
             assertApiErrorContract(
                     response.body(),
                     "AUTHORIZATION_DENIED"
@@ -234,8 +240,11 @@ class CatalogIdentityIntegrationTest extends MySqlIntegrationTestSupport {
             String expectedCode
     ) {
         assertTrue(
-                body.contains("\"code\":\"" + expectedCode + "\"")
+                body.contains(
+                        "\"code\":\"" + expectedCode + "\""
+                )
         );
+
         assertTrue(body.contains("\"message\":"));
         assertTrue(body.contains("\"traceId\":null"));
         assertTrue(body.contains("\"evidenceId\":null"));

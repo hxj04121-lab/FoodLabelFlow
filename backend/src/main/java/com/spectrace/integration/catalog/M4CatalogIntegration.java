@@ -1,4 +1,4 @@
-package com.spectrace.identity.integration;
+package com.spectrace.integration.catalog;
 
 import com.spectrace.catalog.application.CatalogIntegration;
 import com.spectrace.identity.application.AuthorizationService;
@@ -6,12 +6,17 @@ import com.spectrace.identity.application.IdentityService;
 import com.spectrace.identity.application.UnknownIdentityException;
 import com.spectrace.identity.domain.AuthenticatedActor;
 import com.spectrace.identity.interfaces.web.RequestIdentityContext;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
 
 @Component
+@ConditionalOnProperty(
+        name = "spectrace.catalog-identity-integration.enabled",
+        havingValue = "true"
+)
 public class M4CatalogIntegration implements CatalogIntegration {
 
     private final RequestIdentityContext requestIdentityContext;
