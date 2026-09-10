@@ -1,5 +1,6 @@
 import { FileWarning } from 'lucide-react'
 import { AlertDialog } from 'radix-ui'
+import { useEffect } from 'react'
 import { Button } from './ui/button'
 
 export function DiscardChangesDialog({
@@ -11,6 +12,19 @@ export function DiscardChangesDialog({
   onContinue: () => void
   onDiscard: () => void
 }) {
+  useEffect(() => {
+    if (!open) return
+    const continueOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        onContinue()
+      }
+    }
+    document.addEventListener('keydown', continueOnEscape, true)
+    return () => document.removeEventListener('keydown', continueOnEscape, true)
+  }, [open, onContinue])
+
   return (
     <AlertDialog.Root
       open={open}

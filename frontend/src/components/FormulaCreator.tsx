@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from './ui/dialog'
 import { Input } from './ui/input'
+import { FormulaPersistence } from './FormulaPersistence'
 
 type Item = {
   id: number
@@ -38,32 +39,36 @@ export function FormulaCreator() {
   const [discard, setDiscard] = useState(false)
   const [attempted, setAttempted] = useState(false)
   const [feedback, setFeedback] = useState('')
+  const [saved,setSaved]=useState(false)
+  const [busy,setBusy]=useState(false)
   const dirty =
-    !!product ||
+    !saved && (!!product ||
     items.length !== 1 ||
-    items.some((i) => i.material || i.specification || i.quantity || i.unit)
+    items.some((i) => i.material || i.specification || i.quantity || i.unit))
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
-      open && !!dirty && currentLocation.pathname !== nextLocation.pathname,
+      open && (!!dirty || busy) && currentLocation.pathname !== nextLocation.pathname,
   )
   function continueEditing() {
     setDiscard(false)
     if (blocker.state === 'blocked') blocker.reset()
   }
   function discardChanges() {
+    if(busy)return
     reset()
     if (blocker.state === 'blocked') blocker.proceed()
   }
   useEffect(() => {
-    if (!open || !dirty) return
+    if (!open || (!dirty && !busy)) return
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault()
       e.returnValue = ''
     }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
-  }, [open, dirty])
+  }, [open, dirty, busy])
   function reset() {
+    if(saved) window.dispatchEvent(new Event('catalog-updated'))
     setOpen(false)
     setProduct('')
     setItems([blank(1)])
@@ -72,8 +77,10 @@ export function FormulaCreator() {
     setDiscard(false)
     setAttempted(false)
     setFeedback('')
+    setSaved(false);setBusy(false)
   }
   function close() {
+    if(busy)return
     if (dirty) setDiscard(true)
     else reset()
   }
@@ -168,7 +175,7 @@ export function FormulaCreator() {
           </DialogHeader>
           <>
             <div className="source-notice">
-              This preview does not save or publish a formula. The server will assign its version, creator and status.
+              Review your entries first. Saving and publishing require explicit actions and the local demo identity.
             </div>
             <p role="status" aria-live="polite" className="muted">
               {feedback}
@@ -436,17 +443,18 @@ export function FormulaCreator() {
                   ))}
                 </div>
                 <p className="muted">
-                  Local checks passed. This formula has not been saved, published or validated by the server.
+                  {saved ? 'This draft is stored on the server. Published versions retain their original content.' : 'Local checks passed. Review the content before saving to the server.'}
                 </p>
                 <div className="formula-actions">
-                  <Button variant="outline" onClick={() => setPreview(false)}>
+                  <Button variant="outline" disabled={saved||busy} onClick={() => setPreview(false)}>
                     <ArrowLeft size={16} />
                     Back to editor
                   </Button>
-                  <Button variant="outline" onClick={close}>
+                  <Button variant="outline" disabled={busy} onClick={close}>
                     Close preview
                   </Button>
                 </div>
+                <FormulaPersistence request={{productId:product,provenanceId:'prov_project_seed',items:items.map(i=>({materialId:i.material,specificationId:i.specification,quantity:i.quantity.trim()?Number(i.quantity):null,unit:i.unit.trim()||null}))}} onSaved={()=>{setSaved(true);setFeedback('Draft saved to the server.')}} onBusy={setBusy}/>
               </section>
             )}
           </>

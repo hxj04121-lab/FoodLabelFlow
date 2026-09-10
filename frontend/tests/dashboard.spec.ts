@@ -85,7 +85,7 @@ test('all routes, material details and honest unavailable states', async ({
   await expect(page.getByText('Cocoa', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Close dialog' }).click()
   await page.goto('/formulas')
-  await expect(page.getByText('Saving and publishing are not available')).toBeVisible()
+  await expect(page.getByText('Local demo saving and publishing')).toBeVisible()
   await page.screenshot({ path: 'test-results/formulas.png', fullPage: true })
 })
 

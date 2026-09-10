@@ -124,8 +124,8 @@ export function Catalog({ formulas = false }: { formulas?: boolean }) {
         <div className="availability-note">
           <ShieldCheck size={18} />
           <div>
-            <strong>Saving and publishing are not available</strong>
-            <p>Saving new versions will be available after write integration. Released history is preserved.</p>
+            <strong>Local demo saving and publishing</strong>
+            <p>Create a formula preview, enable the local demo identity, and save a draft. Publication requires a separate confirmation.</p>
           </div>
         </div>
       )}

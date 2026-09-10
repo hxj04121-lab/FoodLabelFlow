@@ -216,7 +216,7 @@ export function Shell() {
             <li>Use the detail tabs to view formula items, version history and sources.</li>
             <li>Browse suppliers and materials to inspect specifications and components.</li>
             <li>Catalog pages read from the M1 API. Refresh to reload; failed requests never fall back to offline data.</li>
-            <li>The preview profile is not a signed-in account. Saving, publishing and approvals are not available.</li>
+            <li>The preview profile is not a signed-in account. On localhost, the formula editor can explicitly enable the course demo identity for saving and publishing. Label approvals remain a separate workflow.</li>
           </ol>
         </DialogContent>
       </Dialog>

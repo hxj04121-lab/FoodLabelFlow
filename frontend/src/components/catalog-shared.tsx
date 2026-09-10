@@ -42,7 +42,7 @@ export function ReadOnlyNotice() {
     <div className="source-notice">
       <Database size={15} />
       <span>
-        Read-only data from the catalog API. Saving and publishing await identity and audit integration.
+        Data loaded from the catalog API. Formula writes use the local course identity and are not production sign-in.
       </span>
     </div>
   )

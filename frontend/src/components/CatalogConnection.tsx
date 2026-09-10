@@ -6,6 +6,7 @@ export function CatalogConnection({ children }: { children:ReactNode }) {
   const [state,setState]=useState<'loading'|'ready'|'error'>('loading')
   const [error,setError]=useState('')
   const [attempt,setAttempt]=useState(0)
+  useEffect(()=>{const refresh=()=>setAttempt(n=>n+1);window.addEventListener('catalog-updated',refresh);return()=>window.removeEventListener('catalog-updated',refresh)},[])
   useEffect(()=>{
     const controller=new AbortController()
     let active = true
@@ -16,5 +17,5 @@ export function CatalogConnection({ children }: { children:ReactNode }) {
   },[attempt])
   if(state==='loading') return <section className="panel upcoming" role="status"><h2>Loading catalog data</h2><p>Connecting to the catalog API and loading products, specifications and formula history.</p></section>
   if(state==='error') return <section className="panel upcoming"><h2>Catalog data is unavailable</h2><p role="alert">{error}</p><p>Start the M1 backend and try again. Offline preview data will not be substituted.</p><Button onClick={()=>setAttempt(attempt+1)}>Retry connection</Button></section>
-  return <><div className="source-notice">Connected to the M1 read-only API · Loaded at {loadedAt} · Writes await M4 identity and audit integration</div>{children}</>
+  return <><div className="source-notice">Connected to the M1 read-only API · Loaded at {loadedAt} · Local demo writes available in the formula editor</div>{children}</>
 }

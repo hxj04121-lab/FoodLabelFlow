@@ -1,5 +1,7 @@
 # M3 本地前端操作与交接
 
+2026-09-10 更新：英文界面已整合 main 29601a4，支持显式启用本地开发身份后 Save draft → Publish formula → Confirm publication → Refresh server history。真实本地写入和审计验证见 `docs/evidence/M3-S1-integrated-lifecycle.md`。下文 2026-09-08 的预览限制属于历史状态，最新运行结论以该集成记录为准。生产登录、人工验收与新集成提交的远程 CI 尚未完成。
+
 ## 本阶段可以演示的内容
 
 技术栈为 React、TypeScript、Tailwind CSS、shadcn/ui。概览、供应商、物料、产品和配方采用明确标注的只读基线数据；系统状态页调用真实健康接口。页面中的本地预览身份不是登录凭据。

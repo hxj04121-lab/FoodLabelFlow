@@ -1,11 +1,12 @@
 openapi: 3.1.0
 info:
   title: SpecTrace Allergen and Validation API
-  version: 0.1.0-draft
+  version: 1.0.0
   description: >-
-    Prepared M2 shared contract. It is not an assertion that these endpoints are
-    implemented or integrated. Reconcile it with accepted main and obtain cross-module
-    review before implementation.
+    M2 shared contract reconciled with the M1 catalog and M4/M5 identity/workflow
+    implementations on main. It defines the future allergen/validation HTTP boundary;
+    it is not an assertion that these endpoints are implemented. Successful responses
+    contain the resource directly. Every HTTP error uses ApiError.
 tags:
   - name: allergen
   - name: validation
@@ -33,6 +34,8 @@ paths:
                   $ref: '#/components/schemas/Allergen'
         '400':
           $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
         '403':
           $ref: '#/components/responses/AuthorizationDenied'
   /api/v1/label-versions/{labelVersionId}/validation-runs:
@@ -60,6 +63,8 @@ paths:
                 $ref: '#/components/schemas/ValidationRun'
         '400':
           $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
         '403':
           $ref: '#/components/responses/AuthorizationDenied'
         '404':
@@ -89,6 +94,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ValidationRun'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
         '403':
           $ref: '#/components/responses/AuthorizationDenied'
         '404':
@@ -113,6 +120,17 @@ components:
             code: INVALID_REQUEST
             message: ruleSetVersionId must be supplied.
             traceId: trace-example-001
+            evidenceId: null
+    AuthenticationRequired:
+      description: Credentials are absent, invalid, or do not map to an active identity.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            code: AUTHENTICATION_REQUIRED
+            message: Authentication is required.
+            traceId: trace-example-007
             evidenceId: null
     AuthorizationDenied:
       description: Authenticated actor lacks the M4-defined permission.
@@ -208,10 +226,12 @@ components:
           type: string
         status:
           type: string
-          description: Persisted lifecycle state defined by the validation module.
+          enum: [PASSED, FAILED]
+          description: Persisted lifecycle state constrained by the accepted database baseline.
         ranAt:
           type: string
           format: date-time
+          description: RFC 3339 timestamp normalized to UTC by the HTTP adapter.
         summary:
           type: string
         results:
@@ -238,6 +258,10 @@ components:
       type: object
       additionalProperties: false
       required: [code, message, traceId, evidenceId]
+      description: >-
+        Canonical error envelope for M1/M2/M4/M5 web adapters. Domain-specific codes
+        are permitted, but callers branch on code rather than message. traceId and
+        evidenceId remain null unless a genuine corresponding identifier exists.
       properties:
         code:
           type: string

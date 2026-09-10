@@ -19,6 +19,8 @@
 .error-jump { text-align:left; text-decoration:underline; text-underline-offset:3px; padding:4px 0; font-size:13px; }
 .discard-box p { margin-top:10px; color:#796a89; }
 .discard-symbol { display:grid; place-items:center; width:48px; height:48px; border-radius:14px; background:#f0eafa; color:#805bc6; margin-bottom:18px; }
+.persistence-panel { border-top:1px solid #e8e1f0; padding-top:20px; }
+.demo-consent { display:flex!important; align-items:center; gap:10px; padding:12px; background:#f6f3fc; border-radius:8px; }
 @media(max-width:560px) { .formula-fields { grid-template-columns:minmax(0,1fr); }.formula-section-heading { flex-wrap:wrap; }.formula-creator { padding:18px; } }
 
 @theme inline {
