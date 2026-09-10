@@ -61,7 +61,9 @@ References must already exist; provenance IDs identify genuine existing source e
 Formula items must reference a released, effective specification belonging to the same
 material. Trace never substitutes the newest specification for the referenced version.
 
-Errors include `code` and `message`; validation does not expose database exception text.
+Errors use the shared `ApiError` object with exactly `code`, `message`, `traceId`, and
+`evidenceId`. `traceId` and `evidenceId` are `null` unless real identifiers exist;
+validation does not expose database exception text.
 Codes: INVALID_REQUEST, RESOURCE_NOT_FOUND, DATA_CONFLICT, VERSION_IMMUTABLE,
 CURRENT_FORMULA_CHANGED, SPECIFICATION_MATERIAL_MISMATCH, SPECIFICATION_NOT_RELEASED,
 SPECIFICATION_NOT_EFFECTIVE, AUTHORIZATION_DENIED, CATALOG_INTEGRATION_UNAVAILABLE.

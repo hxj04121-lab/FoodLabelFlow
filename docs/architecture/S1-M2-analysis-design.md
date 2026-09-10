@@ -1,6 +1,7 @@
 # S1-M2 analysis-to-design trace
 
-Status: **prepared design material, pending current-main reconciliation and review**.
+Status: **design baseline merged in PR #3 and reconciled with the M1/M4/M5 runtime at
+`a3bb498bb565e4f53d8161ba837f833d6bb9167b`; closure review remains a real PR gate**.
 
 This trace follows the course chain: use-case flow → analysis objects/sequences →
 transition strategy → design objects/sequences. It supports the M2 S1 SAD/contract
