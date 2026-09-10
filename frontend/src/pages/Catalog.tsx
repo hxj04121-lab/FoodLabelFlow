@@ -7,7 +7,7 @@ import { FormulaCreator } from '@/components/FormulaCreator'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { groups, type Product } from '@/data/catalog'
-import data from '@/data/seed-preview.json'
+import { data } from '@/data/catalog'
 import { ProductDetails } from '@/features/catalog/ProductDetails'
 import { ProductTable } from '@/features/catalog/ProductTable'
 import {
@@ -42,15 +42,15 @@ export function Catalog({ formulas = false }: { formulas?: boolean }) {
           <div className="eyebrow">
             {formulas ? 'VERSIONED & TRACEABLE' : 'YOUR PRODUCT LIBRARY'}
           </div>
-          <h1>{formulas ? '配方版本' : '产品目录'}</h1>
+          <h1>{formulas ? 'Formula versions' : 'Products'}</h1>
           <p>
             {formulas
-              ? '查看每个产品的物料引用与配方历史。'
-              : '集中查看产品档案与上游供应链关联。'}
+              ? 'Explore material references and formula history for each product.'
+              : 'Browse product records and their upstream supply links.'}
           </p>
         </div>
         <Button variant="outline" onClick={() => exportProducts(filtered)}>
-          <ArrowDownToLine size={16} /> 导出当前列表
+          <ArrowDownToLine size={16} /> Export list
         </Button>
       </div>
       <ReadOnlyNotice />
@@ -64,8 +64,8 @@ export function Catalog({ formulas = false }: { formulas?: boolean }) {
           <div className="search-box">
             <Search size={17} />
             <Input
-              aria-label="搜索产品"
-              placeholder="搜索产品、品牌或 FDC 编号…"
+              aria-label="Search products"
+              placeholder="Search products, brands or FDC IDs…"
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value)
@@ -74,21 +74,21 @@ export function Catalog({ formulas = false }: { formulas?: boolean }) {
             />
           </div>
           <select
-            aria-label="筛选基线分组"
+            aria-label="Filter fixture group"
             value={group}
             onChange={(e) => {
               setGroup(e.target.value)
               setPage(1)
             }}
           >
-            <option value="all">全部分组</option>
+            <option value="all">All groups</option>
             {Object.entries(groups).map(([key, label]) => (
               <option key={key} value={key}>
                 {label}
               </option>
             ))}
           </select>
-          <span className="results-count">{filtered.length} 个产品</span>
+          <span className="results-count">{filtered.length} products</span>
         </div>
         <ProductTable
           products={filtered.slice((page - 1) * 8, page * 8)}
@@ -96,13 +96,13 @@ export function Catalog({ formulas = false }: { formulas?: boolean }) {
         />
         <div className="pagination">
           <span>
-            第 {page} / {total} 页 · 基线只读数据
+            Page {page} / {total} · Read-only API data
           </span>
           <div>
             <Button
               variant="outline"
               size="icon"
-              aria-label="上一页"
+              aria-label="Previous page"
               disabled={page === 1}
               onClick={() => setPage(page - 1)}
             >
@@ -111,7 +111,7 @@ export function Catalog({ formulas = false }: { formulas?: boolean }) {
             <Button
               variant="outline"
               size="icon"
-              aria-label="下一页"
+              aria-label="Next page"
               disabled={page >= total}
               onClick={() => setPage(page + 1)}
             >
@@ -124,8 +124,8 @@ export function Catalog({ formulas = false }: { formulas?: boolean }) {
         <div className="availability-note">
           <ShieldCheck size={18} />
           <div>
-            <strong>服务器保存与发布暂未开放</strong>
-            <p>配方接口接入后，可在这里创建新版本；已发布版本始终保留历史。</p>
+            <strong>Local demo saving and publishing</strong>
+            <p>Create a formula preview, enable the local demo identity, and save a draft. Publication requires a separate confirmation.</p>
           </div>
         </div>
       )}

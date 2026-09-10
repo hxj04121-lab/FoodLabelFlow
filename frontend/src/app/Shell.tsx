@@ -39,15 +39,16 @@ import {
   useNavigate,
 } from 'react-router-dom'
 const navigation = [
-  { path: '/', label: '工作概览', icon: LayoutDashboard },
-  { path: '/suppliers', label: '供应商', icon: Truck },
-  { path: '/materials', label: '物料与规格', icon: Layers3 },
-  { path: '/products', label: '产品目录', icon: Package },
-  { path: '/formulas', label: '配方版本', icon: FlaskConical },
-  { path: '/labels', label: '标签管理', icon: FileText },
-  { path: '/impact', label: '变更影响', icon: GitBranch },
-  { path: '/reviews', label: '审核工作台', icon: ClipboardCheck },
+  { path: '/', label: 'Overview', icon: LayoutDashboard },
+  { path: '/suppliers', label: 'Suppliers', icon: Truck },
+  { path: '/materials', label: 'Materials & specs', icon: Layers3 },
+  { path: '/products', label: 'Products', icon: Package },
+  { path: '/formulas', label: 'Formula versions', icon: FlaskConical },
+  { path: '/labels', label: 'Labels', icon: FileText },
+  { path: '/impact', label: 'Change impact', icon: GitBranch },
+  { path: '/reviews', label: 'Review workspace', icon: ClipboardCheck },
 ]
+import { CatalogConnection } from '@/components/CatalogConnection'
 export function Shell() {
   const [mobile, setMobile] = useState(false)
   const [help, setHelp] = useState(false)
@@ -60,21 +61,21 @@ export function Shell() {
   return (
     <div className="app-shell">
       <a href="#main" className="skip-link">
-        跳到主要内容
+        Skip to main content
       </a>
       <header className="topbar">
         <div className="wordmark">
           <span className="logo">
             <Layers3 size={23} />
           </span>
-          SpecTrace<span className="workspace-label">食品标签工作空间</span>
+          SpecTrace<span className="workspace-label">Food label workspace</span>
         </div>
         <div className="topbar-right">
           <span className="environment">
             <span />
-            本地工作空间
+            Local workspace
           </span>
-          <button aria-label="使用帮助" onClick={() => setHelp(true)}>
+          <button aria-label="Help" onClick={() => setHelp(true)}>
             <CircleHelp size={19} />
           </button>
           <span className="topbar-divider" />
@@ -84,7 +85,7 @@ export function Shell() {
       {mobile && (
         <button
           className="mobile-overlay"
-          aria-label="关闭导航遮罩"
+          aria-label="Dismiss navigation overlay"
           onClick={() => setMobile(false)}
         />
       )}
@@ -99,14 +100,14 @@ export function Shell() {
           </div>
           <button
             className="mobile-close"
-            aria-label="关闭导航"
+            aria-label="Close navigation"
             onClick={() => setMobile(false)}
           >
             <X size={18} />
           </button>
         </div>
-        <p className="nav-section-label">工作空间</p>
-        <nav aria-label="主导航">
+        <p className="nav-section-label">Workspace</p>
+        <nav aria-label="Main navigation">
           {navigation.map((n, i) => (
             <NavLink
               end={n.path === '/'}
@@ -127,25 +128,25 @@ export function Shell() {
             <span className="version-icon">
               <ShieldCheck size={21} />
             </span>
-            <strong>版本始终可追溯</strong>
-            <p>保留过去，准确管理每一次变化。</p>
+            <strong>Always traceable</strong>
+            <p>Preserve history. Keep every change in view.</p>
           </div>
           <NavLink
             to="/health"
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
           >
             <Activity size={18} />
-            <span>系统状态</span>
+            <span>System status</span>
           </NavLink>
           <button className="nav-item" onClick={() => setHelp(true)}>
             <CircleHelp size={18} />
-            <span>使用指南</span>
+            <span>User guide</span>
           </button>
           <div className="user-card">
             <span className="avatar">XF</span>
             <div>
               <strong>Xu Feiyang</strong>
-              <small>M3 · 本地预览身份</small>
+              <small>M3 · Preview profile</small>
             </div>
           </div>
         </div>
@@ -155,16 +156,16 @@ export function Shell() {
           <div className="breadcrumb">
             <button
               className="mobile-toggle"
-              aria-label="展开导航"
+              aria-label="Open navigation"
               onClick={() => setMobile(true)}
             >
               <Menu size={20} />
             </button>
-            <span>工作空间</span>
+            <span>Workspace</span>
             <ChevronRight size={14} />
             <strong>
               {active?.label ??
-                (location.pathname === '/health' ? '系统状态' : '页面')}
+                (location.pathname === '/health' ? 'System status' : 'Page')}
             </strong>
           </div>
           <button
@@ -172,16 +173,16 @@ export function Shell() {
             onClick={() => navigate('/products')}
           >
             <Search size={16} />
-            <span>搜索产品与配方</span>
+            <span>Find products and formulas</span>
           </button>
         </div>
         <main id="main">
           <Routes>
-            <Route path="/" element={<Overview />} />
-            <Route path="/products" element={<Catalog />} />
-            <Route path="/formulas" element={<Catalog formulas />} />
-            <Route path="/suppliers" element={<Materials suppliers />} />
-            <Route path="/materials" element={<Materials />} />
+            <Route path="/" element={<CatalogConnection><Overview /></CatalogConnection>} />
+            <Route path="/products" element={<CatalogConnection><Catalog /></CatalogConnection>} />
+            <Route path="/formulas" element={<CatalogConnection><Catalog formulas /></CatalogConnection>} />
+            <Route path="/suppliers" element={<CatalogConnection><Materials suppliers /></CatalogConnection>} />
+            <Route path="/materials" element={<CatalogConnection><Materials /></CatalogConnection>} />
             <Route path="/labels" element={<Upcoming kind="labels" />} />
             <Route path="/impact" element={<Upcoming kind="impact" />} />
             <Route path="/reviews" element={<Upcoming kind="reviews" />} />
@@ -190,32 +191,32 @@ export function Shell() {
               path="*"
               element={
                 <Panel className="upcoming">
-                  <h1>页面不存在</h1>
-                  <Button onClick={() => navigate('/')}>返回工作概览</Button>
+                  <h1>Page not found</h1>
+                  <Button onClick={() => navigate('/')}>Back to overview</Button>
                 </Panel>
               }
             />
           </Routes>
           <footer className="page-footer">
             <span>SpecTrace · Food label change control</span>
-            <span>本地预览 / 单市场 MVP</span>
+            <span>Local workspace / Single-market MVP</span>
           </footer>
         </main>
       </div>
       <Dialog open={help} onOpenChange={setHelp}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>欢迎使用 SpecTrace</DialogTitle>
+            <DialogTitle>Welcome to SpecTrace</DialogTitle>
             <DialogDescription>
-              当前版本支持浏览基线产品、物料和配方追溯。
+              Browse products, materials and formula traceability.
             </DialogDescription>
           </DialogHeader>
           <ol className="help-list">
-            <li>在产品目录中搜索名称、品牌或编号，点击产品查看配方。</li>
-            <li>在详情弹窗中切换配方、版本历史与数据来源。</li>
-            <li>供应商和物料页面可查看具体规格和成分。</li>
-            <li>业务数据为 V3 种子快照；只有系统状态页读取实时健康接口。</li>
-            <li>本地预览身份不代表已登录，创建、发布和审批尚未开放。</li>
+            <li>Search by product name, brand or ID, then select a product to view its formula.</li>
+            <li>Use the detail tabs to view formula items, version history and sources.</li>
+            <li>Browse suppliers and materials to inspect specifications and components.</li>
+            <li>Catalog pages read from the M1 API. Refresh to reload; failed requests never fall back to offline data.</li>
+            <li>The preview profile is not a signed-in account. On localhost, the formula editor can explicitly enable the course demo identity for saving and publishing. Label approvals remain a separate workflow.</li>
           </ol>
         </DialogContent>
       </Dialog>

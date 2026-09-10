@@ -33,15 +33,22 @@ const catalogHeaders = {
   'X-External-Subject': 'dev-external-admin',
 }
 
+export class CatalogRequestError extends Error {
+  constructor(public code: string, message: string, public status: number) { super(message) }
+}
 async function catalogRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, init)
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 15000)
+  try {
+  const response = await fetch(path, { ...init, signal: controller.signal })
   if (!response.ok) {
     const error = (await response.json().catch(() => null)) as
       | { code?: string; message?: string }
       | null
-    throw new Error(error?.message || error?.code || `Request failed with status ${response.status}`)
+    throw new CatalogRequestError(error?.code || 'HTTP_ERROR', error?.message || `Request failed with status ${response.status}`, response.status)
   }
   return response.json() as Promise<T>
+  } finally { clearTimeout(timer) }
 }
 
 export async function getHealth(): Promise<HealthResponse> {

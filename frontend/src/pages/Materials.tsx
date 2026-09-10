@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { type Material } from '@/data/catalog'
-import data from '@/data/seed-preview.json'
+import { data } from '@/data/catalog'
 import { ArrowUpRight, Check, Search, Truck } from 'lucide-react'
 import { useState } from 'react'
 export function Materials({ suppliers = false }: { suppliers?: boolean }) {
@@ -31,8 +31,8 @@ export function Materials({ suppliers = false }: { suppliers?: boolean }) {
       <div className="page-title">
         <div>
           <div className="eyebrow">SUPPLY CHAIN DIRECTORY</div>
-          <h1>{suppliers ? '供应商' : '物料与规格'}</h1>
-          <p>从供应商到具体规格，保留每一层关联。</p>
+          <h1>{suppliers ? 'Suppliers' : 'Materials & specs'}</h1>
+          <p>Follow every link from supplier to specification.</p>
         </div>
         <SourceBadge />
       </div>
@@ -44,7 +44,7 @@ export function Materials({ suppliers = false }: { suppliers?: boolean }) {
               <span className={`supplier-icon tone-${i}`}>
                 <Truck size={25} />
               </span>
-              <Badge variant="outline">项目演示</Badge>
+              <Badge variant="outline">Demo fixture</Badge>
               <h2>{s.supplier_name}</h2>
               <p>{s.supplier_code}</p>
               <div className="supplier-stats">
@@ -55,7 +55,7 @@ export function Materials({ suppliers = false }: { suppliers?: boolean }) {
                     ).length
                   }
                 </strong>
-                <span>关联物料</span>
+                <span>Linked materials</span>
               </div>
               {data.supplier_material
                 .filter((m) => m.supplier_id === s.supplier_id)
@@ -78,23 +78,23 @@ export function Materials({ suppliers = false }: { suppliers?: boolean }) {
             <div className="search-box">
               <Search size={17} />
               <Input
-                aria-label="搜索物料"
-                placeholder="搜索物料名称或编号…"
+                aria-label="Search materials"
+                placeholder="Search material names or codes…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
-            <span className="results-count">{filtered.length} 种物料</span>
+            <span className="results-count">{filtered.length} materials</span>
           </div>
           <div className="table-scroll">
             <table>
               <thead>
                 <tr>
-                  <th>供应商物料</th>
-                  <th>供应商</th>
-                  <th>规格版本</th>
-                  <th>状态</th>
-                  <th>详情</th>
+                  <th>Supplier material</th>
+                  <th>Suppliers</th>
+                  <th>Specification version</th>
+                  <th>Status</th>
+                  <th>Details</th>
                 </tr>
               </thead>
               <tbody>
@@ -119,15 +119,15 @@ export function Materials({ suppliers = false }: { suppliers?: boolean }) {
                         )?.supplier_name
                       }
                     </td>
-                    <td>V1</td>
+                    <td>{data.ingredient_specification_version.filter(s=>s.supplier_material_id===m.supplier_material_id).map(s=>`V${s.version_number}`).join(' / ') || 'No specifications'}</td>
                     <td>
-                      <span className="group-tag teal">已发布</span>
+                      <span className="group-tag teal">{data.ingredient_specification_version.filter(s=>s.supplier_material_id===m.supplier_material_id).map(s=>s.lifecycle_status).join(' / ') || '—'}</span>
                     </td>
                     <td>
                       <Button
                         variant="ghost"
                         size="icon"
-                        aria-label={`查看 ${m.material_name}`}
+                        aria-label={`View ${m.material_name}`}
                         onClick={() => setSelected(m)}
                       >
                         <ArrowUpRight size={17} />
@@ -138,7 +138,7 @@ export function Materials({ suppliers = false }: { suppliers?: boolean }) {
               </tbody>
             </table>
             {filtered.length === 0 && (
-              <div className="empty-search">没有匹配的物料</div>
+              <div className="empty-search">No matching materials</div>
             )}
           </div>
         </Panel>
@@ -150,7 +150,7 @@ export function Materials({ suppliers = false }: { suppliers?: boolean }) {
         <DialogContent className="detail-dialog">
           <DialogHeader>
             <DialogTitle>{selected?.material_name}</DialogTitle>
-            <DialogDescription>物料规格与上游成分 · 基线快照</DialogDescription>
+            <DialogDescription>Specifications and components · API snapshot</DialogDescription>
           </DialogHeader>
           {selected && (
             <>
@@ -164,10 +164,10 @@ export function Materials({ suppliers = false }: { suppliers?: boolean }) {
                 .map((s) => (
                   <div key={s.specification_version_id}>
                     <div className="detail-summary">
-                      <strong>规格 V{s.version_number}</strong>
+                      <strong>Spec V{s.version_number}</strong>
                       <Badge variant="outline">{s.lifecycle_status}</Badge>
                     </div>
-                    <p className="muted">生效日期 {s.effective_date}</p>
+                    <p className="muted">Effective date {s.effective_date}</p>
                     <div className="trace-list">
                       {data.spec_component
                         .filter(
@@ -189,9 +189,9 @@ export function Materials({ suppliers = false }: { suppliers?: boolean }) {
                   </div>
                 ))}
               <div className="dialog-bottom">
-                <span>来源：PROJECT_SEEDED</span>
+                <span>Source: PROJECT_SEEDED</span>
                 <Button variant="outline" onClick={() => setSelected(null)}>
-                  关闭
+                  Close
                 </Button>
               </div>
             </>

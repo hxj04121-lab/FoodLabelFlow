@@ -1,6 +1,6 @@
 import { ProductGlyph } from '@/components/catalog-shared'
 import { Button } from '@/components/ui/button'
-import { groupColors, groups, type Product } from '@/data/catalog'
+import { data, groupColors, groups, type Product } from '@/data/catalog'
 import { ArrowUpRight, Search } from 'lucide-react'
 const short = (text: string) =>
   text.length > 52 ? text.slice(0, 52) + '…' : text
@@ -18,12 +18,12 @@ export function ProductTable({
       <table>
         <thead>
           <tr>
-            <th>产品名称</th>
-            <th>品牌 / 所有者</th>
-            <th>配方版本</th>
-            {!compact && <th>基线分组</th>}
+            <th>Product name</th>
+            <th>Brand / owner</th>
+            <th>Formula versions</th>
+            {!compact && <th>Fixture group</th>}
             <th>
-              <span className="sr-only">操作</span>
+              <span className="sr-only">Actions</span>
             </th>
           </tr>
         </thead>
@@ -45,8 +45,8 @@ export function ProductTable({
                 <span className="brand-cell">{p.brand_owner}</span>
               </td>
               <td>
-                <span className="version-chip">V1</span>
-                <span className="released-dot" /> 已发布
+                <span className="version-chip">{data.formula_version.find(f=>f.formula_version_id===p.current_formula_version_id)?.version_number ?? '—'}</span>
+                {data.formula_version.find(f=>f.formula_version_id===p.current_formula_version_id)?.lifecycle_status ?? 'No current formula'}
               </td>
               {!compact && (
                 <td>
@@ -59,7 +59,7 @@ export function ProductTable({
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label={`查看 ${p.product_description}`}
+                  aria-label={`View ${p.product_description}`}
                   onClick={() => onSelect(p)}
                 >
                   <ArrowUpRight size={17} />
@@ -72,8 +72,8 @@ export function ProductTable({
       {products.length === 0 && (
         <div className="empty-search">
           <Search />
-          <h3>没有匹配的产品</h3>
-          <p>试试其他名称、品牌或 FDC 编号。</p>
+          <h3>No matching products</h3>
+          <p>Try another name, brand or FDC ID.</p>
         </div>
       )}
     </div>

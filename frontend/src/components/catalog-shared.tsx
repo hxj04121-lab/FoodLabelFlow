@@ -33,7 +33,7 @@ export function SectionHead({
 export function SourceBadge() {
   return (
     <Badge variant="outline" className="source-badge">
-      <Database size={12} /> 基线预览
+      <Database size={12} /> API data
     </Badge>
   )
 }
@@ -42,7 +42,7 @@ export function ReadOnlyNotice() {
     <div className="source-notice">
       <Database size={15} />
       <span>
-        当前展示数据库种子文件的只读快照，非实时业务数据。创建、发布与审核将在对应接口接入后开放。
+        Data loaded from the catalog API. Formula writes use the local course identity and are not production sign-in.
       </span>
     </div>
   )

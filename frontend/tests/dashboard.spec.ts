@@ -1,19 +1,19 @@
-import { test, expect } from '@playwright/test'
+import { test, expect } from './catalog-fixture'
 
 test('overview, chart switching and CSV export', async ({ page }) => {
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message))
   await page.goto('/')
   await expect(
-    page.getByRole('heading', { name: '工作概览', exact: true }),
+    page.getByRole('heading', { name: 'Overview', exact: true }),
   ).toBeVisible()
-  await expect(page.getByText('非实时业务数据', { exact: false })).toBeVisible()
-  await page.getByRole('button', { name: '按分组', exact: true }).click()
-  await expect(page.getByRole('img', { name: /已声明大豆: 20/ })).toBeVisible()
-  await page.getByRole('button', { name: '按物料', exact: true }).click()
+  await expect(page.getByText('Connected to the M1 read-only API', { exact: false })).toBeVisible()
+  await page.getByRole('button', { name: 'By group', exact: true }).click()
+  await expect(page.locator('.bar-chart')).toHaveAttribute('aria-label', /Soy declared: 20/)
+  await page.getByRole('button', { name: 'By material', exact: true }).click()
   await expect(page.getByRole('img', { name: /Chocolate: 40/ })).toBeVisible()
   const downloading = page.waitForEvent('download')
-  await page.getByRole('button', { name: '导出基线', exact: true }).click()
+  await page.getByRole('button', { name: 'Export data', exact: true }).click()
   expect((await downloading).suggestedFilename()).toBe(
     'spectrace-seed-preview.csv',
   )
@@ -25,18 +25,18 @@ test('product search, group filter, pagination and traceability tabs', async ({
   page,
 }) => {
   await page.goto('/products')
-  await page.getByRole('button', { name: '下一页' }).click()
-  await expect(page.getByText('第 2 / 8 页', { exact: false })).toBeVisible()
+  await page.getByRole('button', { name: 'Next page' }).click()
+  await expect(page.getByText('Page 2 / 8', { exact: false })).toBeVisible()
   await page
-    .getByRole('combobox', { name: '筛选基线分组' })
+    .getByRole('combobox', { name: 'Filter fixture group' })
     .selectOption('REVIEW_REQUIRED_BASELINE_NO_SOY')
-  await expect(page.getByText('20 个产品', { exact: true })).toBeVisible()
+  await expect(page.getByText('20 products', { exact: true })).toBeVisible()
   await page.getByRole('combobox').selectOption('all')
-  await page.getByRole('textbox', { name: '搜索产品' }).fill('1106285')
+  await page.getByRole('textbox', { name: 'Search products' }).fill('1106285')
   await expect(page.locator('tbody tr')).toHaveCount(1)
   await page
     .getByRole('button', {
-      name: '查看 PLAIN BREAD CRUMBS, PLAIN',
+      name: 'View PLAIN BREAD CRUMBS, PLAIN',
       exact: true,
     })
     .click()
@@ -44,21 +44,19 @@ test('product search, group filter, pagination and traceability tabs', async ({
   await expect(
     page.getByText('spec_chocolate_v1', { exact: true }),
   ).toBeVisible()
-  await page.getByRole('tab', { name: '版本历史' }).click()
+  await page.getByRole('tab', { name: 'Version history' }).click()
+  await expect(page.getByRole('tabpanel')).toContainText('RELEASED')
+  await page.getByRole('tab', { name: 'Data sources' }).click()
   await expect(
-    page.getByText('实时版本历史尚未接入', { exact: false }),
-  ).toBeVisible()
-  await page.getByRole('tab', { name: '数据来源' }).click()
-  await expect(
-    page.getByText('不代表该品牌的真实供应链', { exact: false }),
+    page.getByText('not the actual supply chain of the brand', { exact: false }),
   ).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await page
-    .getByRole('textbox', { name: '搜索产品' })
+    .getByRole('textbox', { name: 'Search products' })
     .fill('no-such-product-xyz')
   await expect(
-    page.getByRole('heading', { name: '没有匹配的产品' }),
+    page.getByRole('heading', { name: 'No matching products' }),
   ).toBeVisible()
 })
 
@@ -66,12 +64,12 @@ test('all routes, material details and honest unavailable states', async ({
   page,
 }) => {
   for (const [route, heading] of [
-    ['/suppliers', '供应商'],
-    ['/materials', '物料与规格'],
-    ['/formulas', '配方版本'],
-    ['/labels', '标签管理'],
-    ['/impact', '变更影响'],
-    ['/reviews', '审核工作台'],
+    ['/suppliers', 'Suppliers'],
+    ['/materials', 'Materials & specs'],
+    ['/formulas', 'Formula versions'],
+    ['/labels', 'Labels'],
+    ['/impact', 'Change impact'],
+    ['/reviews', 'Review workspace'],
   ]) {
     await page.goto(route)
     await expect(
@@ -79,15 +77,15 @@ test('all routes, material details and honest unavailable states', async ({
     ).toBeVisible()
   }
   await page.goto('/materials')
-  await page.getByRole('textbox', { name: '搜索物料' }).fill('CHOC_BASE')
+  await page.getByRole('textbox', { name: 'Search materials' }).fill('CHOC_BASE')
   await expect(page.locator('tbody tr')).toHaveCount(1)
   await page
-    .getByRole('button', { name: '查看 Chocolate Base', exact: true })
+    .getByRole('button', { name: 'View Chocolate Base', exact: true })
     .click()
   await expect(page.getByText('Cocoa', { exact: true })).toBeVisible()
-  await page.getByRole('button', { name: '关闭弹窗' }).click()
+  await page.getByRole('button', { name: 'Close dialog' }).click()
   await page.goto('/formulas')
-  await expect(page.getByText('服务器保存与发布暂未开放')).toBeVisible()
+  await expect(page.getByText('Local demo saving and publishing')).toBeVisible()
   await page.screenshot({ path: 'test-results/formulas.png', fullPage: true })
 })
 
@@ -99,12 +97,12 @@ test('mobile navigation and no page-wide overflow', async ({ page }) => {
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBeTruthy()
-  await page.getByRole('button', { name: '展开导航' }).click()
-  await page.getByRole('link', { name: '产品目录', exact: true }).click()
+  await page.getByRole('button', { name: 'Open navigation' }).click()
+  await page.getByRole('link', { name: 'Products', exact: true }).click()
   await expect(
-    page.getByRole('heading', { name: '产品目录', exact: true }),
+    page.getByRole('heading', { name: 'Products', exact: true }),
   ).toBeVisible()
-  await expect(page.getByRole('button', { name: '关闭导航遮罩' })).toHaveCount(
+  await expect(page.getByRole('button', { name: 'Dismiss navigation overlay' })).toHaveCount(
     0,
   )
   expect(
@@ -122,11 +120,11 @@ test('health success, error and retry states', async ({ page }) => {
     route.fulfill({ json: { status: 'ok', database: 'ok' } }),
   )
   await page.goto('/health')
-  await expect(page.getByText('运行正常')).toHaveCount(2)
+  await expect(page.getByText('Healthy')).toHaveCount(2)
   await page.unroute('**/api/health')
   await page.route('**/api/health', (route) =>
     route.fulfill({ status: 503, body: 'Unavailable' }),
   )
-  await page.getByRole('button', { name: '重新检查' }).click()
+  await page.getByRole('button', { name: 'Check again' }).click()
   await expect(page.getByRole('alert')).toContainText('503')
 })

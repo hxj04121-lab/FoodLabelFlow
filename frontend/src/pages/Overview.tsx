@@ -7,7 +7,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { groups, type Product } from '@/data/catalog'
-import data from '@/data/seed-preview.json'
+import { data } from '@/data/catalog'
 import { ProductDetails } from '@/features/catalog/ProductDetails'
 import { ProductTable } from '@/features/catalog/ProductTable'
 import {
@@ -46,44 +46,44 @@ export function Overview() {
         <div>
           <div className="eyebrow">YOUR WORKSPACE, AT A GLANCE</div>
           <h1>
-            工作概览 <span className="hello-dot" />
+            Overview <span className="hello-dot" />
           </h1>
-          <p>从原料到标签，每一个版本都有迹可循。</p>
+          <p>Every version connected, from ingredient to label.</p>
         </div>
         <Button variant="outline" onClick={() => exportProducts(data.product)}>
-          <ArrowDownToLine size={16} /> 导出基线
+          <ArrowDownToLine size={16} /> Export data
         </Button>
       </div>
       <ReadOnlyNotice />
       <div className="metrics-grid">
         {[
           {
-            label: '产品档案',
+            label: 'Product records',
             value: data.product.length,
-            unit: '个产品',
+            unit: 'products',
             icon: Package,
-            note: '已关联配方版本',
+            note: 'Linked formula versions',
           },
           {
-            label: '供应商',
+            label: 'Suppliers',
             value: data.supplier.length,
-            unit: '家供应商',
+            unit: 'suppliers',
             icon: Truck,
-            note: '项目演示供应链',
+            note: 'Demo supply chain',
           },
           {
-            label: '供应商物料',
+            label: 'Supplier material',
             value: data.supplier_material.length,
-            unit: '种物料',
+            unit: 'materials',
             icon: Layers3,
-            note: '规格版本可追溯',
+            note: 'Versioned specifications',
           },
           {
-            label: '配方版本',
+            label: 'Formula versions',
             value: data.formula_version.length,
-            unit: '个版本',
+            unit: 'versions',
             icon: FlaskConical,
-            note: '基线已发布版本',
+            note: 'Versions loaded',
           },
         ].map((metric, i) => (
           <Panel
@@ -108,21 +108,21 @@ export function Overview() {
       <div className="overview-charts">
         <Panel>
           <SectionHead
-            title="供应链数据概览"
-            caption="配方引用分布 · 数据库基线"
+            title="Supply chain overview"
+            caption="Formula references · Database snapshot"
             action={
               <div className="segmented">
                 <button
                   className={chart === 'materials' ? 'active' : ''}
                   onClick={() => setChart('materials')}
                 >
-                  按物料
+                  By material
                 </button>
                 <button
                   className={chart === 'groups' ? 'active' : ''}
                   onClick={() => setChart('groups')}
                 >
-                  按分组
+                  By group
                 </button>
               </div>
             }
@@ -134,17 +134,17 @@ export function Overview() {
                 : data.product.length}
             </strong>
             <span>
-              {chart === 'materials' ? '条配方物料引用' : '个基线产品'}
+              {chart === 'materials' ? 'material references' : 'products'}
             </span>
-            <Badge variant="outline">V3 基线</Badge>
+            <Badge variant="outline">API data</Badge>
           </div>
           <div
             className="bar-chart"
             role="img"
-            aria-label={bars.map((b) => `${b.name}: ${b.count}`).join('；')}
+            aria-label={bars.map((b) => `${b.name}: ${b.count}`).join('; ')}
           >
             <div className="axis-labels">
-              {[60, 45, 30, 15, 0].map((n) => (
+              {[1,.75,.5,.25,0].map(f=>Math.ceil(Math.max(4,...bars.map(b=>b.count))/4)*4*f).map((n) => (
                 <span key={n}>{n}</span>
               ))}
             </div>
@@ -153,7 +153,7 @@ export function Overview() {
                 <div className="bar-column" key={b.name}>
                   <div
                     className={`bar bar-${i}`}
-                    style={{ height: `${(b.count / 60) * 100}%` }}
+                    style={{ height: `${(b.count / (Math.ceil(Math.max(4,...bars.map(b=>b.count))/4)*4)) * 100}%` }}
                   >
                     <span>{b.count}</span>
                   </div>
@@ -165,18 +165,18 @@ export function Overview() {
         </Panel>
         <Panel>
           <SectionHead
-            title="演示数据分组"
-            caption="分组不代表已执行的影响分析"
+            title="Demo dataset groups"
+            caption="Fixture groups, not impact analysis results"
           />
           <div className="donut-layout">
             <div
-              className="donut"
+              className="donut" style={{ background: (()=>{const total=data.product.length || 1; const a=data.product.filter(p=>p.fixture_group==="REVIEW_REQUIRED_BASELINE_NO_SOY").length/total*100; const b=a+data.product.filter(p=>p.fixture_group==="NO_ACTION_BASELINE_SOY").length/total*100; return `conic-gradient(#8862e4 0 ${a}%,#5dcfc4 ${a}% ${b}%,#6fb8e5 ${b}% 100%)`})() }}
               role="img"
-              aria-label="三组基线数据各20个产品"
+              aria-label={Object.entries(groups).map(([key,label])=>`${label}: ${data.product.filter(p=>p.fixture_group===key).length}`).join("; ")}
             >
               <div>
-                <strong>60</strong>
-                <span>基线产品</span>
+                <strong>{data.product.length}</strong>
+                <span>Product</span>
               </div>
             </div>
             <div className="donut-legend">
@@ -196,11 +196,11 @@ export function Overview() {
       <div className="overview-bottom">
         <Panel>
           <SectionHead
-            title="产品档案"
-            caption="查看产品、配方和上游规格"
+            title="Product records"
+            caption="Explore products, formulas and specifications"
             action={
               <Button variant="ghost" onClick={() => navigate('/products')}>
-                全部产品 <ArrowRight size={16} />
+                All products <ArrowRight size={16} />
               </Button>
             }
           />
@@ -214,17 +214,17 @@ export function Overview() {
           <span className="journey-icon">
             <GitBranch size={24} />
           </span>
-          <h2>让变更有据可查</h2>
-          <p>沿着物料与配方的关联，查看产品使用的具体规格版本。</p>
+          <h2>Trace every change</h2>
+          <p>Follow material and formula links to the exact specification used.</p>
           <div className="mini-journey">
-            <span>原料规格</span>
-            <span>配方版本</span>
-            <span>产品档案</span>
+            <span>Specifications</span>
+            <span>Formula versions</span>
+            <span>Product records</span>
           </div>
           <Button onClick={() => navigate('/formulas')}>
-            探索配方追溯 <ArrowUpRight size={16} />
+            Explore formulas <ArrowUpRight size={16} />
           </Button>
-          <small>标签与审核功能将在后续阶段接入</small>
+          <small>Labels and reviews will be connected in a later phase</small>
         </Panel>
       </div>
       <ProductDetails product={selected} close={() => setSelected(null)} />
