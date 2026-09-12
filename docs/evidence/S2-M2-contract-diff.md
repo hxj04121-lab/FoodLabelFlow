@@ -3,6 +3,7 @@
 Evidence captured: 2026-09-12T12:32:54+08:00 (Asia/Shanghai)  
 Repository baseline: `origin/main` at `6fa40184ffeb3805e9b66bd948935de08dbbc547`  
 Working branch: `codex/s2-m2-contract-diff`  
+Pull request: [#13](https://github.com/hxj04121-lab/FoodLabelFlow/pull/13)  
 Jira: [SCRUM-13](https://hxj04121.atlassian.net/browse/SCRUM-13), observed status `正在进行` (id `10002`), Sprint 2 `future`, Story Points `15`
 
 This is a Day 1 candidate note. It records the contract boundary and the decisions to
@@ -160,9 +161,9 @@ introduced by this diff.
 
 | Reviewer boundary | Required review question | Status at candidate creation |
 | --- | --- | --- |
-| M1 / Huang Xiangjia | Are snapshot/fact/finding semantics compatible with the owned derivation/orchestration boundary? | Requested on the M2 PR after publication; acceptance pending. |
-| M4 / Zhu Wenyu | Are 401/403 semantics, permission handoff, and lifecycle/current-version assumptions compatible with identity/workflow ownership? | Requested on the M2 PR after publication; acceptance pending. |
-| M5 / Sun Huajian | Are persistence field/status mappings and future fixture consumption compatible with the MySQL/Testcontainers harness? | Requested on the M2 PR after publication; acceptance pending. |
+| M1 / Huang Xiangjia | Are snapshot/fact/finding semantics compatible with the owned derivation/orchestration boundary? | Requested on PR #13 to `hxj04121-lab`; acceptance pending. |
+| M4 / Zhu Wenyu | Are 401/403 semantics, permission handoff, and lifecycle/current-version assumptions compatible with identity/workflow ownership? | Requested on PR #13 to `zhuwenyu04`; acceptance pending. |
+| M5 / Sun Huajian | Are persistence field/status mappings and future fixture consumption compatible with the MySQL/Testcontainers harness? | Requested on PR #13 to `SHJ-SHJ0128`; acceptance pending. |
 | M3 / Xu Feiyang | Optional compatibility feedback on direct response/error field names. | Optional; not a Day 1 freezer. |
 
 The review requests are not approval claims. Contract freeze remains pending until
@@ -176,6 +177,8 @@ real M1/M4/M5 review evidence exists.
   under `.project-control/sprint/S2/`.
 - CI workflow inspected: backend Maven/Testcontainers verification, frontend build,
   Compose validation/image build, and conditional Trivy/OWASP security jobs.
+- PR #13 is open against `main` at head `1c186d7`; GitHub reports review requests
+  for `hxj04121-lab`, `zhuwenyu04`, and `SHJ-SHJ0128`, with no review approvals yet.
 - Jira live read/write evidence: native Atlassian write comment id `10001`, followed by
   a live re-read showing status id `10002`; Story Points write/read verified as `15`.
 
