@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
+import { testArtifactPath } from './artifact-path'
 
 test('captures live RBAC API outcomes for human acceptance', async ({ page, request }) => {
   const body = {
@@ -25,7 +26,7 @@ test('captures live RBAC API outcomes for human acceptance', async ({ page, requ
     auditor: { status: auditor.status(), body: await auditor.json() },
     admin: { status: admin.status(), body: await admin.json() },
   }, null, 2)}</pre></main>`)
-  await page.screenshot({ path: '../test-artifacts/sprint1/screenshots/wo-m4-rbac-http-results.png', fullPage: true })
+  await page.screenshot({ path: testArtifactPath('screenshots', 'wo-m4-rbac-http-results.png'), fullPage: true })
 })
 
 test('captures the live MySQL audit rows for human acceptance', async ({ page }) => {
@@ -37,5 +38,5 @@ test('captures the live MySQL audit rows for human acceptance', async ({ page })
   expect(audit).toContain('FORMULA_RELEASED')
   await page.goto('about:blank')
   await page.setContent(`<main><h1>Live MySQL audit log acceptance</h1><pre>${audit.replaceAll('&', '&amp;').replaceAll('<', '&lt;')}</pre></main>`)
-  await page.screenshot({ path: '../test-artifacts/sprint1/screenshots/wo-m5-audit-log-mysql.png', fullPage: true })
+  await page.screenshot({ path: testArtifactPath('screenshots', 'wo-m5-audit-log-mysql.png'), fullPage: true })
 })

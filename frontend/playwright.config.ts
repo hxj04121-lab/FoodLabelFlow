@@ -1,7 +1,9 @@
 import { defineConfig } from '@playwright/test'
+import { testArtifactPath } from './tests/artifact-path'
 const externalBaseUrl = process.env.PLAYWRIGHT_BASE_URL
 export default defineConfig({
   testDir: './tests',
+  outputDir: testArtifactPath('playwright-results'),
   workers: 1,
   use: {
     baseURL: externalBaseUrl || 'http://127.0.0.1:5173',
@@ -9,6 +11,9 @@ export default defineConfig({
     viewport: { width: 1440, height: 1000 },
     screenshot: 'only-on-failure',
   },
-  reporter: 'list',
+  reporter: [
+    ['list'],
+    ['html', { outputFolder: testArtifactPath('playwright-report'), open: 'never' }],
+  ],
   webServer: externalBaseUrl ? undefined : { command: 'npm run dev -- --host 127.0.0.1 --strictPort', url: 'http://127.0.0.1:5173', reuseExistingServer: true },
 })

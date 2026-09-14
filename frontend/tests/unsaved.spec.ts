@@ -1,4 +1,5 @@
 import { test, expect } from './catalog-fixture'
+import { testArtifactPath } from './artifact-path'
 
 test('clean close, escape confirmation, preserve input and discard reset', async ({
   page,
@@ -22,7 +23,7 @@ test('clean close, escape confirmation, preserve input and discard reset', async
   await page.getByRole('button', { name: 'Keep editing' }).click()
   await page.getByRole('button', { name: 'Close dialog' }).click()
   await expect(page.getByRole('alertdialog')).toBeVisible()
-  await page.screenshot({ path: 'test-results/unsaved-confirmation.png' })
+  await page.screenshot({ path: testArtifactPath('screenshots', 'unsaved-confirmation.png') })
   await page.getByRole('button', { name: 'Discard changes' }).click()
   await page.getByRole('button', { name: 'Create formula preview' }).click()
   await expect(page.getByLabel('Quantity (optional)')).toHaveValue('')

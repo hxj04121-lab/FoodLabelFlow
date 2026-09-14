@@ -1,4 +1,5 @@
 import { test, expect } from './catalog-fixture'
+import { testArtifactPath } from './artifact-path'
 test('formula validation, dependent options, preview and discard', async ({
   page,
 }) => {
@@ -37,7 +38,7 @@ test('formula validation, dependent options, preview and discard', async ({
     ),
   ).toBeTruthy()
   await page.screenshot({
-    path: 'test-results/formula-creator-mobile.png',
+    path: testArtifactPath('screenshots', 'formula-creator-mobile.png'),
     fullPage: true,
   })
   await page.getByRole('button', { name: 'Cancel', exact: true }).click()

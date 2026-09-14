@@ -9,4 +9,8 @@ dist/
 *.log
 frontend/test-results/
 frontend/playwright-report/
+test-artifacts/*/playwright-results/
+test-artifacts/*/playwright-report/
+test-artifacts/*/screenshots/*
+!test-artifacts/*/screenshots/.gitkeep
 .DS_Store

@@ -1,4 +1,5 @@
 import {test,expect} from './catalog-fixture'
+import { testArtifactPath } from './artifact-path'
 
 test('all routes use English at desktop and mobile widths',async({page})=>{
   for(const width of [1440,390]) {
@@ -28,5 +29,5 @@ test('English form, validation and confirmation fit on mobile',async({page})=>{
   await expect(alert).toBeVisible()
   expect(await alert.evaluate(e=>e.scrollWidth<=e.clientWidth+1)).toBeTruthy()
   expect(await alert.innerText()).not.toMatch(/\p{Script=Han}/u)
-  await page.screenshot({path:'test-results/english-confirmation-mobile.png'})
+  await page.screenshot({path:testArtifactPath('screenshots', 'english-confirmation-mobile.png')})
 })

@@ -1,4 +1,5 @@
 import { test, expect } from './catalog-fixture'
+import { testArtifactPath } from './artifact-path'
 
 test('overview, chart switching and CSV export', async ({ page }) => {
   const errors: string[] = []
@@ -18,7 +19,7 @@ test('overview, chart switching and CSV export', async ({ page }) => {
     'spectrace-seed-preview.csv',
   )
   expect(errors).toEqual([])
-  await page.screenshot({ path: 'test-results/overview.png', fullPage: true })
+  await page.screenshot({ path: testArtifactPath('screenshots', 'overview.png'), fullPage: true })
 })
 
 test('product search, group filter, pagination and traceability tabs', async ({
@@ -86,7 +87,7 @@ test('all routes, material details and honest unavailable states', async ({
   await page.getByRole('button', { name: 'Close dialog' }).click()
   await page.goto('/formulas')
   await expect(page.getByText('Local demo saving and publishing')).toBeVisible()
-  await page.screenshot({ path: 'test-results/formulas.png', fullPage: true })
+  await page.screenshot({ path: testArtifactPath('screenshots', 'formulas.png'), fullPage: true })
 })
 
 test('mobile navigation and no page-wide overflow', async ({ page }) => {
@@ -111,7 +112,7 @@ test('mobile navigation and no page-wide overflow', async ({ page }) => {
     ),
   ).toBeTruthy()
   await page.goto('/')
-  await page.screenshot({ path: 'test-results/mobile.png', fullPage: true })
+  await page.screenshot({ path: testArtifactPath('screenshots', 'mobile.png'), fullPage: true })
 })
 
 test('health success, error and retry states', async ({ page }) => {

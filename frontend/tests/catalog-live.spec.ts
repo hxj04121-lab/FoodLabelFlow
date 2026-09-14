@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test'
+import { testArtifactPath } from './artifact-path'
 test('M1 real read-only product and formula integration',async({page,request})=>{
   test.skip(process.env.LIVE_CATALOG!=='1','Requires independently started M1 backend')
   const response=await request.get('/api/catalog/products?limit=100&offset=0')
@@ -17,7 +18,7 @@ test('M1 real read-only product and formula integration',async({page,request})=>
   await expect(page.getByRole('dialog')).toContainText(traceBody.trace[0].specification.specification_version_id)
   await page.getByRole('tab',{name:'Version history'}).click()
   await expect(page.getByRole('tabpanel')).toContainText(product.current_formula_version_id)
-  await page.screenshot({path:'test-results/live-catalog.png',fullPage:true})
+  await page.screenshot({path:testArtifactPath('screenshots', 'live-catalog.png'),fullPage:true})
 })
 test('backend failure never falls back to seed data',async({page})=>{
   await page.route('**/api/catalog/**',r=>r.fulfill({status:503,json:{code:'UNAVAILABLE',message:'Read service unavailable'}}))
