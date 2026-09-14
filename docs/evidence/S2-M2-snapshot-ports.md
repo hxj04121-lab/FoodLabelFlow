@@ -48,6 +48,19 @@ four-field `ApiError` remain unchanged.
 - The contracts are pure Java records/interfaces; no persistence fallback is
   introduced.
 
+## Execution evidence
+
+- Implementation commit: `3cee9e6eca3daac62cfea20bd4db8636d3d3514f`.
+- Pull request: [#18](https://github.com/hxj04121-lab/FoodLabelFlow/pull/18), base
+  `main`, one PR for `SCRUM-22` only.
+- Focused local command passed with 10 tests and 0 failures:
+  `mvn -B -ntp -f backend/pom.xml -Dtest=SnapshotPortContractTest,ValidationBoundaryArchitectureTest,OpenApiContractTest,SharedApiErrorContractTest test`.
+- PR CI run
+  [34797532401](https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/34797532401)
+  passed backend, frontend, security, and containers on the pushed head.
+- Real review requests are active for `hxj04121-lab`, `zhuwenyu04`, and
+  `SHJ-SHJ0128`; no review approval is claimed.
+
 ## Review and compatibility note
 
 PR #13 was re-read live before this work: it is merged and its backend,
