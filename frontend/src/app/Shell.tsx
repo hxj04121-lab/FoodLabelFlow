@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dialog'
 import { Catalog } from '@/pages/Catalog'
 import { HealthPage } from '@/pages/HealthPage'
+import { Labels } from '@/pages/Labels'
 import { Materials } from '@/pages/Materials'
 import { Overview } from '@/pages/Overview'
 import { Upcoming } from '@/pages/Upcoming'
@@ -183,7 +184,7 @@ export function Shell() {
             <Route path="/formulas" element={<CatalogConnection><Catalog formulas /></CatalogConnection>} />
             <Route path="/suppliers" element={<CatalogConnection><Materials suppliers /></CatalogConnection>} />
             <Route path="/materials" element={<CatalogConnection><Materials /></CatalogConnection>} />
-            <Route path="/labels" element={<Upcoming kind="labels" />} />
+            <Route path="/labels" element={<Labels />} />
             <Route path="/impact" element={<Upcoming kind="impact" />} />
             <Route path="/reviews" element={<Upcoming kind="reviews" />} />
             <Route path="/health" element={<HealthPage />} />
