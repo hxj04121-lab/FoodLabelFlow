@@ -1,7 +1,7 @@
 # S2-M2 contract diff and freeze candidate
 
-Evidence captured: 2026-09-12T12:32:54+08:00 (Asia/Shanghai)  
-Repository baseline: `origin/main` at `6fa40184ffeb3805e9b66bd948935de08dbbc547`  
+Evidence refreshed: 2026-09-14T09:32:38+08:00 (Asia/Shanghai)
+Repository baseline: latest `origin/main` at `a3887660ff54f5d88bd7bae3812fd53bf12344dc`
 Working branch: `codex/s2-m2-contract-diff`  
 Pull request: [#13](https://github.com/hxj04121-lab/FoodLabelFlow/pull/13)  
 Jira: [SCRUM-13](https://hxj04121.atlassian.net/browse/SCRUM-13), observed status `正在进行` (id `10002`), Sprint 2 `future`, Story Points `15`
@@ -21,17 +21,20 @@ The comparison covered:
 - current M1 catalog code: `CatalogController`, `CatalogCommands`, `CatalogFailure`,
   `CatalogStore`, and `CatalogErrors`;
 - current M4/M5 identity/workflow code: `IdentityErrors`, `IdentityService`,
-  `AuthorizationService`, `RequestCatalogIntegration`, workflow ports/services, and
-  `JdbcIdentityRepository`;
-- current shared and consumer surfaces: `ApiError`, `HealthResponse`, frontend API
-  error projection, Flyway V1/V2/V3, `OpenApiContractTest`, `SharedApiErrorContractTest`,
-  `ArchitectureTest`, and `.github/workflows/ci.yml`.
+  `AuthorizationService`, `RequestCatalogIntegration`, workflow ports/services,
+  `JdbcIdentityRepository`, and the newly merged validation domain/repository seams;
+- current M3 consumer surface: `frontend/src/api/labels.ts`, `Labels.tsx`, and
+  `frontend/tests/labels.spec.ts`;
+- current shared and verification surfaces: `ApiError`, `HealthResponse`, Flyway V1/V2/V3,
+  `OpenApiContractTest`, `SharedApiErrorContractTest`, `ArchitectureTest`, and
+  `.github/workflows/ci.yml`.
 
-M2 owns the contract, future snapshot/application ports, deterministic golden fixtures,
-and focused contract/fixture tests. M1 retains validation orchestration and allergen
-derivation; M3 retains UI; M4 retains identity/RBAC/lifecycle; M5 retains validation
-persistence, RuleSet behavior, and the full integration/CI harness. No implementation
-from those modules is included in this Day 1 change.
+M2 owns the contract, M2-specific snapshot/fact/finding boundaries, deterministic golden
+fixtures, and focused contract/fixture tests. M1 retains validation orchestration and
+allergen derivation; M3 retains UI/API consumption; M4 retains identity/RBAC/lifecycle;
+M5 retains validation domain persistence, RuleSet behavior, repository adapters, and
+the full integration/CI harness. This Day 1 change only documents those boundaries and
+does not modify another member's implementation.
 
 ## Version and endpoint diff
 
@@ -39,8 +42,9 @@ from those modules is included in this Day 1 change.
 | --- | --- | --- | --- |
 | OpenAPI version | The original S1 file was `0.1.0-draft`; `docs/evidence/M3_API_INTEGRATION_REQUEST.md` still repeats that historical value. | `openapi: 3.1.0`, `info.version: 1.0.0`; the contract description explicitly says the future validation endpoints are not asserted to be implemented. | Treat 1.0.0 as the canonical candidate. Treat 0.1.0-draft references as historical/stale documentation to correct or annotate in a later documentation-only cleanup. |
 | Success envelope | S1 closure decision: return the resource/list directly. | The OpenAPI has no generic success wrapper. Existing M1 catalog responses are direct `List<Map<String,Object>>` / `Map<String,Object>` under `/api/catalog`. | Keep direct successful resources. M2 HTTP DTOs use `camelCase`; M1's existing raw JDBC `snake_case` success rows remain a documented legacy/module-specific surface and are not copied into new M2 DTOs. |
+| M3 consumer alignment | Earlier S1 work had no live validation consumer. | `frontend/src/api/labels.ts` now models `Allergen`, `ValidationRun`, `ValidationResult`, and the four-field `ApiError`; `Labels.tsx` consumes the allergen endpoint and explicitly does not substitute seed data. | Keep the direct resource shapes and exact error identifiers; M3 consumer code is evidence of the current client boundary, not proof that the backend validation endpoints are implemented. |
 | `GET /api/v1/allergens` | S1 contract endpoint. | Required query `jurisdictionCode`; `200` returns an array of `Allergen`; negative responses are `400`, `401`, `403`. | Freeze this bounded, jurisdiction-scoped lookup; do not add search or pagination without review. |
-| `POST /api/v1/label-versions/{labelVersionId}/validation-runs` | S1 contract endpoint. | Required JSON body `ValidationRunRequest`; `201` returns persisted `ValidationRun`; negative responses are `400`, `401`, `403`, `404`, `409`, `422`, `500`. | Keep the current-label guard and synchronous persisted-create semantics in the contract. M1/M5 implement the behavior; M2 supplies the types/ports and fixtures. |
+| `POST /api/v1/label-versions/{labelVersionId}/validation-runs` | S1 contract endpoint. | Required JSON body `ValidationRunRequest`; `201` returns persisted `ValidationRun`; negative responses are `400`, `401`, `403`, `404`, `409`, `422`, `500`. M5 now has internal persistence records/adapters, but no HTTP adapter for this endpoint was found. | Keep the current-label guard and synchronous persisted-create semantics in the contract. M1/M5 own behavior and persistence; M2 must not duplicate M5 persistence types or adapters. |
 | `GET /api/v1/validation-runs/{validationRunId}` | S1 contract endpoint. | `200` returns `ValidationRun`; negative responses are `401`, `403`, `404`. | Freeze read semantics and the same error envelope. |
 
 ## Current contract fields
@@ -61,10 +65,17 @@ HTTP adapter.
 `message`; `ruleDefinitionId` is optional and nullable. Persistence uses `Y`/`N`
 flags for `passed` and `blocking`, but the application/HTTP boundary exposes booleans.
 
-There are currently no Java definitions for `LabelValidationSnapshot`, `AllergenFact`,
-`ValidationFinding`, `ValidationRun`, or `ValidationResult`, and no validation
-application ports. `ValidationModuleBoundary` is only an empty package marker. Those
-are Day 2 outputs, not missing Day 1 work.
+The latest main now contains M5-owned Java definitions and persistence seams for
+`RuleSetVersion`, `RuleDefinition`, `ValidationRun`, and `ValidationResult`, plus
+`RuleSetVersionRepository`, `ValidationRunRepository`, `ValidationResultRepository`,
+and JDBC adapters. The internal `ValidationRun` additionally carries `ranByUserId` and
+`dataProvenanceId`; the internal `ValidationResult` carries persistence identifiers
+`validationResultId` and `validationRunId`. These are M5 persistence/domain fields and
+must be mapped at the HTTP boundary rather than leaked into the OpenAPI resource.
+
+No HTTP controller/adapter for the declared validation endpoints was found on the
+latest main. M2 Day 2 may add only its owned snapshot/fact/finding boundary after the
+required review, without duplicating or importing M5 infrastructure.
 
 ## Canonical four-field `ApiError` mapping
 
@@ -112,8 +123,9 @@ The supplied Flyway baseline already defines `allergen`, `rule_set_version`,
 - validation-result `passed` and `blocking` to `Y`/`N`.
 
 These existing constraints support the current OpenAPI status enum and the planned
-fixture outcomes. No migration, seed fallback, or persistence implementation is
-introduced by this diff.
+fixture outcomes. The latest main also contains M5 JDBC repository adapters that map
+these persistence values to the internal validation records; PR #13 does not modify
+those adapters, add a migration, or introduce a seed fallback.
 
 ## Duplicate, stale, and absent definitions
 
@@ -131,9 +143,10 @@ introduced by this diff.
 4. `HealthResponse` is a health-only DTO and is unrelated to validation responses.
    Catalog command records are M1 input DTOs and must not be reused as M2 validation
    snapshot types.
-5. No current Java validation DTO/port definition was found beyond the empty
-   `ValidationModuleBoundary`; Day 2 must add the cross-module boundary explicitly,
-   without importing another module's repository or issuing foreign-module SQL.
+5. Current M5 Java validation domain records and repository ports are real definitions,
+   not duplicates to be recreated by M2. Day 2 must add only the reviewed M2
+   snapshot/fact/finding boundary, without importing M5 infrastructure or issuing
+   foreign-module SQL.
 
 ## Proposed freeze decisions for M1/M4/M5 review
 
@@ -148,8 +161,9 @@ introduced by this diff.
    the application boundary, UTC RFC 3339 timestamps, and nullable
    `ruleDefinitionId`.
 5. Add Day 2 snapshot/finding DTOs and application ports only after M1/M4/M5 review;
-   keep formula-to-ingredient/component-to-allergen derivation behind ports and keep
-   all validation persistence/RuleSet behavior in M5's ownership boundary.
+   keep formula-to-ingredient/component-to-allergen derivation behind ports, reuse the
+   reviewed M5 persistence/domain boundary where appropriate, and keep all validation
+   persistence/RuleSet behavior in M5's ownership boundary.
 6. Use explicit deterministic fixtures for positive and negative outcomes. A missing
    fixture row, absent active RuleSet, unmapped ingredient, or ambiguous ingredient
    must produce an explicit finding/blocking expectation; no silent seed fallback is
@@ -171,15 +185,38 @@ real M1/M4/M5 review evidence exists.
 
 ## Baseline verification
 
-- `git fetch origin --prune`: completed; `origin/main` observed at `6fa4018`.
+- `git fetch origin --prune`: completed; latest `origin/main` observed at
+  `a3887660ff54f5d88bd7bae3812fd53bf12344dc`.
 - `git status --short --branch`: clean tracked worktree on the new M2 branch before
   this documentation change; pre-existing scheduler runtime files remain untracked
   under `.project-control/sprint/S2/`.
 - CI workflow inspected: backend Maven/Testcontainers verification, frontend build,
   Compose validation/image build, and conditional Trivy/OWASP security jobs.
-- PR #13 is open against `main` at head `1c186d7`; GitHub reports review requests
-  for `hxj04121-lab`, `zhuwenyu04`, and `SHJ-SHJ0128`, with no review approvals yet.
+- PR #13 was rebased from its old base onto the latest `origin/main`; its final head,
+  mergeability, CI, and review state are verified live after the rebase and must not be
+  inferred from this historical note. GitHub review requests remain for
+  `hxj04121-lab`, `zhuwenyu04`, and `SHJ-SHJ0128`; no approval is claimed.
 - Jira live read/write evidence: native Atlassian write comment id `10001`, followed by
   a live re-read showing status id `10002`; Story Points write/read verified as `15`.
 
 This note is a freeze candidate, not a claim of review completion or Day 7 closure.
+
+## Rebase refresh verification — 2026-09-14
+
+- The PR branch was rebased cleanly from its old base onto the latest live
+  `origin/main` at `a3887660ff54f5d88bd7bae3812fd53bf12344dc`; no conflict resolution
+  or implementation rollback was required.
+- The rebase review confirmed that main now includes M3's label API/UI consumer
+  foundation and M5's validation domain/repository adapters. This note updates the
+  ownership and internal-versus-HTTP-field boundary accordingly; PR #13 still adds
+  only this Day 1 evidence document.
+- Focused backend `OpenApiContractTest`, `SharedApiErrorContractTest`, and
+  `ArchitectureTest` passed: 5 tests, 0 failures.
+- OpenAPI YAML/version/four-field `ApiError` validation passed, and
+  `docker compose config --quiet` passed.
+- M5 repository integration tests were attempted but are locally blocked because the
+  Docker Desktop Linux engine is unavailable; this is an environment blocker, not a
+  PR #13 code failure. The frontend build was also locally blocked because the
+  existing dependency tree has no `tsc`; no M3 files were changed.
+- GitHub Actions must be rechecked on the final pushed PR head. No CI success or review
+  acceptance is inferred from these local results.
