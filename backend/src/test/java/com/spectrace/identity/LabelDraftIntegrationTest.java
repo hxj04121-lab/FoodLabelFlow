@@ -26,6 +26,9 @@ class LabelDraftIntegrationTest extends MySqlIntegrationTestSupport {
     private static final String PRODUCT_ID =
             "prod_usda_1106285";
 
+    private static final String EXISTING_LABEL_ID =
+            "label_1106285_v1";
+
     private static final Pattern LABEL_ID =
             Pattern.compile(
                     "\"labelVersionId\":\"([^\"]+)\""
@@ -75,8 +78,7 @@ class LabelDraftIntegrationTest extends MySqlIntegrationTestSupport {
 
         HttpResponse<String> created;
 
-        try (HttpClient client =
-                     HttpClient.newHttpClient()) {
+        try (HttpClient client = HttpClient.newHttpClient()) {
 
             HttpRequest request =
                     HttpRequest.newBuilder(
@@ -205,8 +207,7 @@ class LabelDraftIntegrationTest extends MySqlIntegrationTestSupport {
                 isCurrentPublished
         );
 
-        try (HttpClient client =
-                     HttpClient.newHttpClient()) {
+        try (HttpClient client = HttpClient.newHttpClient()) {
 
             HttpRequest request =
                     HttpRequest.newBuilder(
@@ -215,14 +216,21 @@ class LabelDraftIntegrationTest extends MySqlIntegrationTestSupport {
                                                     + "/api/labels/"
                                                     + labelVersionId
                                     ))
+                            .header(
+                                    "X-Auth-Provider",
+                                    "DEV_EXTERNAL"
+                            )
+                            .header(
+                                    "X-External-Subject",
+                                    "dev-external-label-officer"
+                            )
                             .GET()
                             .build();
 
             HttpResponse<String> response =
                     client.send(
                             request,
-                            HttpResponse.BodyHandlers
-                                    .ofString()
+                            HttpResponse.BodyHandlers.ofString()
                     );
 
             assertEquals(
@@ -281,8 +289,7 @@ class LabelDraftIntegrationTest extends MySqlIntegrationTestSupport {
                         PRODUCT_ID
                 );
 
-        try (HttpClient client =
-                     HttpClient.newHttpClient()) {
+        try (HttpClient client = HttpClient.newHttpClient()) {
 
             HttpRequest request =
                     HttpRequest.newBuilder(
@@ -311,8 +318,7 @@ class LabelDraftIntegrationTest extends MySqlIntegrationTestSupport {
             HttpResponse<String> response =
                     client.send(
                             request,
-                            HttpResponse.BodyHandlers
-                                    .ofString()
+                            HttpResponse.BodyHandlers.ofString()
                     );
 
             assertEquals(
@@ -345,5 +351,43 @@ class LabelDraftIntegrationTest extends MySqlIntegrationTestSupport {
                 beforeCount,
                 afterCount
         );
+    }
+
+    @Test
+    void unauthenticatedCallerCannotReadLabelVersion()
+            throws Exception {
+
+        String base = "http://localhost:" + port;
+
+        try (HttpClient client = HttpClient.newHttpClient()) {
+
+            HttpRequest request =
+                    HttpRequest.newBuilder(
+                                    URI.create(
+                                            base
+                                                    + "/api/labels/"
+                                                    + EXISTING_LABEL_ID
+                                    ))
+                            .GET()
+                            .build();
+
+            HttpResponse<String> response =
+                    client.send(
+                            request,
+                            HttpResponse.BodyHandlers.ofString()
+                    );
+
+            assertEquals(
+                    401,
+                    response.statusCode(),
+                    response.body()
+            );
+
+            assertTrue(
+                    response.body().contains(
+                            "AUTHENTICATION_REQUIRED"
+                    )
+            );
+        }
     }
 }

@@ -62,8 +62,11 @@ public class LabelDraftController {
 
     @GetMapping("/{labelVersionId}")
     public ResponseEntity<LabelDraft> getById(
-            @PathVariable String labelVersionId
+            @PathVariable String labelVersionId,
+            HttpServletRequest request
     ) {
+        authenticate(request);
+
         return ResponseEntity.ok(
                 service.getById(labelVersionId)
         );
