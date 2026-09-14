@@ -92,6 +92,12 @@ after the run is persisted. Introducing asynchronous execution later is an archi
 change requiring a new SAD/contract revision because it changes observable status and
 retry semantics.
 
+SCRUM-41 supplies the initial executable `RuleEvaluatorRegistry`, `RuleEvaluator`,
+`RuleEvaluationContext`, `ValidationFinding` and owner-scoped snapshot/derivation ports.
+Their exact signatures, version/currentness semantics, failure behavior and review
+state are in the [S2 contract freeze](../s2-m1/SCRUM-41-contract-freeze.md).
+Concrete evaluators, adapters and orchestration are still subsequent implementation.
+
 ## Cross-module integration checkpoints
 
 1. M1's merged catalog/formula API uses server-assigned IDs, version-specific resource

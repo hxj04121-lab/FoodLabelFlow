@@ -3,10 +3,11 @@ info:
   title: SpecTrace Allergen and Validation API
   version: 1.0.0
   description: >-
-    M2 shared contract reconciled with the M1 catalog and M4/M5 identity/workflow
-    implementations on main. It defines the future allergen/validation HTTP boundary;
-    it is not an assertion that these endpoints are implemented. Successful responses
-    contain the resource directly. Every HTTP error uses ApiError.
+    Shared HTTP contract 1.0.0, prepared for the SCRUM-41 implementation freeze.
+    Internal ports, rule registry and owner review state are documented in
+    docs/s2-m1/SCRUM-41-contract-freeze.md. This contract does not assert that
+    the HTTP endpoints are implemented. Successful responses contain the resource
+    directly. Every HTTP error uses ApiError.
 tags:
   - name: allergen
   - name: validation
@@ -44,8 +45,14 @@ paths:
       operationId: validateCurrentLabelVersion
       summary: Validate the exact current label version against an active rule-set version.
       description: >-
-        The request is rejected if the label version is not current (BR-05). A successful
-        response is returned only after a ValidationRun and its results are persisted.
+        The request is rejected if the label version is not current (BR-05).
+        Currentness comes from the label application snapshot, not the published
+        pointer: a current draft can be validated. ruleSetVersionId must match the
+        label snapshot and an active, effective rule set for the same jurisdiction;
+        it is never silently replaced. A successful response is returned only after
+        the run, all results and same-transaction audit are committed. A completed
+        evaluation with blocking ERROR findings returns 201 with status FAILED;
+        422 means required canonical inputs are unavailable before evaluation.
       parameters:
         - $ref: '#/components/parameters/LabelVersionId'
       requestBody:
@@ -155,7 +162,9 @@ components:
             traceId: trace-example-003
             evidenceId: null
     LabelVersionNotCurrent:
-      description: BR-05 forbids validation of a historical or superseded label version.
+      description: >-
+        BR-05 forbids validation of a historical or superseded label version.
+        A current draft is not required to be the current published label.
       content:
         application/json:
           schema:
@@ -166,7 +175,9 @@ components:
             traceId: trace-example-004
             evidenceId: null
     ValidationPreconditionFailed:
-      description: Canonical data required to evaluate the current label is incomplete.
+      description: >-
+        Required canonical inputs are unavailable, or the requested rule set differs
+        from the label snapshot, is not active/effective, or has a different jurisdiction.
       content:
         application/json:
           schema:
@@ -227,7 +238,7 @@ components:
         status:
           type: string
           enum: [PASSED, FAILED]
-          description: Persisted lifecycle state constrained by the accepted database baseline.
+          description: FAILED when a failed blocking ERROR exists; otherwise PASSED after complete evaluation.
         ranAt:
           type: string
           format: date-time
@@ -248,10 +259,12 @@ components:
           type: string
         severity:
           type: string
+          enum: [INFO, WARNING, ERROR]
         passed:
           type: boolean
         blocking:
           type: boolean
+          description: A blocking finding must have severity ERROR and passed false.
         message:
           type: string
     ApiError:
