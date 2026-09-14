@@ -7,7 +7,6 @@ public interface AuditEventPort {
             String labelVersionId,
             String validationRunId,
             String ruleSetVersionId,
-            String status,
             String provenanceId
     );
 }

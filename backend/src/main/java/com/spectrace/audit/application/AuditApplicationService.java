@@ -46,7 +46,6 @@ public class AuditApplicationService implements AuditEventPort {
             String labelVersionId,
             String validationRunId,
             String ruleSetVersionId,
-            String status,
             String provenanceId
     ) {
         jdbcTemplate.update(
@@ -55,16 +54,15 @@ public class AuditApplicationService implements AuditEventPort {
                   audit_event_id, event_type, entity_type, entity_id, event_at,
                   actor_user_id, event_payload, correlation_id, data_provenance_id
                 ) VALUES (?, ?, 'LABEL_VERSION', ?, UTC_TIMESTAMP(), ?,
-                          JSON_OBJECT('validationRunId', ?, 'ruleSetVersionId', ?, 'status', ?),
+                          JSON_OBJECT('validationRunId', ?, 'ruleSetVersionId', ?),
                           ?, ?)
                 """,
                 UUID.randomUUID().toString(),
-                "LABEL_VALIDATION_" + status,
+                "LABEL_VALIDATION",
                 labelVersionId,
                 actorId,
                 validationRunId,
                 ruleSetVersionId,
-                status,
                 validationRunId,
                 provenanceId
         );
