@@ -58,5 +58,19 @@ add separate `MAY_CONTAIN` cases without changing these IDs.
 
 ## Verification
 
-Verification commands and the final commit/PR/CI evidence are recorded after the
-focused suite and the one Day-3 PR complete.
+- Implementation commit: `bea3a25cacbd400a758c4b7f5eb5514b9eb2e3f3`.
+- Pull request: [#21](https://github.com/hxj04121-lab/FoodLabelFlow/pull/21),
+  base `main`, one PR for `SCRUM-23` only.
+- Local JDK 25 focused suite: 18 tests, 0 failures/errors/skips:
+  `mvn -B -ntp -f backend/pom.xml -Dtest=PositiveGoldenFixtureContractTest,com.spectrace.validation.application.SnapshotPortContractTest,com.spectrace.validation.ValidationBoundaryArchitectureTest,OpenApiContractTest,SharedApiErrorContractTest test`.
+- PR CI run
+  [34916591194](https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/34916591194)
+  passed backend, frontend, security, and containers on the implementation head.
+  Backend passed 88 tests with 0 failures/errors/skips. Its log shows the isolated
+  `PositiveGoldenFixtureMySqlTest` applied exactly V1–V2, reached schema version
+  `v2`, and passed its owner-port comparison.
+- Local Docker Desktop could not start because its existing runtime socket was
+  inaccessible; no local MySQL pass is claimed. The real PR Testcontainers result
+  above is the execution evidence.
+- Real review requests are active for `hxj04121-lab`, `zhuwenyu04`, and
+  `SHJ-SHJ0128`; no approval is claimed.
