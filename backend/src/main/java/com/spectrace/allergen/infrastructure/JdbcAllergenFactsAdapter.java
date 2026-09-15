@@ -20,7 +20,7 @@ import static com.spectrace.shared.contract.ContractValues.requiredText;
 
 /** Reads allergen-owned mappings and derives facts from an already captured formula snapshot. */
 @Repository
-public final class JdbcAllergenFactsAdapter implements AllergenFactsPort {
+public class JdbcAllergenFactsAdapter implements AllergenFactsPort {
     private final JdbcTemplate jdbc;
 
     public JdbcAllergenFactsAdapter(JdbcTemplate jdbc) {

@@ -15,7 +15,7 @@ import static com.spectrace.shared.contract.ContractValues.requiredText;
 
 /** Captures catalog-owned formula/specification data behind the validation input port. */
 @Repository
-public final class JdbcFormulaCompositionAdapter implements FormulaCompositionPort {
+public class JdbcFormulaCompositionAdapter implements FormulaCompositionPort {
     private final JdbcTemplate jdbc;
 
     public JdbcFormulaCompositionAdapter(JdbcTemplate jdbc) {
