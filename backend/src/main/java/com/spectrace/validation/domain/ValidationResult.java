@@ -15,9 +15,15 @@ public record ValidationResult(
     public ValidationResult {
         validationResultId = required(validationResultId, "validationResultId");
         validationRunId = required(validationRunId, "validationRunId");
+        if (ruleDefinitionId != null && ruleDefinitionId.isBlank()) {
+            throw new IllegalArgumentException("ruleDefinitionId must be null or non-blank");
+        }
         resultCode = required(resultCode, "resultCode");
         severity = Objects.requireNonNull(severity, "severity");
         message = required(message, "message");
+        if (blocking && (passed || severity != ValidationSeverity.ERROR)) {
+            throw new IllegalArgumentException("Only a failed ERROR result can block validation");
+        }
     }
 
     private static String required(String value, String field) {

@@ -26,7 +26,15 @@ public record RuleSetVersion(
         effectiveFrom = Objects.requireNonNull(effectiveFrom, "effectiveFrom");
         description = required(description, "description");
         dataProvenanceId = required(dataProvenanceId, "dataProvenanceId");
-        ruleDefinitions = ruleDefinitions == null ? List.of() : List.copyOf(ruleDefinitions);
+        if (effectiveTo != null && effectiveTo.isBefore(effectiveFrom)) {
+            throw new IllegalArgumentException("effectiveTo must not precede effectiveFrom");
+        }
+        ruleDefinitions = List.copyOf(Objects.requireNonNull(ruleDefinitions, "ruleDefinitions"));
+        for (RuleDefinition rule : ruleDefinitions) {
+            if (!ruleSetVersionId.equals(rule.ruleSetVersionId())) {
+                throw new IllegalArgumentException("rule definitions must belong to this rule set version");
+            }
+        }
     }
 
     private static String required(String value, String field) {
