@@ -48,13 +48,30 @@ public class AuditApplicationService implements AuditEventPort {
             String ruleSetVersionId,
             String provenanceId
     ) {
+        recordValidationEvent(
+                actorId, labelVersionId, validationRunId, ruleSetVersionId,
+                provenanceId, null, null);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordValidationEvent(
+            String actorId,
+            String labelVersionId,
+            String validationRunId,
+            String ruleSetVersionId,
+            String provenanceId,
+            String validationStatus,
+            String summary
+    ) {
         jdbcTemplate.update(
                 """
                 INSERT INTO audit_event(
                   audit_event_id, event_type, entity_type, entity_id, event_at,
                   actor_user_id, event_payload, correlation_id, data_provenance_id
                 ) VALUES (?, ?, 'LABEL_VERSION', ?, UTC_TIMESTAMP(), ?,
-                          JSON_OBJECT('validationRunId', ?, 'ruleSetVersionId', ?),
+                          JSON_OBJECT('validationRunId', ?, 'labelVersionId', ?,
+                                      'ruleSetVersionId', ?, 'status', ?, 'summary', ?),
                           ?, ?)
                 """,
                 UUID.randomUUID().toString(),
@@ -62,7 +79,10 @@ public class AuditApplicationService implements AuditEventPort {
                 labelVersionId,
                 actorId,
                 validationRunId,
+                labelVersionId,
                 ruleSetVersionId,
+                validationStatus,
+                summary,
                 validationRunId,
                 provenanceId
         );
