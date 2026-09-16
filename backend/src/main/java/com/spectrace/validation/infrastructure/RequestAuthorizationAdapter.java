@@ -57,4 +57,19 @@ public class RequestAuthorizationAdapter implements ValidationIntegration {
         auditEvents.recordValidationEvent(
                 actorId, labelVersionId, validationRunId, ruleSetVersionId, dataProvenanceId);
     }
+
+    @Override
+    public void auditValidation(
+            String actorId,
+            String labelVersionId,
+            String ruleSetVersionId,
+            String validationRunId,
+            String dataProvenanceId,
+            String validationStatus,
+            String summary
+    ) {
+        auditEvents.recordValidationEvent(
+                actorId, labelVersionId, validationRunId, ruleSetVersionId,
+                dataProvenanceId, validationStatus, summary);
+    }
 }

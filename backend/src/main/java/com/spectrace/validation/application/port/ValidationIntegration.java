@@ -13,4 +13,11 @@ public interface ValidationIntegration {
     void auditValidation(
             String actorId, String labelVersionId, String ruleSetVersionId,
             String validationRunId, String dataProvenanceId);
+
+    default void auditValidation(
+            String actorId, String labelVersionId, String ruleSetVersionId,
+            String validationRunId, String dataProvenanceId,
+            String validationStatus, String summary) {
+        auditValidation(actorId, labelVersionId, ruleSetVersionId, validationRunId, dataProvenanceId);
+    }
 }
