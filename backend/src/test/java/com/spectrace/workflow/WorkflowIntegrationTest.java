@@ -2,6 +2,7 @@ package com.spectrace.workflow;
 
 import com.spectrace.support.MySqlIntegrationTestSupport;
 import com.spectrace.workflow.application.port.LabelWorkflowRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,57 +32,7 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
 
     @BeforeEach
     void prepareFixture() {
-        jdbcTemplate.update(
-                "DELETE FROM approval_record WHERE label_version_id = ?",
-                LABEL_ID
-        );
-
-        jdbcTemplate.update(
-                "DELETE FROM review_task WHERE review_task_id = ?",
-                REVIEW_TASK_ID
-        );
-
-        jdbcTemplate.update(
-                "DELETE FROM impact_finding WHERE impact_finding_id = ?",
-                IMPACT_FINDING_ID
-        );
-
-        jdbcTemplate.update(
-                "DELETE FROM impact_analysis_run WHERE impact_analysis_run_id = ?",
-                IMPACT_RUN_ID
-        );
-
-        jdbcTemplate.update(
-                "DELETE FROM change_request WHERE change_request_id = ?",
-                CHANGE_REQUEST_ID
-        );
-
-        jdbcTemplate.update(
-                "DELETE FROM publication_record WHERE label_version_id = ?",
-                LABEL_ID
-        );
-
-        jdbcTemplate.update(
-                "DELETE FROM validation_result WHERE validation_run_id IN " +
-                        "(SELECT validation_run_id FROM validation_run WHERE label_version_id = ?)",
-                LABEL_ID
-        );
-
-        jdbcTemplate.update(
-                "DELETE FROM validation_run WHERE label_version_id = ?",
-                LABEL_ID
-        );
-
-        jdbcTemplate.update(
-                "UPDATE product SET current_published_label_version_id = NULL " +
-                        "WHERE current_published_label_version_id = ?",
-                LABEL_ID
-        );
-
-        jdbcTemplate.update(
-                "DELETE FROM label_version WHERE label_version_id = ?",
-                LABEL_ID
-        );
+        cleanUpTestData();
 
         jdbcTemplate.update(
                 """
@@ -119,6 +70,12 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
                 """,
                 LABEL_ID
         );
+    }
+
+    @AfterEach
+    void restoreFixture() {
+        restoreSupersededBaseline();
+        cleanUpTestData();
     }
 
     @Test
@@ -483,6 +440,118 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
                 WHERE label_version_id = ?
                 """,
                 "validation_run_scrum37",
+                LABEL_ID
+        );
+    }
+
+        private void restoreSupersededBaseline() {
+        Integer testLabelCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM label_version WHERE label_version_id = ?",
+                Integer.class,
+                LABEL_ID
+        );
+
+        if (testLabelCount == null || testLabelCount == 0) {
+            return;
+        }
+
+        jdbcTemplate.update(
+                """
+                UPDATE label_version
+                SET lifecycle_status = 'APPROVED',
+                    is_current_published = 'N'
+                WHERE label_version_id = ?
+                  AND lifecycle_status = 'PUBLISHED'
+                  AND is_current_published = 'Y'
+                """,
+                LABEL_ID
+        );
+
+        jdbcTemplate.update(
+                """
+                UPDATE label_version baseline
+                JOIN label_version test_label
+                  ON test_label.label_version_id = ?
+                 AND baseline.product_id = test_label.product_id
+                 AND baseline.jurisdiction_code = test_label.jurisdiction_code
+                SET baseline.lifecycle_status = 'PUBLISHED',
+                    baseline.is_current_published = 'Y'
+                WHERE baseline.label_version_id <> ?
+                  AND baseline.lifecycle_status = 'SUPERSEDED'
+                  AND baseline.is_current_published = 'N'
+                """,
+                LABEL_ID,
+                LABEL_ID
+        );
+
+        jdbcTemplate.update(
+                """
+                UPDATE product p
+                JOIN label_version baseline
+                  ON baseline.product_id = p.product_id
+                 AND baseline.lifecycle_status = 'PUBLISHED'
+                 AND baseline.is_current_published = 'Y'
+                JOIN label_version test_label
+                  ON test_label.label_version_id = ?
+                 AND test_label.product_id = p.product_id
+                 AND test_label.jurisdiction_code = baseline.jurisdiction_code
+                SET p.current_published_label_version_id = baseline.label_version_id
+                """,
+                LABEL_ID
+        );
+    }
+
+    private void cleanUpTestData() {
+        jdbcTemplate.update(
+                "DELETE FROM approval_record WHERE label_version_id = ?",
+                LABEL_ID
+        );
+
+        jdbcTemplate.update(
+                "DELETE FROM review_task WHERE review_task_id = ?",
+                REVIEW_TASK_ID
+        );
+
+        jdbcTemplate.update(
+                "DELETE FROM impact_finding WHERE impact_finding_id = ?",
+                IMPACT_FINDING_ID
+        );
+
+        jdbcTemplate.update(
+                "DELETE FROM impact_analysis_run WHERE impact_analysis_run_id = ?",
+                IMPACT_RUN_ID
+        );
+
+
+        jdbcTemplate.update(
+                "DELETE FROM change_request WHERE change_request_id = ?",
+                CHANGE_REQUEST_ID
+        );
+
+        jdbcTemplate.update(
+                "DELETE FROM publication_record WHERE label_version_id = ?",
+                LABEL_ID
+        );
+
+        jdbcTemplate.update(
+                "DELETE FROM validation_result WHERE validation_run_id IN " +
+                        "(SELECT validation_run_id FROM validation_run WHERE label_version_id = ?)",
+                LABEL_ID
+        );
+
+        jdbcTemplate.update(
+                "DELETE FROM validation_run WHERE label_version_id = ?",
+                LABEL_ID
+        );
+
+        jdbcTemplate.update(
+                "UPDATE product SET current_published_label_version_id = NULL " +
+                        "WHERE current_published_label_version_id = ?",
+                LABEL_ID
+        );
+
+        jdbcTemplate.update(
+                "DELETE FROM label_version WHERE label_version_id = ?",
                 LABEL_ID
         );
     }
