@@ -8,10 +8,10 @@ ports (`FormulaCompositionPort`, `LabelSnapshotPort`, `AllergenFactsPort`, and
 ## Scope
 
 - Positive SOY, MILK, WHEAT, and multi-item fixtures are loaded from the existing
-  SCRUM-23 SQL resource and checked through the real owner adapters.
-- Missing declaration, no active rule set, unmapped ingredient, and ambiguous
-  ingredient are loaded from the SCRUM-24 SQL resource and checked through the
-  same ports.
+  SCRUM-23 SQL resource and checked through the real owner adapters first.
+- The test then resets only its isolated schema and loads the SCRUM-24 SQL
+  resource unchanged, checking missing declaration, no active rule set, unmapped
+  ingredient, and ambiguous ingredient through the same ports.
 - The exact requested rule-set ID is preserved. The retired-rule-set case must
   remain unavailable through `findActiveById`; an active alternative is not a
   substitute.
@@ -29,6 +29,9 @@ The test uses the repository's canonical MySQL Testcontainers pattern in its own
 isolated container. The M5 shared JVM container persists across full-suite
 contexts and can already contain V3 seed rows; isolating this fixture test keeps
 the `@Sql` resources deterministic without changing shared M5 infrastructure or
-duplicating its harness. Flyway is limited to V1–V2. Local Docker availability is
-environment-dependent; the authoritative MySQL execution must be observed in the
-Day-5 GitHub Actions backend job.
+duplicating its harness. Because the positive and negative resources deliberately
+reuse canonical allergen codes, the test resets only its own schema between the
+two exact loads; it does not upsert or suppress fixture collisions. Flyway is
+limited to V1–V2. Local Docker availability is environment-dependent; the
+authoritative MySQL execution must be observed in the Day-5 GitHub Actions
+backend job.

@@ -11,13 +11,20 @@ import com.spectrace.validation.domain.ValidationStatus;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.jdbc.Sql;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -29,11 +36,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Testcontainers
 @SpringBootTest(properties = "spring.flyway.target=2")
 @Sql(
-        scripts = {
-                PositiveGoldenFixtures.SQL_RESOURCE,
-                NegativeGoldenFixtures.SQL_RESOURCE
-        },
-        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS
+        scripts = PositiveGoldenFixtures.SQL_RESOURCE,
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD
 )
 class ExecutableFixtureBindingMySqlTest {
 
@@ -55,6 +59,9 @@ class ExecutableFixtureBindingMySqlTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private DataSource dataSource;
 
     @Autowired
     private LabelSnapshotPort labelSnapshots;
@@ -86,6 +93,13 @@ class ExecutableFixtureBindingMySqlTest {
                     .isEqualTo(fixture.expectedDerivation());
             assertThat(fixture.expectedResult()).isEqualTo(ValidationStatus.PASSED);
         }
+
+        // Positive and negative resources intentionally reuse canonical allergen
+        // codes. Reset only this test-owned schema before loading the negatives;
+        // the fixture SQL remains exact and still fails loudly on collisions.
+        resetFixtureSchema();
+        new ResourceDatabasePopulator(
+                new ClassPathResource(NegativeGoldenFixtures.SQL_RESOURCE)).execute(dataSource);
 
         for (var fixture : NegativeGoldenFixtures.ALL) {
             var formula = formulas.findById(fixture.formulaSnapshot().formulaVersionId()).orElseThrow();
@@ -128,10 +142,7 @@ class ExecutableFixtureBindingMySqlTest {
                         .isPresent();
             }
         }
-    }
 
-    @Test
-    void missingFixtureAndNegativeLabelsCannotBeSatisfiedByValidationSeedRows() {
         assertThat(formulas.findById("formula_s2_m2_not_a_fixture")).isEmpty();
         assertThat(labelSnapshots.findById("label_s2_m2_not_a_fixture")).isEmpty();
         assertThat(jdbcTemplate.queryForObject(
@@ -139,9 +150,26 @@ class ExecutableFixtureBindingMySqlTest {
                 Integer.class)).isZero();
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM validation_result vr "
-                        + "JOIN validation_run run ON run.validation_run_id = vr.validation_run_id "
-                        + "WHERE run.label_version_id LIKE 'label_s2_m2_%'",
+                + "JOIN validation_run run ON run.validation_run_id = vr.validation_run_id "
+                + "WHERE run.label_version_id LIKE 'label_s2_m2_%'",
                 Integer.class)).isZero();
+    }
+
+    private void resetFixtureSchema() {
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement()) {
+            statement.execute("SET FOREIGN_KEY_CHECKS=0");
+            try (var tables = connection.getMetaData().getTables(
+                    connection.getCatalog(), null, "%", new String[]{"TABLE"})) {
+                while (tables.next()) {
+                    String tableName = tables.getString("TABLE_NAME").replace("`", "``");
+                    statement.execute("TRUNCATE TABLE `" + tableName + "`");
+                }
+            }
+            statement.execute("SET FOREIGN_KEY_CHECKS=1");
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Unable to reset the isolated fixture schema", exception);
+        }
     }
 
 }
