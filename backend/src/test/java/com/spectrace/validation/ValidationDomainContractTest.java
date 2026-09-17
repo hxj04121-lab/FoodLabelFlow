@@ -55,6 +55,13 @@ class ValidationDomainContractTest {
     }
 
     @Test
+    void onlyActiveRuleSetLifecycleIsExecutable() {
+        assertThat(RuleSetLifecycleStatus.ACTIVE.isExecutable()).isTrue();
+        assertThat(RuleSetLifecycleStatus.DRAFT.isExecutable()).isFalse();
+        assertThat(RuleSetLifecycleStatus.RETIRED.isExecutable()).isFalse();
+    }
+
+    @Test
     void resultRejectsContradictoryBlockingFlags() {
         assertThatIllegalArgumentException().isThrownBy(() -> result(null, true, true, ValidationSeverity.ERROR));
         assertThatIllegalArgumentException().isThrownBy(() -> result(null, false, true, ValidationSeverity.WARNING));
