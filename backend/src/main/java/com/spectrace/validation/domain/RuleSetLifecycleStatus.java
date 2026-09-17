@@ -5,6 +5,10 @@ public enum RuleSetLifecycleStatus {
     ACTIVE,
     RETIRED;
 
+    public boolean isExecutable() {
+        return this == ACTIVE;
+    }
+
     public static RuleSetLifecycleStatus fromDatabase(String value) {
         if (value == null || value.isBlank()) {
             throw new IllegalStateException("rule-set lifecycle status is missing");
