@@ -1,11 +1,14 @@
 package com.spectrace;
 
 import com.spectrace.support.MySqlIntegrationTestSupport;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -31,10 +34,33 @@ class FormulaLifecycleEndToEndTest extends MySqlIntegrationTestSupport {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    private String originalFormulaId;
+    private String newFormulaId;
+
+    @AfterEach
+    void restoreSharedFixtureAfterCommittedHttpRequests() {
+        if (newFormulaId == null) return;
+        new TransactionTemplate(transactionManager).executeWithoutResult(transaction -> {
+            jdbcTemplate.update("UPDATE formula_version SET is_current_released = 'N' WHERE formula_version_id = ?",
+                    newFormulaId);
+            jdbcTemplate.update("UPDATE formula_version SET is_current_released = 'Y' WHERE formula_version_id = ?",
+                    originalFormulaId);
+            jdbcTemplate.update("UPDATE product SET current_formula_version_id = ? WHERE product_id = ?",
+                    originalFormulaId, PRODUCT_ID);
+            jdbcTemplate.update("DELETE FROM audit_event WHERE entity_id = ? "
+                    + "AND event_type IN ('FORMULA_CREATED', 'FORMULA_RELEASED')", newFormulaId);
+            jdbcTemplate.update("DELETE FROM formula_item WHERE formula_version_id = ?", newFormulaId);
+            jdbcTemplate.update("DELETE FROM formula_version WHERE formula_version_id = ?", newFormulaId);
+        });
+    }
+
     @Test
     void createsReleasesAndReadsImmutableFormulaHistoryThroughHttpAndMySql() throws Exception {
         HttpClient client = HttpClient.newHttpClient();
-        String originalFormulaId = jdbcTemplate.queryForObject(
+        originalFormulaId = jdbcTemplate.queryForObject(
                 "SELECT current_formula_version_id FROM product WHERE product_id = ?",
                 String.class,
                 PRODUCT_ID
@@ -54,7 +80,7 @@ class FormulaLifecycleEndToEndTest extends MySqlIntegrationTestSupport {
                 }
                 """);
         assertThat(created.statusCode()).isEqualTo(201);
-        String newFormulaId = formulaId(created.body());
+        newFormulaId = formulaId(created.body());
 
         HttpResponse<String> released = send(client, "POST", "/api/catalog/formulas/" + newFormulaId + "/release", """
                 {"expectedCurrentFormulaId":"%s"}
