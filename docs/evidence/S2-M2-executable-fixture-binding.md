@@ -25,10 +25,10 @@ Day 4 / SCRUM-24 PR #26 is merged into `main`. The Day-5 PR is based on `main`
 and its diff contains only this binding test and this evidence note; it does not
 copy or modify the Day-4 fixture files.
 
-The test uses `MySqlIntegrationTestSupport`, the canonical shared Testcontainers
-runtime already present in the repository. It allocates an isolated Day-5 schema
-inside that shared container so a full Maven suite that has already migrated the
-shared schema to V3 cannot make the fixture `@Sql` load non-idempotent. Flyway is
-limited to V1–V2 for that schema; no second container or duplicate M5 harness is
-introduced. Local Docker availability is environment-dependent; the authoritative
-MySQL execution must be observed in the Day-5 GitHub Actions backend job.
+The test uses the repository's canonical MySQL Testcontainers pattern in its own
+isolated container. The M5 shared JVM container persists across full-suite
+contexts and can already contain V3 seed rows; isolating this fixture test keeps
+the `@Sql` resources deterministic without changing shared M5 infrastructure or
+duplicating its harness. Flyway is limited to V1–V2. Local Docker availability is
+environment-dependent; the authoritative MySQL execution must be observed in the
+Day-5 GitHub Actions backend job.

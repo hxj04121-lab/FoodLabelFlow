@@ -3,7 +3,6 @@ package com.spectrace.validation;
 import com.spectrace.allergen.application.port.AllergenFactsPort;
 import com.spectrace.catalog.application.port.FormulaCompositionPort;
 import com.spectrace.label.application.port.LabelSnapshotPort;
-import com.spectrace.support.MySqlIntegrationTestSupport;
 import com.spectrace.support.fixture.NegativeGoldenFixtures;
 import com.spectrace.support.fixture.PositiveGoldenFixtures;
 import com.spectrace.validation.application.port.RuleSetVersionRepository;
@@ -16,16 +15,18 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.jdbc.Sql;
-
-import java.sql.DriverManager;
-import java.sql.SQLException;
+import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Day-5 binding gate: execute both M2 fixture families through owner ports and
- * the canonical M5 MySQL test support without invoking a validation seed path.
+ * the canonical MySQL Testcontainers runtime without invoking a validation seed
+ * path.
  */
+@Testcontainers
 @SpringBootTest(properties = "spring.flyway.target=2")
 @Sql(
         scripts = {
@@ -34,20 +35,17 @@ import static org.assertj.core.api.Assertions.assertThat;
         },
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS
 )
-class ExecutableFixtureBindingMySqlTest extends MySqlIntegrationTestSupport {
+class ExecutableFixtureBindingMySqlTest {
 
-    private static final String DAY5_DATABASE = "spectrace_s2_m2_day5";
-
-    static {
-        createDay5Database();
-    }
+    @Container
+    private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4.11")
+            .withDatabaseName("spectrace_day5")
+            .withUsername("spectrace_day5")
+            .withPassword("spectrace_day5_password");
 
     @DynamicPropertySource
     static void day5DatabaseProperties(DynamicPropertyRegistry registry) {
-        registry.add(
-                "spring.datasource.url",
-                () -> MYSQL.getJdbcUrl().replace("/spectrace", "/" + DAY5_DATABASE)
-        );
+        registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
         registry.add("spring.datasource.username", MYSQL::getUsername);
         registry.add("spring.datasource.password", MYSQL::getPassword);
         registry.add("spring.flyway.enabled", () -> true);
@@ -144,14 +142,4 @@ class ExecutableFixtureBindingMySqlTest extends MySqlIntegrationTestSupport {
                 Integer.class)).isZero();
     }
 
-    private static void createDay5Database() {
-        String adminUrl = MYSQL.getJdbcUrl().replace("/spectrace", "/");
-        try (var connection = DriverManager.getConnection(
-                adminUrl, "root", MYSQL.getPassword());
-             var statement = connection.createStatement()) {
-            statement.execute("CREATE DATABASE IF NOT EXISTS " + DAY5_DATABASE);
-        } catch (SQLException exception) {
-            throw new ExceptionInInitializerError(exception);
-        }
-    }
 }
