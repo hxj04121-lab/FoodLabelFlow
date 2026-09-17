@@ -15,6 +15,9 @@ ports (`FormulaCompositionPort`, `LabelSnapshotPort`, `AllergenFactsPort`, and
 - The exact requested rule-set ID is preserved. The retired-rule-set case must
   remain unavailable through `findActiveById`; an active alternative is not a
   substitute.
+- The test asserts zero `validation_run` and `validation_result` rows immediately
+  after the positive owner-port phase, before the schema reset, and again after
+  the negative phase; a positive-output mutation therefore cannot be masked.
 - Missing fixture lookups remain empty, and no validation run/result rows are
   created by fixture loading. The test contains no seed import, upsert, migration,
   or duplicate M5 harness.

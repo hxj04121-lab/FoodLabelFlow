@@ -94,6 +94,8 @@ class ExecutableFixtureBindingMySqlTest {
             assertThat(fixture.expectedResult()).isEqualTo(ValidationStatus.PASSED);
         }
 
+        assertNoValidationOutputs("positive fixture phase");
+
         // Positive and negative resources intentionally reuse canonical allergen
         // codes. Reset only this test-owned schema before loading the negatives;
         // the fixture SQL remains exact and still fails loudly on collisions.
@@ -143,16 +145,25 @@ class ExecutableFixtureBindingMySqlTest {
             }
         }
 
+        assertNoValidationOutputs("negative fixture phase");
+
         assertThat(formulas.findById("formula_s2_m2_not_a_fixture")).isEmpty();
         assertThat(labelSnapshots.findById("label_s2_m2_not_a_fixture")).isEmpty();
+    }
+
+    private void assertNoValidationOutputs(String phase) {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM validation_run WHERE label_version_id LIKE 'label_s2_m2_%'",
-                Integer.class)).isZero();
+                Integer.class))
+                .as("%s must not persist validation_run rows", phase)
+                .isZero();
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM validation_result vr "
-                + "JOIN validation_run run ON run.validation_run_id = vr.validation_run_id "
-                + "WHERE run.label_version_id LIKE 'label_s2_m2_%'",
-                Integer.class)).isZero();
+                        + "JOIN validation_run run ON run.validation_run_id = vr.validation_run_id "
+                        + "WHERE run.label_version_id LIKE 'label_s2_m2_%'",
+                Integer.class))
+                .as("%s must not persist validation_result rows", phase)
+                .isZero();
     }
 
     private void resetFixtureSchema() {
