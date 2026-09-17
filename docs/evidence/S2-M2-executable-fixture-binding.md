@@ -3,7 +3,7 @@
 This Day-5 slice binds the existing M2 positive fixtures and the Day-4 negative
 fixtures to one executable MySQL test. The test consumes the owner application
 ports (`FormulaCompositionPort`, `LabelSnapshotPort`, `AllergenFactsPort`, and
-`RuleSetVersionRepository`) and reuses M5's `MySqlIntegrationTestSupport`.
+`RuleSetVersionRepository`) in an isolated, test-owned MySQL container.
 
 ## Scope
 

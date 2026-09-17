@@ -39,7 +39,9 @@ class ExecutableFixtureBindingMySqlTest {
 
     @Container
     private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4.11")
-            .withDatabaseName("spectrace_day5")
+            // V1__schema.sql owns the canonical database name and switches to it.
+            // Keep the container isolated while granting the test user that schema.
+            .withDatabaseName("spectrace")
             .withUsername("spectrace_day5")
             .withPassword("spectrace_day5_password");
 
