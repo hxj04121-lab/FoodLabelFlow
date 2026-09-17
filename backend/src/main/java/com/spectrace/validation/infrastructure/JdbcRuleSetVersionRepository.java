@@ -21,6 +21,7 @@ public class JdbcRuleSetVersionRepository implements RuleSetVersionRepository {
                    description, data_provenance_id
             FROM rule_set_version
             WHERE rule_set_version_id = ?
+            FOR SHARE
             """;
 
     private static final String RULE_DEFINITION_COLUMNS = """
@@ -29,6 +30,7 @@ public class JdbcRuleSetVersionRepository implements RuleSetVersionRepository {
             FROM rule_definition
             WHERE rule_set_version_id = ?
             ORDER BY rule_definition_id ASC
+            FOR SHARE
             """;
 
     private final JdbcTemplate jdbcTemplate;
