@@ -8,6 +8,7 @@ import com.spectrace.validation.application.ValidationApplicationService;
 import com.spectrace.validation.application.ValidationFailure;
 import com.spectrace.validation.application.port.ValidationRunRepository;
 import com.spectrace.validation.domain.ValidationResult;
+import com.spectrace.validation.domain.ValidationFinding;
 import com.spectrace.validation.domain.ValidationSeverity;
 import com.spectrace.validation.domain.ValidationStatus;
 import com.spectrace.validation.infrastructure.JdbcValidationResultRepository;
@@ -152,14 +153,14 @@ class ValidationApplicationServiceMySqlTest {
         var saved = results.findByRunId(run.validationRunId());
         assertThat(saved).hasSize(3).allSatisfy(result -> {
             assertThat(result.validationRunId()).isEqualTo(run.validationRunId());
-            assertThat(result.resultCode()).isEqualTo("LABEL_DECLARATION_PRESENT");
-            assertThat(result.message()).isEqualTo("Structured allergen declarations are present and use CONTAINS");
             assertThat(result.severity()).isEqualTo(ValidationSeverity.INFO);
             assertThat(result.passed()).isTrue();
             assertThat(result.blocking()).isFalse();
         });
-        assertThat(saved).extracting(ValidationResult::ruleDefinitionId).containsExactlyInAnyOrder(
-                "rule_s2_m2_milk_decl", "rule_s2_m2_soy_decl", "rule_s2_m2_wheat_decl");
+        assertThat(saved.stream().map(result -> new ValidationFinding(
+                result.ruleDefinitionId(), result.resultCode(), result.severity(),
+                result.passed(), result.blocking(), result.message())).toList())
+                .containsExactlyInAnyOrderElementsOf(PositiveGoldenFixtures.byId(PositiveGoldenFixtures.MULTI_ID).findings());
         assertThat(saved).extracting(ValidationResult::validationResultId).doesNotHaveDuplicates();
         var event = jdbc.queryForMap("""
                 SELECT event_type, entity_type, entity_id, actor_user_id, data_provenance_id,
@@ -186,7 +187,8 @@ class ValidationApplicationServiceMySqlTest {
         assertThat(run.status()).isEqualTo(ValidationStatus.FAILED);
         assertThat(runs.findById(run.validationRunId())).contains(run);
         assertThat(results.findByRunId(run.validationRunId())).hasSize(3).allSatisfy(result -> {
-            assertThat(result.resultCode()).isEqualTo("LABEL_DECLARATION_MISSING");
+            assertThat(result.resultCode()).isEqualTo("ALLERGEN_DECLARATION_MISSING");
+            assertThat(result.message()).endsWith(" is derived but no CONTAINS declaration is present.");
             assertThat(result.severity()).isEqualTo(ValidationSeverity.ERROR);
             assertThat(result.passed()).isFalse();
             assertThat(result.blocking()).isTrue();

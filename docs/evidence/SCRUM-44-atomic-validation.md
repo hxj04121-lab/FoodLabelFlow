@@ -39,10 +39,19 @@ Testcontainer using Flyway V1–V2 and M2's positive fixture SQL, with explicit 
 identity permissions. It has no test-managed transaction: queries after a service
 call observe its committed or rolled-back database state.
 
+`NegativeGoldenValidationPersistenceMySqlTest` adds four cases using the exact M2
+negative SQL in a separate container (the positive and negative resources reuse
+canonical allergen codes). The real service, identity bridge and repositories
+persist missing-declaration, unmapped and ambiguous inputs as completed FAILED
+runs, with exact golden rule IDs, codes, severity, flags and messages. Input-level
+guards retain their component/status attribution and null rule ID. The exact
+retired rule-set remains a 422 with no run, result or audit rows.
+
 | Requirement | Executable evidence |
 | --- | --- |
 | Successful atomic commit | PASSED run, all findings, exact IDs, trusted actor, UTC time, label provenance and attributable audit payload round-trip |
 | Complete evaluated failure | Every blocking failure persists with FAILED; warning failures remain nonblocking PASSED; input findings retain a null rule ID |
+| Reviewed M2 negative truth | ALLERGEN_DECLARATION_MISSING, INGREDIENT_UNMAPPED and INGREDIENT_AMBIGUOUS findings round-trip with their full golden fields and an attributable audit event |
 | Fresh run per request | Repeated validation creates independent run/result IDs and audit events |
 | Audit failure rolls back everything | Injection after the real audit insert observes staged run/results/audit, throws, then verifies all three tables are empty |
 | Partial result write rolls back | A real duplicate-key failure after the first result insert leaves neither run nor results and never calls audit |
@@ -52,8 +61,8 @@ call observe its committed or rolled-back database state.
 
 Verification on 2026-09-17 with Java 21 and MySQL 8.4.11:
 
-- Focused SCRUM-44 suite: **20 tests, zero failures/errors/skips**.
-- Full backend verify and executable JAR build: **145 tests, zero failures/errors/skips; BUILD SUCCESS**.
+- Focused SCRUM-44 suites: **24 tests, zero failures/errors/skips**.
+- Full backend verify and executable JAR build: **163 tests, zero failures/errors/skips; BUILD SUCCESS**.
 
 The full backend command is:
 
@@ -69,10 +78,14 @@ created. The HTTP test still verifies real commits before that cleanup.
 
 ## Dependency and review scope
 
-This branch starts at `origin/main@85b34c3` and includes the existing SCRUM-43
-orchestrator commit `a52e71c` from [PR #27](https://github.com/hxj04121-lab/FoodLabelFlow/pull/27).
-That PR was still open when this work began. Its commit is retained as an ancestor
-so the dependency is reviewable. Review/merge PR #27 first, then synchronize this
+This branch starts at `origin/main@85b34c3` and includes SCRUM-43's original
+orchestrator commit `a52e71c` and reviewed-contract fix `a9bcd6c` from
+[PR #27](https://github.com/hxj04121-lab/FoodLabelFlow/pull/27).
+The follow-up fixes stale-formula 409 mapping, explicit null-target unresolved
+ingredient rules, and shared CONTAINS/missing-declaration result semantics.
+See [SCRUM-43 regression evidence](SCRUM-43-review-regressions.md).
+PR #27 remains a dependency, retained as an ancestor so the integration is
+reviewable. Review/merge PR #27 first, then synchronize this
 branch with main if needed to show only the SCRUM-44 changes.
 SCRUM-44 adds the transactional service, snapshot locks and persistence tests.
 Final HTTP controllers and end-to-end API wiring remain SCRUM-45's scope.
