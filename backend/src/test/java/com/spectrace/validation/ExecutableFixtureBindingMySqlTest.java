@@ -13,7 +13,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.jdbc.Sql;
+
+import java.sql.DriverManager;
+import java.sql.SQLException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -30,6 +35,23 @@ import static org.assertj.core.api.Assertions.assertThat;
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS
 )
 class ExecutableFixtureBindingMySqlTest extends MySqlIntegrationTestSupport {
+
+    private static final String DAY5_DATABASE = "spectrace_s2_m2_day5";
+
+    static {
+        createDay5Database();
+    }
+
+    @DynamicPropertySource
+    static void day5DatabaseProperties(DynamicPropertyRegistry registry) {
+        registry.add(
+                "spring.datasource.url",
+                () -> MYSQL.getJdbcUrl().replace("/spectrace", "/" + DAY5_DATABASE)
+        );
+        registry.add("spring.datasource.username", MYSQL::getUsername);
+        registry.add("spring.datasource.password", MYSQL::getPassword);
+        registry.add("spring.flyway.enabled", () -> true);
+    }
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -120,5 +142,16 @@ class ExecutableFixtureBindingMySqlTest extends MySqlIntegrationTestSupport {
                         + "JOIN validation_run run ON run.validation_run_id = vr.validation_run_id "
                         + "WHERE run.label_version_id LIKE 'label_s2_m2_%'",
                 Integer.class)).isZero();
+    }
+
+    private static void createDay5Database() {
+        String adminUrl = MYSQL.getJdbcUrl().replace("/spectrace", "/");
+        try (var connection = DriverManager.getConnection(
+                adminUrl, MYSQL.getUsername(), MYSQL.getPassword());
+             var statement = connection.createStatement()) {
+            statement.execute("CREATE DATABASE IF NOT EXISTS " + DAY5_DATABASE);
+        } catch (SQLException exception) {
+            throw new ExceptionInInitializerError(exception);
+        }
     }
 }
