@@ -24,6 +24,9 @@ public final class LabelDeclarationEvaluator implements RuleEvaluator {
         if (rule.ruleType() != ruleType()) {
             throw new IllegalArgumentException("Rule type does not match label declaration evaluator");
         }
+        if (rule.targetAllergenId() != null) {
+            return List.of(AllergenDeclarationFindings.evaluate(rule, context));
+        }
 
         List<LabelValidationSnapshot.AllergenDeclaration> declarations = context.label().declarations();
         boolean present = !declarations.isEmpty();
@@ -32,7 +35,7 @@ public final class LabelDeclarationEvaluator implements RuleEvaluator {
         boolean passed = present && allContains;
         String resultCode = passed
                 ? "LABEL_DECLARATION_PRESENT"
-                : present ? "LABEL_DECLARATION_TYPE_INVALID" : "LABEL_DECLARATION_MISSING";
+                : present ? "LABEL_DECLARATION_TYPE_INVALID" : "ALLERGEN_DECLARATION_MISSING";
         String message = passed
                 ? "Structured allergen declarations are present and use CONTAINS"
                 : present

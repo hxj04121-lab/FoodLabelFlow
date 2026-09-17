@@ -21,7 +21,6 @@ import com.spectrace.validation.domain.ValidationStatus;
 
 import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -178,9 +177,12 @@ public class ValidationOrchestrator {
     }
 
     private void validateFormula(FormulaCompositionSnapshot formula, LabelValidationSnapshot label) {
+        if (!formula.isCurrentReleased()) {
+            throw ValidationFailure.notCurrent(
+                    "The label no longer references the current released formula");
+        }
         if (!formula.formulaVersionId().equals(label.formulaVersionId())
                 || !formula.productId().equals(label.productId())
-                || !formula.isCurrentReleased()
                 || formula.items().isEmpty()
                 || formula.items().stream().anyMatch(item -> item.components().isEmpty())) {
             throw ValidationFailure.precondition(

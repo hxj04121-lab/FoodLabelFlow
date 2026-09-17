@@ -1,7 +1,6 @@
 package com.spectrace.validation.application.rule;
 
-import com.spectrace.allergen.application.port.AllergenFact;
-import com.spectrace.label.application.port.LabelValidationSnapshot;
+import com.spectrace.catalog.application.port.FormulaCompositionSnapshot.MatchStatus;
 import com.spectrace.validation.domain.RuleDefinition;
 import com.spectrace.validation.domain.RuleType;
 import com.spectrace.validation.domain.ValidationFinding;
@@ -23,30 +22,30 @@ public final class IngredientToAllergenEvaluator implements RuleEvaluator {
         if (rule.ruleType() != ruleType()) {
             throw new IllegalArgumentException("Rule type does not match ingredient evaluator");
         }
-        String targetAllergenId = rule.targetAllergenId();
-        if (targetAllergenId == null || targetAllergenId.isBlank()) {
-            throw new IllegalStateException("Ingredient rule targetAllergenId is missing");
-        }
-        AllergenFact fact = context.allergens().facts().stream()
-                .filter(candidate -> candidate.allergenId().equals(targetAllergenId))
-                .findFirst()
-                .orElse(null);
-        if (fact == null) {
-            return List.of(ValidationFinding.forRule(
-                    rule,
-                    rule.ruleCode() + "_NOT_DERIVED",
-                    true,
-                    "No " + targetAllergenId + " allergen was derived from the formula"));
+        if (rule.targetAllergenId() != null) {
+            return List.of(AllergenDeclarationFindings.evaluate(rule, context));
         }
 
-        boolean declared = context.label().declarations().stream()
-                .map(LabelValidationSnapshot.AllergenDeclaration::allergenId)
-                .anyMatch(targetAllergenId::equals);
-        String resultCode = fact.allergenCode()
-                + (declared ? "_DECLARATION_PRESENT" : "_DECLARATION_MISSING");
-        String message = declared
-                ? fact.allergenCode() + " is derived and declared"
-                : fact.allergenCode() + " is derived but not declared";
-        return List.of(ValidationFinding.forRule(rule, resultCode, declared, message));
+        // A null target is valid only for the explicit unresolved-component rules.
+        // It is not a catch-all fallback for malformed allergen rules.
+        MatchStatus matchStatus = switch (rule.patternText()) {
+            case "UNMAPPED" -> MatchStatus.UNMAPPED;
+            case "AMBIGUOUS" -> MatchStatus.AMBIGUOUS;
+            default -> throw new IllegalStateException(
+                    "Ingredient rule without a target must specify UNMAPPED or AMBIGUOUS");
+        };
+        List<ValidationFinding> findings = context.allergens().unresolvedComponents().stream()
+                .filter(component -> component.matchStatus() == matchStatus)
+                .map(component -> ValidationFinding.forRule(rule, "INGREDIENT_" + matchStatus, false,
+                        "Ingredient phrase '" + component.rawPhrase() + "' "
+                                + (matchStatus == MatchStatus.UNMAPPED
+                                ? "is unmapped." : "has multiple canonical matches.")))
+                .toList();
+        if (findings.isEmpty()) {
+            return List.of(ValidationFinding.forRule(
+                    rule, "INGREDIENT_" + matchStatus + "_ABSENT", true,
+                    "No formula components have match status " + matchStatus + "."));
+        }
+        return findings;
     }
 }
