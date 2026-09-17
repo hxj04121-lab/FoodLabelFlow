@@ -21,9 +21,9 @@ ports (`FormulaCompositionPort`, `LabelSnapshotPort`, `AllergenFactsPort`, and
 
 ## Dependency and execution evidence
 
-Day 5 is a stacked PR on Day-4 PR #26 because SCRUM-24's fixture artifacts are
-not yet merged into `main`. The Day-5 PR diff contains only this binding test and
-this evidence note; it does not copy or modify Day-4 fixture files.
+Day 4 / SCRUM-24 PR #26 is merged into `main`. The Day-5 PR is based on `main`
+and its diff contains only this binding test and this evidence note; it does not
+copy or modify the Day-4 fixture files.
 
 The test uses `MySqlIntegrationTestSupport`, the canonical shared Testcontainers
 runtime already present in the repository, with Flyway limited to V1–V2. Local
