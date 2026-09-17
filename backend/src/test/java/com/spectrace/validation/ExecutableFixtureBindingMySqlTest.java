@@ -147,7 +147,7 @@ class ExecutableFixtureBindingMySqlTest extends MySqlIntegrationTestSupport {
     private static void createDay5Database() {
         String adminUrl = MYSQL.getJdbcUrl().replace("/spectrace", "/");
         try (var connection = DriverManager.getConnection(
-                adminUrl, MYSQL.getUsername(), MYSQL.getPassword());
+                adminUrl, "root", MYSQL.getPassword());
              var statement = connection.createStatement()) {
             statement.execute("CREATE DATABASE IF NOT EXISTS " + DAY5_DATABASE);
         } catch (SQLException exception) {
