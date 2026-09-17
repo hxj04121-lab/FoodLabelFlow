@@ -71,7 +71,7 @@ class ValidationOrchestratorTest {
 
         assertThat(result.status()).isEqualTo(ValidationStatus.FAILED);
         assertThat(result.findings()).extracting(ValidationFinding::resultCode)
-                .containsExactly("SOY_DECLARATION_MISSING", "LABEL_DECLARATION_MISSING");
+                .containsExactly("ALLERGEN_DECLARATION_MISSING", "ALLERGEN_DECLARATION_MISSING");
         assertThat(result.findings()).allSatisfy(finding -> assertThat(finding.blocking()).isTrue());
     }
 
@@ -114,6 +114,33 @@ class ValidationOrchestratorTest {
                 .isInstanceOfSatisfying(ValidationFailure.class, failure -> {
                     assertThat(failure.status()).isEqualTo(409);
                     assertThat(failure.code()).isEqualTo("LABEL_VERSION_NOT_CURRENT");
+                });
+    }
+
+    @Test
+    void distinguishesAStaleFormulaFromIncompleteCompositionEvenWhenLabelIsCurrent() {
+        var currentLabel = label(true, List.of());
+        var currentFormula = formula(FormulaCompositionSnapshot.MatchStatus.MATCHED);
+        var staleFormula = new FormulaCompositionSnapshot(
+                PRODUCT_ID, FORMULA_ID, false, currentFormula.items());
+        var incompleteStaleFormula = new FormulaCompositionSnapshot(PRODUCT_ID, FORMULA_ID, false, List.of());
+        var incompleteFormula = new FormulaCompositionSnapshot(PRODUCT_ID, FORMULA_ID, true, List.of());
+
+        for (var formula : List.of(staleFormula, incompleteStaleFormula)) {
+            assertThatThrownBy(() -> orchestrator(currentLabel, formula, activeRuleSet(ingredientRule()),
+                    derivation(List.of(), List.of()), allEvaluators(), new RecordingIntegration())
+                    .orchestrate(LABEL_ID, RULE_SET_ID))
+                    .isInstanceOfSatisfying(ValidationFailure.class, failure -> {
+                        assertThat(failure.status()).isEqualTo(409);
+                        assertThat(failure.code()).isEqualTo("LABEL_VERSION_NOT_CURRENT");
+                    });
+        }
+        assertThatThrownBy(() -> orchestrator(currentLabel, incompleteFormula, activeRuleSet(ingredientRule()),
+                derivation(List.of(), List.of()), allEvaluators(), new RecordingIntegration())
+                .orchestrate(LABEL_ID, RULE_SET_ID))
+                .isInstanceOfSatisfying(ValidationFailure.class, failure -> {
+                    assertThat(failure.status()).isEqualTo(422);
+                    assertThat(failure.code()).isEqualTo("VALIDATION_PRECONDITION_FAILED");
                 });
     }
 

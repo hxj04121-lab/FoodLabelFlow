@@ -6,8 +6,15 @@ import com.spectrace.label.application.port.LabelSnapshotPort;
 import com.spectrace.support.fixture.NegativeGoldenFixtures;
 import com.spectrace.support.fixture.NegativeGoldenFixtures.Fixture;
 import com.spectrace.validation.application.port.RuleSetVersionRepository;
+import com.spectrace.validation.application.port.ValidationIntegration;
+import com.spectrace.validation.application.ValidationOrchestrator;
+import com.spectrace.validation.application.ValidationFailure;
+import com.spectrace.validation.application.rule.RuleEvaluatorRegistry;
 import com.spectrace.validation.domain.RuleSetLifecycleStatus;
+import com.spectrace.validation.domain.ValidationSeverity;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -18,7 +25,17 @@ import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.stream.Stream;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 @Testcontainers
 @SpringBootTest(properties = "spring.flyway.target=2")
@@ -50,12 +67,57 @@ class NegativeGoldenFixtureMySqlTest {
     @Autowired
     private RuleSetVersionRepository ruleSets;
 
+    @Autowired
+    private RuleEvaluatorRegistry evaluators;
+
     @DynamicPropertySource
     static void databaseProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
         registry.add("spring.datasource.username", MYSQL::getUsername);
         registry.add("spring.datasource.password", MYSQL::getPassword);
         registry.add("spring.flyway.enabled", () -> true);
+    }
+
+    static Stream<Fixture> negativeFixtures() {
+        return NegativeGoldenFixtures.ALL.stream();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("negativeFixtures")
+    void actualOrchestratorMatchesNegativeGoldenFindingsAndBoundary(Fixture fixture) {
+        var integration = mock(ValidationIntegration.class);
+        when(integration.requireActor(ValidationOrchestrator.VALIDATE_PERMISSION)).thenReturn("fixture-actor");
+        var orchestrator = new ValidationOrchestrator(labelSnapshots, formulas, allergenFacts,
+                ruleSets, evaluators, integration,
+                Clock.fixed(Instant.parse("2026-09-17T00:00:00Z"), ZoneOffset.UTC));
+        var label = fixture.labelSnapshot();
+
+        if (fixture.expectedOutcome().completedRunStatus() == null) {
+            assertThatThrownBy(() -> orchestrator.orchestrate(label.labelVersionId(), label.ruleSetVersionId()))
+                    .isInstanceOfSatisfying(ValidationFailure.class, failure -> {
+                        assertThat(failure.status()).isEqualTo(fixture.expectedOutcome().httpStatus());
+                        assertThat(failure.code()).isEqualTo(fixture.expectedOutcome().code());
+                    });
+        } else {
+            var evaluation = orchestrator.orchestrate(label.labelVersionId(), label.ruleSetVersionId());
+            assertThat(evaluation.status()).isEqualTo(fixture.expectedOutcome().completedRunStatus());
+            assertThat(evaluation.allergens()).isEqualTo(fixture.expectedDerivation());
+            assertThat(evaluation.findings()).filteredOn(finding -> finding.ruleDefinitionId() != null)
+                    .containsExactlyElementsOf(fixture.expectedFindings());
+            // Input-level guards remain independent of rule configuration/severity.
+            assertThat(evaluation.findings()).filteredOn(finding -> finding.ruleDefinitionId() == null)
+                    .hasSize(fixture.expectedDerivation().unresolvedComponents().size())
+                    .allSatisfy(finding -> {
+                        assertThat(finding.resultCode()).isEqualTo("FORMULA_COMPONENT_UNRESOLVED");
+                        assertThat(finding.severity()).isEqualTo(ValidationSeverity.ERROR);
+                        assertThat(finding.passed()).isFalse();
+                        assertThat(finding.blocking()).isTrue();
+                    });
+        }
+        verify(integration).requireActor(ValidationOrchestrator.VALIDATE_PERMISSION);
+        verifyNoMoreInteractions(integration);
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM validation_run", Integer.class)).isZero();
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM validation_result", Integer.class)).isZero();
     }
 
     @Test
