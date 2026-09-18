@@ -3,9 +3,12 @@ package com.spectrace.validation.infrastructure;
 import com.spectrace.allergen.application.port.AllergenFactsPort;
 import com.spectrace.catalog.application.port.FormulaCompositionPort;
 import com.spectrace.label.application.port.LabelSnapshotPort;
+import com.spectrace.validation.application.ValidationApplicationService;
 import com.spectrace.validation.application.ValidationOrchestrator;
 import com.spectrace.validation.application.port.RuleSetVersionRepository;
 import com.spectrace.validation.application.port.ValidationIntegration;
+import com.spectrace.validation.application.port.ValidationResultRepository;
+import com.spectrace.validation.application.port.ValidationRunRepository;
 import com.spectrace.validation.application.rule.IngredientToAllergenEvaluator;
 import com.spectrace.validation.application.rule.LabelDeclarationEvaluator;
 import com.spectrace.validation.application.rule.RuleEvaluator;
@@ -13,6 +16,7 @@ import com.spectrace.validation.application.rule.RuleEvaluatorRegistry;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.time.Clock;
 import java.util.List;
 
 /** Spring wiring for the application-owned validation strategies and flow. */
@@ -45,5 +49,15 @@ public class ValidationInfrastructureConfiguration {
         return new ValidationOrchestrator(
                 labelSnapshots, formulaCompositions, allergenFacts, ruleSets,
                 evaluators, validationIntegration);
+    }
+
+    @Bean
+    public ValidationApplicationService validationApplicationService(
+            ValidationOrchestrator orchestrator,
+            ValidationRunRepository runs,
+            ValidationResultRepository results,
+            ValidationIntegration integration
+    ) {
+        return new ValidationApplicationService(orchestrator, runs, results, integration, Clock.systemUTC());
     }
 }

@@ -39,6 +39,7 @@ public class JdbcFormulaCompositionAdapter implements FormulaCompositionPort {
                         FROM formula_item
                         WHERE formula_version_id = ?
                         ORDER BY sequence_no, formula_item_id
+                        FOR SHARE
                         """, formulaVersionId).stream()
                 .map(item -> new Item(
                         (String) item.get("formula_item_id"),
@@ -60,6 +61,7 @@ public class JdbcFormulaCompositionAdapter implements FormulaCompositionPort {
                         FROM spec_component
                         WHERE specification_version_id = ?
                         ORDER BY sequence_no, spec_component_id
+                        FOR SHARE
                         """, specificationVersionId).stream()
                 .map(component -> new Component(
                         (String) component.get("spec_component_id"),
