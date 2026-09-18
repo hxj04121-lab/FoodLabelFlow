@@ -59,10 +59,12 @@ retired rule-set remains a 422 with no run, result or audit rows.
 | Trusted identity and permission | Unknown/inactive identities and an actor without LABEL.VALIDATE produce no writes |
 | Protection through commit | A second connection cannot lock seven captured row types with FOR UPDATE NOWAIT while audit is paused, sees no partial commit, then sees complete persisted state after audit completes |
 
-Verification on 2026-09-17 with Java 21 and MySQL 8.4.11:
+Verification after synchronizing main on 2026-09-18 with Java 21 and MySQL 8.4.11:
 
-- Focused SCRUM-44 suites: **24 tests, zero failures/errors/skips**.
-- Full backend verify and executable JAR build: **163 tests, zero failures/errors/skips; BUILD SUCCESS**.
+- SCRUM-44 MySQL suites within the full run: **24 tests, zero failures/errors/skips**.
+- Full backend verify and executable JAR build: **164 tests, zero failures/errors/skips; BUILD SUCCESS**.
+- The full run includes PR #29's newly merged executable fixture binding test,
+  which accounts for the increase from the prior 163-test verification.
 
 The full backend command is:
 
@@ -75,18 +77,26 @@ lifecycle test committed a new current formula and left it selected, causing the
 later allergen and workflow-publication tests to fail. Its cleanup now restores
 the original formula selection and removes only the formula/items/audit rows it
 created. The HTTP test still verifies real commits before that cleanup.
+That cleanup is now in main through PR #27 and is no longer part of the
+remaining SCRUM-44 diff.
 
 ## Dependency and review scope
 
-This branch starts at `origin/main@85b34c3` and includes SCRUM-43's original
-orchestrator commit `a52e71c` and reviewed-contract fix `a9bcd6c` from
-[PR #27](https://github.com/hxj04121-lab/FoodLabelFlow/pull/27).
-The follow-up fixes stale-formula 409 mapping, explicit null-target unresolved
-ingredient rules, and shared CONTAINS/missing-declaration result semantics.
-See [SCRUM-43 regression evidence](SCRUM-43-review-regressions.md).
-PR #27 remains a dependency, retained as an ancestor so the integration is
-reviewable. Review/merge PR #27 first, then synchronize this
-branch with main if needed to show only the SCRUM-44 changes.
-SCRUM-44 adds the transactional service, snapshot locks and persistence tests.
+[PR #27](https://github.com/hxj04121-lab/FoodLabelFlow/pull/27) was merged into
+main on 2026-09-17 as `7d8dd20`. SCRUM-43's orchestrator and reviewed-contract
+fix `a9bcd6c` are therefore already on main, not a pending merge dependency.
+Its stale-formula 409 mapping, explicit null-target unresolved ingredient rules,
+and shared CONTAINS/missing-declaration semantics are documented in
+[SCRUM-43 regression evidence](SCRUM-43-review-regressions.md).
+
+On 2026-09-18 this branch explicitly merged `origin/main@58f381d`, including
+the merged [PR #29](https://github.com/hxj04121-lab/FoodLabelFlow/pull/29) and
+its positive-fixture no-output regression check. The merge is conflict-free;
+PR #29's executable fixture test and evidence file are retained unchanged.
+
+The final diff against `58f381d` is limited to eight SCRUM-44 files: the
+transactional application service, its Spring wiring, row locks in the three
+owner adapters, the two persistence test classes, and this evidence document.
+There are no additional evaluator, fixture SQL, schema, frontend or HTTP changes.
 Final HTTP controllers and end-to-end API wiring remain SCRUM-45's scope.
 Automated verification does not represent human review or a Jira Done transition.
