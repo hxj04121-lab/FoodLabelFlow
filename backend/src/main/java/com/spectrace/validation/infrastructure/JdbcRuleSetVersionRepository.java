@@ -21,9 +21,8 @@ public class JdbcRuleSetVersionRepository implements RuleSetVersionRepository {
                    description, data_provenance_id
             FROM rule_set_version
             WHERE rule_set_version_id = ?
+            FOR SHARE
             """;
-
-    private static final String ACTIVE_RULE_SET_COLUMNS = RULE_SET_COLUMNS + " AND lifecycle_status = 'ACTIVE'";
 
     private static final String RULE_DEFINITION_COLUMNS = """
             SELECT rule_definition_id, rule_set_version_id, rule_code, rule_type,
@@ -31,6 +30,7 @@ public class JdbcRuleSetVersionRepository implements RuleSetVersionRepository {
             FROM rule_definition
             WHERE rule_set_version_id = ?
             ORDER BY rule_definition_id ASC
+            FOR SHARE
             """;
 
     private final JdbcTemplate jdbcTemplate;
@@ -42,11 +42,6 @@ public class JdbcRuleSetVersionRepository implements RuleSetVersionRepository {
     @Override
     public Optional<RuleSetVersion> findById(String ruleSetVersionId) {
         return findOne(RULE_SET_COLUMNS, ruleSetVersionId);
-    }
-
-    @Override
-    public Optional<RuleSetVersion> findActiveById(String ruleSetVersionId) {
-        return findOne(ACTIVE_RULE_SET_COLUMNS, ruleSetVersionId);
     }
 
     private Optional<RuleSetVersion> findOne(String query, String ruleSetVersionId) {

@@ -31,6 +31,7 @@ public class JdbcLabelSnapshotAdapter implements LabelSnapshotPort {
                        is_current_published, data_provenance_id
                 FROM label_version
                 WHERE label_version_id = ?
+                FOR UPDATE
                 """,
                 (rs, rowNum) -> new LabelRow(
                         rs.getString("label_version_id"),
@@ -66,6 +67,7 @@ public class JdbcLabelSnapshotAdapter implements LabelSnapshotPort {
                 FROM label_allergen_declaration
                 WHERE label_version_id = ?
                 ORDER BY declaration_type, allergen_id
+                FOR SHARE
                 """,
                 (rs, rowNum) -> new AllergenDeclaration(
                         rs.getString("allergen_id"),
