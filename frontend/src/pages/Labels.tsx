@@ -7,6 +7,7 @@ import {
   type LabelDraft,
 } from '@/api/labels'
 import { Panel, SectionHead, SourceBadge } from '@/components/catalog-shared'
+import { LabelValidationPanel } from '@/components/LabelValidationPanel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { data } from '@/data/catalog'
@@ -352,12 +353,13 @@ export function Labels() {
               The merged draft response does not expose declarations or derived allergen facts. This UI does not invent them or read another module's database.
             </p>
             <div className="label-dependencies">
-              <Badge variant="outline">SCRUM-42 · In progress</Badge>
-              <Badge variant="outline">HTTP contract confirmation required</Badge>
+              <Badge variant="outline">SCRUM-42 · Core merged</Badge>
+              <Badge variant="outline">SCRUM-45 · HTTP pending</Badge>
             </div>
           </div>
         </Panel>
       </div>
+      <LabelValidationPanel draft={draft} />
     </>
   )
 }

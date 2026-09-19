@@ -220,7 +220,7 @@ export async function runValidation(
     `/api/v1/label-versions/${encodeURIComponent(labelVersionId)}/validation-runs`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: labelOfficerHeaders,
       body: JSON.stringify({ ruleSetVersionId }),
       signal,
     },
@@ -241,7 +241,7 @@ export async function getValidationRun(
 ): Promise<ValidationRun> {
   const result = await requestJson(
     `/api/v1/validation-runs/${encodeURIComponent(validationRunId)}`,
-    { signal },
+    { headers: labelOfficerHeaders, signal },
   )
   if (!isValidationRun(result)) {
     throw new LabelApiError(
