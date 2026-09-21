@@ -3,6 +3,13 @@
   "generated_at": "2026-09-03T17:32:23+08:00",
   "items": [
     {
+      "id": "EVID-SCRUM-34-001",
+      "kind": "sprint2_validation_ci_evidence",
+      "path": "docs/evidence/SCRUM-34-final-evidence.md",
+      "status": "BLOCKED",
+      "binding": "SCRUM-34 / S2-M5.8; see verification SHA and exact results in the evidence document"
+    },
+    {
       "id": "EVID-DB0-V3-001",
       "kind": "db0_runtime_validation",
       "path": ".stage0/evidence/DB0_RUNTIME_VALIDATION.json",
