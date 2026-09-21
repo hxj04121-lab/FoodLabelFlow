@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -35,9 +36,15 @@ public class ValidationApplicationService {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** A completed FAILED evaluation is persisted just like a PASSED evaluation. */
+    /** Retains the SCRUM-44 caller contract and its outer transaction. */
     @Transactional
     public ValidationRun validate(String labelVersionId, String ruleSetVersionId) {
+        return validateWithResults(labelVersionId, ruleSetVersionId).run();
+    }
+
+    /** Returns the saved evidence without adding a fallible query after the commit. */
+    @Transactional
+    public RunDetails validateWithResults(String labelVersionId, String ruleSetVersionId) {
         ValidationEvaluation evaluation = orchestrator.orchestrate(labelVersionId, ruleSetVersionId);
         ValidationRun run = new ValidationRun(
                 UUID.randomUUID().toString(),
@@ -61,6 +68,25 @@ public class ValidationApplicationService {
         integration.auditValidation(
                 run.ranByUserId(), run.labelVersionId(), run.ruleSetVersionId(),
                 run.validationRunId(), run.dataProvenanceId());
-        return run;
+        return new RunDetails(run, persistedResults);
+    }
+
+    /** Read the immutable persisted evidence, never re-evaluate today's label or rules. */
+    @Transactional(readOnly = true)
+    public RunDetails getRun(String validationRunId) {
+        if (validationRunId == null || validationRunId.isBlank()) {
+            throw ValidationFailure.invalid("validationRunId is required");
+        }
+        ValidationRun run = runs.findById(validationRunId)
+                .orElseThrow(() -> ValidationFailure.notFound("The requested validation run was not found"));
+        return new RunDetails(run, results.findByRunId(validationRunId));
+    }
+
+    public record RunDetails(ValidationRun run, List<ValidationResult> results) {
+        public RunDetails {
+            Objects.requireNonNull(run, "run");
+            // Match the persisted repository order for identical POST/GET representations.
+            results = results.stream().sorted(Comparator.comparing(ValidationResult::validationResultId)).toList();
+        }
     }
 }

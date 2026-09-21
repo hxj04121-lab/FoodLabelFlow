@@ -12,6 +12,12 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 @AnalyzeClasses(packages = "com.spectrace", importOptions = ImportOption.DoNotIncludeTests.class)
 class ValidationBoundaryArchitectureTest {
     @ArchTest
+    static final ArchRule validation_web_uses_application_boundaries_not_storage = noClasses()
+            .that().resideInAnyPackage("com.spectrace.validation.interfaces..")
+            .should().dependOnClassesThat().resideInAnyPackage(
+                    "..infrastructure..", "org.springframework.jdbc..", "java.sql..", "javax.sql..");
+
+    @ArchTest
     static final ArchRule contracts_and_rules_do_not_access_storage_or_web = noClasses()
             .that().resideInAnyPackage(
                     "com.spectrace.label.application.port..", "com.spectrace.catalog.application.port..",
