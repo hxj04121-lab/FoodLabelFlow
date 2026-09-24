@@ -1,4 +1,6 @@
 import { test as base, expect } from '@playwright/test'
+import { randomUUID } from 'node:crypto'
+import { mkdir, writeFile } from 'node:fs/promises'
 import seed from '../src/data/seed-preview.json' with { type: 'json' }
 // UI regression tests only: explicit HTTP fixtures, never live-integration evidence.
 export const test=base.extend<{catalogFixture:void}>({catalogFixture:[async({page},use)=>{
@@ -13,5 +15,14 @@ export const test=base.extend<{catalogFixture:void}>({catalogFixture:[async({pag
     if(value===undefined) await route.fulfill({status:404,json:{code:'RESOURCE_NOT_FOUND',message:'Test fixture missing'}})
     else await route.fulfill({json:value})
   }); await use()
+  if (process.env.VITE_COVERAGE === 'true' && !page.isClosed()) {
+    const coverage = await page.evaluate(() =>
+      (window as Window & { __coverage__?: Record<string, unknown> }).__coverage__,
+    )
+    if (coverage) {
+      await mkdir('.nyc_output', { recursive: true })
+      await writeFile(`.nyc_output/${randomUUID()}.json`, JSON.stringify(coverage))
+    }
+  }
 },{auto:true}]})
 export {expect}

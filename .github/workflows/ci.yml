@@ -103,6 +103,14 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+      - name: Generate frontend coverage from browser tests
+        working-directory: frontend
+        env:
+          VITE_COVERAGE: 'true'
+        run: |
+          npx playwright install --with-deps chromium
+          npx playwright test --grep-invert 'captures.*live'
+          npx nyc report --reporter=lcov --reporter=text-summary
       - name: Cache SonarQube packages
         uses: actions/cache@v4
         with:

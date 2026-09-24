@@ -9,4 +9,6 @@ dist/
 *.log
 frontend/test-results/
 frontend/playwright-report/
+frontend/.nyc_output/
+frontend/coverage/
 .DS_Store
