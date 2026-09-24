@@ -108,7 +108,7 @@ jobs:
         env:
           VITE_COVERAGE: 'true'
         run: |
-          npx playwright install --with-deps chromium
+          npx playwright install chromium
           npx playwright test --grep-invert 'captures.*live'
           npx nyc report --reporter=lcov --reporter=text-summary
       - name: Cache SonarQube packages
