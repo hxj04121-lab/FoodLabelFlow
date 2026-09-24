@@ -55,7 +55,10 @@ and the current ArchUnit boundary suites.
 - `docker compose config --quiet`: PASS in the final CI Run.
 - `docker compose build`: PASS in the final CI Run.
 - Full-stack container smoke plus live browser validation: PASS in the containers job.
-- Shared staging: NOT_CONFIGURED — no shared deployment URL, credentials, or deployment workflow was available. Local Compose and GitHub Actions containers are not claimed as shared staging.
+- Shared staging: NOT_CONFIGURED
+  - Owner: deployment/staging owner.
+  - Evidence: no shared deployment URL, credentials, or deployment workflow was available; local Compose and GitHub Actions containers are not shared staging.
+  - Next step: provide the shared deployment target and run the validation smoke against the deployed verified code SHA.
 
 ## Sonar
 
