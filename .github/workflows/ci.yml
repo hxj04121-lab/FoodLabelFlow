@@ -27,6 +27,16 @@ jobs:
           name: backend-coverage
           path: backend/target/site/jacoco/jacoco.xml
           if-no-files-found: error
+      - name: Upload backend test reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: |
+            backend/target/surefire-reports/**
+            backend/target/failsafe-reports/**
+          if-no-files-found: ignore
+          retention-days: 14
 
   frontend:
     runs-on: ubuntu-latest
