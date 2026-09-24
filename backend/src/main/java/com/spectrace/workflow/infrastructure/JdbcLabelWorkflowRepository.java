@@ -31,6 +31,52 @@ public class JdbcLabelWorkflowRepository implements LabelWorkflowRepository {
     }
 
     @Override
+    public Optional<LabelWorkflowVersion> findVersion(
+            String labelVersionId
+    ) {
+        return jdbcTemplate.query(
+                """
+                SELECT
+                    lv.label_version_id,
+                    lv.lifecycle_status,
+                    CASE
+                        WHEN lv.lifecycle_status = 'PUBLISHED'
+                            THEN lv.is_current_published = 'Y'
+                        WHEN lv.lifecycle_status IN (
+                            'DRAFT',
+                            'PENDING_REVIEW',
+                            'APPROVED'
+                        )
+                            THEN lv.formula_version_id =
+                                 p.current_formula_version_id
+                             AND NOT EXISTS (
+                                 SELECT 1
+                                 FROM label_version newer
+                                 WHERE newer.product_id = lv.product_id
+                                   AND newer.jurisdiction_code =
+                                       lv.jurisdiction_code
+                                   AND newer.version_number >
+                                       lv.version_number
+                             )
+                        ELSE FALSE
+                    END AS is_current
+                FROM label_version lv
+                JOIN product p
+                  ON p.product_id = lv.product_id
+                WHERE lv.label_version_id = ?
+                """,
+                rs -> rs.next()
+                        ? Optional.of(new LabelWorkflowVersion(
+                                rs.getString("label_version_id"),
+                                rs.getString("lifecycle_status"),
+                                rs.getBoolean("is_current")
+                        ))
+                        : Optional.empty(),
+                labelVersionId
+        );
+    }
+
+    @Override
     public void submitForReview(
             String labelVersionId,
             String actorUserId

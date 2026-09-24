@@ -2,6 +2,8 @@ package com.spectrace.workflow.application;
 
 import com.spectrace.identity.application.AuthorizationService;
 import com.spectrace.identity.domain.AuthenticatedActor;
+import com.spectrace.label.application.LabelDraftNotFoundException;
+import com.spectrace.label.application.LabelVersionConflictException;
 import com.spectrace.workflow.application.port.LabelWorkflowRepository;
 import com.spectrace.workflow.domain.MakerCheckerPolicy;
 import org.springframework.stereotype.Service;
@@ -32,6 +34,8 @@ public class LabelWorkflowService {
                 "LABEL.SUBMIT_REVIEW"
         );
 
+        requireCurrentVersion(labelVersionId);
+
         workflowRepository.submitForReview(
                 labelVersionId,
                 actor.userId()
@@ -61,11 +65,13 @@ public class LabelWorkflowService {
 
         authorizationService.requirePermission(actor, permission);
 
+        requireCurrentVersion(labelVersionId);
+
         if ("APPROVE".equals(decision)) {
             String creatorUserId = workflowRepository
                     .findCreatorUserId(labelVersionId)
-                    .orElseThrow(() -> new IllegalArgumentException(
-                            "Label version not found: " + labelVersionId
+                    .orElseThrow(() -> new LabelDraftNotFoundException(
+                            labelVersionId
                     ));
 
             makerCheckerPolicy.requireIndependentChecker(
@@ -80,5 +86,21 @@ public class LabelWorkflowService {
                 actor.userId(),
                 comments
         );
+    }
+
+    private void requireCurrentVersion(String labelVersionId) {
+        LabelWorkflowRepository.LabelWorkflowVersion version =
+                workflowRepository.findVersion(labelVersionId)
+                        .orElseThrow(() ->
+                                new LabelDraftNotFoundException(
+                                        labelVersionId
+                                ));
+
+        if (!version.current()) {
+            throw new LabelVersionConflictException(
+                    "Label version is stale or historical: "
+                            + labelVersionId
+            );
+        }
     }
 }
