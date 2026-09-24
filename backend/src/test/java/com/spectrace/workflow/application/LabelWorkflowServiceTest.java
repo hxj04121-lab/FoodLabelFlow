@@ -32,13 +32,67 @@ class LabelWorkflowServiceTest {
             );
 
     @Test
-    void rejectsSelfApprovalEvenWhenActorHasApprovePermission() {
-        AuthenticatedActor actor = new AuthenticatedActor(
+    void allowsAuthorizedMakerToSubmitForReview() {
+        AuthenticatedActor actor = actor(
+                "user_label_officer",
+                "LABEL.SUBMIT_REVIEW"
+        );
+
+        service.submitForReview("label_test", actor);
+
+        verify(workflowRepository).submitForReview(
+                "label_test",
+                "user_label_officer"
+        );
+    }
+
+    @Test
+    void rejectsSubmitWithoutSubmitReviewPermission() {
+        AuthenticatedActor actor = actor(
+                "user_unauthorized"
+        );
+
+        assertThrows(
+                AuthorizationDeniedException.class,
+                () -> service.submitForReview(
+                        "label_test",
+                        actor
+                )
+        );
+
+        verifyNoInteractions(workflowRepository);
+    }
+
+    @Test
+    void allowsIndependentCheckerToApprove() {
+        AuthenticatedActor checker = actor(
                 "user_approver",
-                "qa.approver",
-                "Demo Approver",
-                Set.of("APPROVER"),
-                Set.of("LABEL.APPROVE")
+                "LABEL.APPROVE"
+        );
+
+        when(workflowRepository.findCreatorUserId("label_test"))
+                .thenReturn(Optional.of("user_label_officer"));
+
+        service.recordDecision(
+                "label_test",
+                "APPROVE",
+                "Approved by independent checker",
+                checker
+        );
+
+        verify(workflowRepository).recordDecision(
+                "label_test",
+                "APPROVE",
+                "user_approver",
+                "Approved by independent checker"
+        );
+    }
+
+    @Test
+    void rejectsSelfApprovalEvenWhenActorHasApprovePermission() {
+        AuthenticatedActor actor = actor(
+                "user_approver",
+                "LABEL.APPROVE"
         );
 
         when(workflowRepository.findCreatorUserId("label_self"))
@@ -63,13 +117,83 @@ class LabelWorkflowServiceTest {
     }
 
     @Test
-    void rejectsNullDecision() {
-        AuthenticatedActor actor = new AuthenticatedActor(
+    void rejectsApprovalWithoutApprovePermission() {
+        AuthenticatedActor actor = actor(
+                "user_label_officer"
+        );
+
+        assertThrows(
+                AuthorizationDeniedException.class,
+                () -> service.recordDecision(
+                        "label_test",
+                        "APPROVE",
+                        "Unauthorized approval",
+                        actor
+                )
+        );
+
+        verifyNoInteractions(workflowRepository);
+    }
+
+    @Test
+    void allowsAuthorizedCheckerToReject() {
+        AuthenticatedActor checker = actor(
                 "user_approver",
-                "qa.approver",
-                "Demo Approver",
-                Set.of("APPROVER"),
-                Set.of("LABEL.APPROVE")
+                "LABEL.REJECT"
+        );
+
+        service.recordDecision(
+                "label_test",
+                "REJECT",
+                "Rejected by checker",
+                checker
+        );
+
+        verify(workflowRepository).recordDecision(
+                "label_test",
+                "REJECT",
+                "user_approver",
+                "Rejected by checker"
+        );
+    }
+
+    @Test
+    void rejectsRejectionWithoutRejectPermission() {
+        AuthenticatedActor actor = actor(
+                "user_label_officer"
+        );
+
+        assertThrows(
+                AuthorizationDeniedException.class,
+                () -> service.recordDecision(
+                        "label_test",
+                        "REJECT",
+                        "Unauthorized rejection",
+                        actor
+                )
+        );
+
+        verifyNoInteractions(workflowRepository);
+    }
+
+    @Test
+    void rejectsNullActor() {
+        assertThrows(
+                AuthorizationDeniedException.class,
+                () -> service.submitForReview(
+                        "label_test",
+                        null
+                )
+        );
+
+        verifyNoInteractions(workflowRepository);
+    }
+
+    @Test
+    void rejectsNullDecision() {
+        AuthenticatedActor actor = actor(
+                "user_approver",
+                "LABEL.APPROVE"
         );
 
         assertThrows(
@@ -87,12 +211,9 @@ class LabelWorkflowServiceTest {
 
     @Test
     void rejectsBlankDecision() {
-        AuthenticatedActor actor = new AuthenticatedActor(
+        AuthenticatedActor actor = actor(
                 "user_approver",
-                "qa.approver",
-                "Demo Approver",
-                Set.of("APPROVER"),
-                Set.of("LABEL.APPROVE")
+                "LABEL.APPROVE"
         );
 
         assertThrows(
@@ -106,5 +227,38 @@ class LabelWorkflowServiceTest {
         );
 
         verifyNoInteractions(workflowRepository);
+    }
+
+    @Test
+    void rejectsUnsupportedDecision() {
+        AuthenticatedActor actor = actor(
+                "user_approver",
+                "LABEL.APPROVE"
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.recordDecision(
+                        "label_test",
+                        "PUBLISH",
+                        null,
+                        actor
+                )
+        );
+
+        verifyNoInteractions(workflowRepository);
+    }
+
+    private AuthenticatedActor actor(
+            String userId,
+            String... permissions
+    ) {
+        return new AuthenticatedActor(
+                userId,
+                userId,
+                userId,
+                Set.of(),
+                Set.of(permissions)
+        );
     }
 }
