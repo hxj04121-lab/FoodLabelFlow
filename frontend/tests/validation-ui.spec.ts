@@ -120,6 +120,72 @@ test('loads a persisted validation run by exact ID', async ({ page }) => {
   await expect(page.getByText(`Loaded validation run ${passedRun.validationRunId}.`)).toBeVisible()
 })
 
+test('clears validation feedback when the selected draft or product changes', async ({ page }) => {
+  const otherDraft = { ...draft, labelVersionId: 'label_other_version' }
+  await page.route(`**/api/v1/validation-runs/${passedRun.validationRunId}`, (route) =>
+    route.fulfill({ json: passedRun }),
+  )
+  await page.route(`**/api/labels/${otherDraft.labelVersionId}`, (route) =>
+    route.fulfill({ json: otherDraft }),
+  )
+  await openDraft(page)
+
+  async function showRun() {
+    await page.getByLabel('Existing validation run ID').fill(passedRun.validationRunId)
+    await page.getByRole('button', { name: 'Load validation run' }).click()
+    await expect(page.getByRole('region', { name: 'Validation run results' })).toContainText('PASSED')
+  }
+
+  await showRun()
+  await page.getByLabel('Existing label version ID').fill(otherDraft.labelVersionId)
+  await page.getByRole('button', { name: 'Load label draft' }).click()
+  await expect(page.getByRole('region', { name: 'Label draft details' })).toContainText(otherDraft.labelVersionId)
+  await expect(page.getByRole('region', { name: 'Validation run results' })).toHaveCount(0)
+  await expect(page.getByLabel('Existing validation run ID')).toHaveValue('')
+
+  await page.getByLabel('Existing label version ID').fill(draft.labelVersionId)
+  await page.getByRole('button', { name: 'Load label draft' }).click()
+  await expect(page.getByRole('region', { name: 'Label draft details' })).toContainText(draft.labelVersionId)
+  await showRun()
+  await page.getByLabel('Product').selectOption({ index: 1 })
+  await expect(page.getByRole('region', { name: 'Validation run results' })).toHaveCount(0)
+  await expect(page.getByLabel('Existing validation run ID')).toHaveCount(0)
+})
+
+test('rejects a validation run for a different label version or rule set', async ({ page }) => {
+  const wrongLabel = { ...passedRun, labelVersionId: 'label_other_version' }
+  const wrongRuleSet = { ...passedRun, ruleSetVersionId: 'ruleset_other' }
+  await page.route('**/api/v1/validation-runs/*', (route) =>
+    route.fulfill({ json: route.request().url().endsWith('wrong-label') ? wrongLabel : wrongRuleSet }),
+  )
+  await openDraft(page)
+
+  for (const runId of ['wrong-label', 'wrong-rule-set']) {
+    await page.getByLabel('Existing validation run ID').fill(runId)
+    await page.getByRole('button', { name: 'Load validation run' }).click()
+    await expect(page.getByRole('alert')).toContainText('VALIDATION_TARGET_MISMATCH')
+    await expect(page.getByRole('region', { name: 'Validation run results' })).toHaveCount(0)
+  }
+})
+
+test('rejects a validation write response for a different target', async ({ page }) => {
+  await page.route('**/api/v1/label-versions/*/validation-runs', (route) =>
+    route.fulfill({ status: 201, json: { ...passedRun, ruleSetVersionId: 'ruleset_other' } }),
+  )
+  await openDraft(page)
+  await page
+    .getByRole('checkbox', {
+      name: 'Enable the local demo label-officer identity to validate this exact version',
+    })
+    .check()
+  await page.getByRole('button', { name: 'Run validation' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('VALIDATION_TARGET_MISMATCH')
+  await expect(page.getByRole('region', { name: 'Validation run results' })).toHaveCount(0)
+  await expect(page.getByText('The validation write outcome may be unknown.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Run validation' })).toBeDisabled()
+})
+
 test('shows stable validation errors without inventing results', async ({ page }) => {
   await page.route('**/api/v1/label-versions/*/validation-runs', (route) =>
     route.fulfill({

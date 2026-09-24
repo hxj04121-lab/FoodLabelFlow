@@ -359,7 +359,10 @@ export function Labels() {
           </div>
         </Panel>
       </div>
-      <LabelValidationPanel draft={draft} />
+      <LabelValidationPanel
+        key={`${productId}:${draft?.labelVersionId ?? ''}:${draft?.ruleSetVersionId ?? ''}`}
+        draft={draft}
+      />
     </>
   )
 }

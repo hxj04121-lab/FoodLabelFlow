@@ -11,6 +11,20 @@ import { Button } from '@/components/ui/button'
 import { AlertTriangle, CheckCircle2, CircleSlash2 } from 'lucide-react'
 import { useRef, useState } from 'react'
 
+function requireCurrentTarget(run: ValidationRun, draft: LabelDraft): ValidationRun {
+  if (
+    run.labelVersionId !== draft.labelVersionId ||
+    run.ruleSetVersionId !== draft.ruleSetVersionId
+  ) {
+    throw new LabelApiError(
+      'VALIDATION_TARGET_MISMATCH',
+      'The validation run does not match the selected label version and rule set.',
+      200,
+    )
+  }
+  return run
+}
+
 export function LabelValidationPanel({ draft }: { draft: LabelDraft | null }) {
   const [enabled, setEnabled] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -26,12 +40,13 @@ export function LabelValidationPanel({ draft }: { draft: LabelDraft | null }) {
     if (!draft || !enabled || !local || busy || uncertain || writeLock.current) return
     writeLock.current = true
     setBusy(true)
+    setRun(null)
     setError('')
     setMessage('')
     try {
-      const created = await runValidation(
-        draft.labelVersionId,
-        draft.ruleSetVersionId,
+      const created = requireCurrentTarget(
+        await runValidation(draft.labelVersionId, draft.ruleSetVersionId),
+        draft,
       )
       setRun(created)
       setLookupId(created.validationRunId)
@@ -46,7 +61,7 @@ export function LabelValidationPanel({ draft }: { draft: LabelDraft | null }) {
           requestError instanceof Error ? requestError.message : 'Validation failed.'
         }`,
       )
-      if (!apiError || apiError.status >= 500) {
+      if (!apiError || apiError.status >= 500 || apiError.code === 'VALIDATION_TARGET_MISMATCH') {
         setUncertain(true)
         setMessage(
           'The validation write outcome may be unknown. Do not submit it again; load the run ID or verify the server first.',
@@ -60,12 +75,13 @@ export function LabelValidationPanel({ draft }: { draft: LabelDraft | null }) {
 
   async function loadRun() {
     const exactId = lookupId.trim()
-    if (!exactId || busy) return
+    if (!draft || !exactId || busy) return
     setBusy(true)
+    setRun(null)
     setError('')
     setMessage('')
     try {
-      const loaded = await getValidationRun(exactId)
+      const loaded = requireCurrentTarget(await getValidationRun(exactId), draft)
       setRun(loaded)
       setUncertain(false)
       setMessage(`Loaded validation run ${loaded.validationRunId}.`)
