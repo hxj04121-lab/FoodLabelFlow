@@ -9,7 +9,7 @@ services:
     volumes:
       - spectrace_mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      test: ["CMD-SHELL", "mysql --protocol=TCP -h 127.0.0.1 -P 3306 -uroot -p$${MYSQL_ROOT_PASSWORD} -D spectrace -e 'SELECT 1' >/dev/null 2>&1"]
       interval: 5s
       timeout: 5s
       retries: 30

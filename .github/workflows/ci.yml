@@ -44,6 +44,35 @@ jobs:
         run: docker compose config --quiet
       - name: Build application images
         run: docker compose build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install browser test dependencies
+        working-directory: frontend
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: Start full stack
+        run: docker compose up -d mysql backend frontend
+      - name: Validate PASS and blocking FAIL through the browser
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:5173
+          LIVE_VALIDATION: '1'
+        run: npx playwright test tests/validation-live.spec.ts
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose ps -a && docker compose logs --no-color mysql backend frontend
+      - name: Upload browser validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-browser-evidence
+          path: frontend/test-results
+          if-no-files-found: warn
+      - name: Stop full stack
+        if: always()
+        run: docker compose down -v
 
   sonarqube:
     name: SonarQube analysis
@@ -74,6 +103,14 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
+      - name: Generate frontend coverage from browser tests
+        working-directory: frontend
+        env:
+          VITE_COVERAGE: 'true'
+        run: |
+          npx playwright install chromium
+          npx playwright test --grep-invert 'captures.*live'
+          npx nyc report --reporter=lcov --reporter=text-summary
       - name: Cache SonarQube packages
         uses: actions/cache@v4
         with:

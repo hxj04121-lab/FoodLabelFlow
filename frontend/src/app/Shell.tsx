@@ -184,7 +184,7 @@ export function Shell() {
             <Route path="/formulas" element={<CatalogConnection><Catalog formulas /></CatalogConnection>} />
             <Route path="/suppliers" element={<CatalogConnection><Materials suppliers /></CatalogConnection>} />
             <Route path="/materials" element={<CatalogConnection><Materials /></CatalogConnection>} />
-            <Route path="/labels" element={<Labels />} />
+            <Route path="/labels" element={<CatalogConnection><Labels /></CatalogConnection>} />
             <Route path="/impact" element={<Upcoming kind="impact" />} />
             <Route path="/reviews" element={<Upcoming kind="reviews" />} />
             <Route path="/health" element={<HealthPage />} />

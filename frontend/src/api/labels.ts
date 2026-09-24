@@ -31,6 +31,21 @@ export type ApiError = {
   evidenceId: string | null
 }
 
+export type LabelDraft = {
+  labelVersionId: string
+  productId: string
+  formulaVersionId: string
+  ruleSetVersionId: string
+  jurisdictionCode: string
+  versionNumber: number
+  rawIngredientText: string
+  lifecycleStatus: string
+  isCurrentPublished: string
+  createdByUserId: string
+  createdAt: string
+  dataProvenanceId: string
+}
+
 export class LabelApiError extends Error {
   constructor(
     public readonly code: string,
@@ -86,6 +101,24 @@ function isValidationRun(value: unknown): value is ValidationRun {
   )
 }
 
+function isLabelDraft(value: unknown): value is LabelDraft {
+  return (
+    isRecord(value) &&
+    typeof value.labelVersionId === 'string' &&
+    typeof value.productId === 'string' &&
+    typeof value.formulaVersionId === 'string' &&
+    typeof value.ruleSetVersionId === 'string' &&
+    typeof value.jurisdictionCode === 'string' &&
+    typeof value.versionNumber === 'number' &&
+    typeof value.rawIngredientText === 'string' &&
+    typeof value.lifecycleStatus === 'string' &&
+    typeof value.isCurrentPublished === 'string' &&
+    typeof value.createdByUserId === 'string' &&
+    typeof value.createdAt === 'string' &&
+    typeof value.dataProvenanceId === 'string'
+  )
+}
+
 async function requestJson(path: string, init?: RequestInit): Promise<unknown> {
   const response = await fetch(path, init)
   let body: unknown
@@ -115,6 +148,51 @@ async function requestJson(path: string, init?: RequestInit): Promise<unknown> {
   return body
 }
 
+const labelOfficerHeaders = {
+  'Content-Type': 'application/json',
+  'X-Auth-Provider': 'DEV_EXTERNAL',
+  'X-External-Subject': 'dev-external-label-officer',
+}
+
+export async function createLabelDraft(
+  productId: string,
+  jurisdictionCode: string,
+  signal?: AbortSignal,
+): Promise<LabelDraft> {
+  const result = await requestJson('/api/labels/drafts', {
+    method: 'POST',
+    headers: labelOfficerHeaders,
+    body: JSON.stringify({ productId, jurisdictionCode }),
+    signal,
+  })
+  if (!isLabelDraft(result)) {
+    throw new LabelApiError(
+      'INVALID_RESPONSE',
+      'The label API returned an invalid draft.',
+      200,
+    )
+  }
+  return result
+}
+
+export async function getLabelDraft(
+  labelVersionId: string,
+  signal?: AbortSignal,
+): Promise<LabelDraft> {
+  const result = await requestJson(
+    `/api/labels/${encodeURIComponent(labelVersionId)}`,
+    { headers: labelOfficerHeaders, signal },
+  )
+  if (!isLabelDraft(result)) {
+    throw new LabelApiError(
+      'INVALID_RESPONSE',
+      'The label API returned an invalid draft.',
+      200,
+    )
+  }
+  return result
+}
+
 export async function listAllergens(
   jurisdictionCode: string,
   signal?: AbortSignal,
@@ -142,7 +220,7 @@ export async function runValidation(
     `/api/v1/label-versions/${encodeURIComponent(labelVersionId)}/validation-runs`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: labelOfficerHeaders,
       body: JSON.stringify({ ruleSetVersionId }),
       signal,
     },
@@ -163,7 +241,7 @@ export async function getValidationRun(
 ): Promise<ValidationRun> {
   const result = await requestJson(
     `/api/v1/validation-runs/${encodeURIComponent(validationRunId)}`,
-    { signal },
+    { headers: labelOfficerHeaders, signal },
   )
   if (!isValidationRun(result)) {
     throw new LabelApiError(
