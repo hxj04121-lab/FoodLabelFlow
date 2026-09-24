@@ -1,0 +1,130 @@
+openapi: 3.1.0
+info:
+  title: Label-bound Derived Allergen Display API
+  version: 1.0.0
+  description: >-
+    Additive M1 display resource for SCRUM-18 integration. This does not change the
+    frozen allergen-validation-api-v1.yaml contract or M4's LabelDraft resource.
+    The response is recomputed from the exact label-pinned formula and rule-set
+    versions as stored at read time; it is not an archived validation-run snapshot
+    and does not assert that a label is valid, current or eligible for submission.
+paths:
+  /api/v1/label-versions/{labelVersionId}/derived-allergens:
+    get:
+      operationId: getLabelDerivedAllergens
+      summary: Read version-bound derived allergen facts and unresolved components.
+      description: >-
+        Requires the same active M4 identity context as GET /api/labels/{labelVersionId}.
+        No LABEL.VALIDATE permission is required and no validation run, result or audit
+        event is created. Formula, rule-set and jurisdiction are resolved from the exact
+        label version, never selected from latest/current alternatives. No query
+        parameters or version overrides are accepted (400). Existing historical labels
+        and retired/inactive rule sets are readable; POST validation still enforces its
+        own currentness, ACTIVE and effective-date guards. Missing/incomplete composition
+        or a mismatched rule-set jurisdiction returns 422, not an empty-success fallback.
+        Unmapped/ambiguous components are returned even when facts is empty. An empty
+        facts list alone must never be rendered as proof that no allergens are present.
+      parameters:
+        - name: labelVersionId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/RequiredText'
+      responses:
+        '200':
+          description: Direct display resource; not a validation outcome.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabelAllergenFacts'
+        '400':
+          $ref: './allergen-validation-api-v1.yaml#/components/responses/InvalidRequest'
+        '401':
+          $ref: './allergen-validation-api-v1.yaml#/components/responses/AuthenticationRequired'
+        '404':
+          $ref: './allergen-validation-api-v1.yaml#/components/responses/ResourceNotFound'
+        '422':
+          $ref: './allergen-validation-api-v1.yaml#/components/responses/ValidationPreconditionFailed'
+        '500':
+          $ref: './allergen-validation-api-v1.yaml#/components/responses/InternalError'
+components:
+  schemas:
+    RequiredText:
+      type: string
+      minLength: 1
+    LabelAllergenFacts:
+      type: object
+      additionalProperties: false
+      required: [labelVersionId, formulaVersionId, ruleSetVersionId, jurisdictionCode, facts, unresolvedComponents]
+      properties:
+        labelVersionId:
+          $ref: '#/components/schemas/RequiredText'
+        formulaVersionId:
+          $ref: '#/components/schemas/RequiredText'
+        ruleSetVersionId:
+          $ref: '#/components/schemas/RequiredText'
+        jurisdictionCode:
+          $ref: '#/components/schemas/RequiredText'
+        facts:
+          type: array
+          description: Grouped by allergen ID, sorted by allergenCode then ID; all contributing paths retained.
+          items:
+            $ref: '#/components/schemas/AllergenFact'
+        unresolvedComponents:
+          type: array
+          description: Source-order unresolved components; never silently omitted.
+          items:
+            $ref: '#/components/schemas/UnresolvedComponent'
+    AllergenFact:
+      type: object
+      additionalProperties: false
+      required: [allergenId, allergenCode, derivationEvidence]
+      properties:
+        allergenId:
+          $ref: '#/components/schemas/RequiredText'
+        allergenCode:
+          $ref: '#/components/schemas/RequiredText'
+        derivationEvidence:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/DerivationEvidence'
+    DerivationEvidence:
+      type: object
+      additionalProperties: false
+      required: [formulaItemId, specificationVersionId, specComponentId, ingredientId, ingredientAllergenId, evidenceRule, dataProvenanceId]
+      properties:
+        formulaItemId:
+          $ref: '#/components/schemas/RequiredText'
+        specificationVersionId:
+          $ref: '#/components/schemas/RequiredText'
+        specComponentId:
+          $ref: '#/components/schemas/RequiredText'
+        ingredientId:
+          $ref: '#/components/schemas/RequiredText'
+        ingredientAllergenId:
+          $ref: '#/components/schemas/RequiredText'
+        evidenceRule:
+          $ref: '#/components/schemas/RequiredText'
+        dataProvenanceId:
+          $ref: '#/components/schemas/RequiredText'
+    UnresolvedComponent:
+      type: object
+      additionalProperties: false
+      required: [formulaItemId, specificationVersionId, specComponentId, ingredientId, rawPhrase, matchRule, matchStatus]
+      properties:
+        formulaItemId:
+          $ref: '#/components/schemas/RequiredText'
+        specificationVersionId:
+          $ref: '#/components/schemas/RequiredText'
+        specComponentId:
+          $ref: '#/components/schemas/RequiredText'
+        ingredientId:
+          $ref: '#/components/schemas/RequiredText'
+        rawPhrase:
+          $ref: '#/components/schemas/RequiredText'
+        matchRule:
+          $ref: '#/components/schemas/RequiredText'
+        matchStatus:
+          type: string
+          enum: [UNMAPPED, AMBIGUOUS]
