@@ -21,6 +21,12 @@ jobs:
           cache: maven
       - name: Verify backend with MySQL Testcontainers
         run: mvn -B -ntp -f backend/pom.xml verify
+      - name: Upload backend coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/target/site/jacoco/jacoco.xml
+          if-no-files-found: error
       - name: Upload backend test reports
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -110,6 +116,11 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Compile backend for analysis
         run: mvn -B -ntp -f backend/pom.xml -DskipTests package
+      - name: Download backend coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/target/site/jacoco
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci

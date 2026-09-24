@@ -31,17 +31,19 @@ const draft = {
 }
 
 test('shows a loading state and renders canonical allergens from the API', async ({ page }) => {
-  let releaseResponse: (() => void) | undefined
+  // Create the gate before navigation: loading can render before the route runs.
+  let releaseResponse!: () => void
+  const responseGate = new Promise<void>((resolve) => {
+    releaseResponse = resolve
+  })
   await page.route('**/api/v1/allergens?*', async (route) => {
-    await new Promise<void>((resolve) => {
-      releaseResponse = resolve
-    })
+    await responseGate
     await route.fulfill({ json: allergens })
   })
 
   await page.goto('/labels')
   await expect(page.getByRole('status')).toContainText('Checking the canonical allergen endpoint')
-  releaseResponse?.()
+  releaseResponse()
 
   await expect(page.getByText('Canonical allergen endpoint connected')).toBeVisible()
   await expect(page.getByText('2 entries returned for US.')).toBeVisible()

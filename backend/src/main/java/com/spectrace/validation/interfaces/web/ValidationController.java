@@ -4,6 +4,8 @@ import com.spectrace.allergen.application.port.AllergenEntry;
 import com.spectrace.allergen.application.port.AllergenFactsPort;
 import com.spectrace.identity.application.IdentityService;
 import com.spectrace.identity.application.UnknownIdentityException;
+import com.spectrace.validation.application.LabelAllergenFacts;
+import com.spectrace.validation.application.LabelAllergenQueryService;
 import com.spectrace.validation.application.ValidationApplicationService;
 import com.spectrace.validation.application.ValidationFailure;
 import com.spectrace.validation.application.ValidationRunRequest;
@@ -26,7 +28,7 @@ import tools.jackson.databind.json.JsonMapper;
 import java.net.URI;
 import java.util.List;
 
-/** HTTP adapter for the frozen SCRUM-41 contract; business policy remains in the application. */
+/** HTTP adapter for validation and label-bound allergen reads; business policy remains in the application. */
 @RestController
 @RequestMapping(value = "/api/v1", produces = MediaType.APPLICATION_JSON_VALUE)
 public class ValidationController {
@@ -39,13 +41,25 @@ public class ValidationController {
     private final ValidationApplicationService validation;
     private final AllergenFactsPort allergens;
     private final IdentityService identities;
+    private final LabelAllergenQueryService labelAllergens;
 
     public ValidationController(
-            ValidationApplicationService validation, AllergenFactsPort allergens, IdentityService identities
+            ValidationApplicationService validation, AllergenFactsPort allergens, IdentityService identities,
+            LabelAllergenQueryService labelAllergens
     ) {
         this.validation = validation;
         this.allergens = allergens;
         this.identities = identities;
+        this.labelAllergens = labelAllergens;
+    }
+
+    @GetMapping("/label-versions/{labelVersionId}/derived-allergens")
+    public LabelAllergenFacts getDerivedAllergens(@PathVariable String labelVersionId, HttpServletRequest request) {
+        authenticateRead(request);
+        if (!request.getParameterMap().isEmpty()) {
+            throw ValidationFailure.invalid("This resource accepts no query parameters; versions are pinned by the label");
+        }
+        return labelAllergens.getByLabelVersionId(labelVersionId);
     }
 
     @GetMapping("/allergens")
