@@ -45,6 +45,52 @@ jobs:
       - name: Build application images
         run: docker compose build
 
+  sonarqube:
+    name: SonarQube analysis
+    runs-on: ubuntu-latest
+    # SonarCloud computes a quality gate only for main and pull requests.
+    # Waiting on a short-lived branch push fails with a misleading
+    # "Not authorized or project not found" error after a successful upload.
+    if: ${{ vars.SONARQUBE_ENABLED == 'true' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main') }}
+    needs: [backend, frontend]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Compile backend for analysis
+        run: mvn -B -ntp -f backend/pom.xml -DskipTests package
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Cache SonarQube packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: |
+            ${{ runner.os }}-sonar
+      - name: SonarQube scan
+        uses: SonarSource/sonarqube-scan-action@v7
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+        with:
+          args: >-
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
+
   security:
     runs-on: ubuntu-latest
     if: ${{ vars.SECURITY_SCANS_ENABLED == 'true' }}
