@@ -33,13 +33,85 @@ class LabelWorkflowServiceTest {
             );
 
     @Test
-    void rejectsSelfApprovalEvenWhenActorHasApprovePermission() {
-        AuthenticatedActor actor = new AuthenticatedActor(
+    void allowsAuthorizedMakerToSubmitForReview() {
+        AuthenticatedActor actor = actor(
+                "user_label_officer",
+                "LABEL.SUBMIT_REVIEW"
+        );
+
+        when(workflowRepository.findVersion("label_test"))
+                .thenReturn(Optional.of(
+                        new LabelWorkflowRepository.LabelWorkflowVersion(
+                                "label_test",
+                                "DRAFT",
+                                true
+                        )
+                ));
+
+        service.submitForReview("label_test", actor);
+
+        verify(workflowRepository).submitForReview(
+                "label_test",
+                "user_label_officer"
+        );
+    }
+
+    @Test
+    void rejectsSubmitWithoutSubmitReviewPermission() {
+        AuthenticatedActor actor = actor(
+                "user_unauthorized"
+        );
+
+        assertThrows(
+                AuthorizationDeniedException.class,
+                () -> service.submitForReview(
+                        "label_test",
+                        actor
+                )
+        );
+
+        verifyNoInteractions(workflowRepository);
+    }
+
+    @Test
+    void allowsIndependentCheckerToApprove() {
+        AuthenticatedActor checker = actor(
                 "user_approver",
-                "qa.approver",
-                "Demo Approver",
-                Set.of("APPROVER"),
-                Set.of("LABEL.APPROVE")
+                "LABEL.APPROVE"
+        );
+
+        when(workflowRepository.findVersion("label_test"))
+                .thenReturn(Optional.of(
+                        new LabelWorkflowRepository.LabelWorkflowVersion(
+                                "label_test",
+                                "PENDING_REVIEW",
+                                true
+                        )
+                ));
+
+        when(workflowRepository.findCreatorUserId("label_test"))
+                .thenReturn(Optional.of("user_label_officer"));
+
+        service.recordDecision(
+                "label_test",
+                "APPROVE",
+                "Approved by independent checker",
+                checker
+        );
+
+        verify(workflowRepository).recordDecision(
+                "label_test",
+                "APPROVE",
+                "user_approver",
+                "Approved by independent checker"
+        );
+    }
+
+    @Test
+    void rejectsSelfApprovalEvenWhenActorHasApprovePermission() {
+        AuthenticatedActor actor = actor(
+                "user_approver",
+                "LABEL.APPROVE"
         );
 
         when(workflowRepository.findVersion("label_self"))
@@ -73,13 +145,92 @@ class LabelWorkflowServiceTest {
     }
 
     @Test
-    void rejectsNullDecision() {
-        AuthenticatedActor actor = new AuthenticatedActor(
+    void rejectsApprovalWithoutApprovePermission() {
+        AuthenticatedActor actor = actor(
+                "user_label_officer"
+        );
+
+        assertThrows(
+                AuthorizationDeniedException.class,
+                () -> service.recordDecision(
+                        "label_test",
+                        "APPROVE",
+                        "Unauthorized approval",
+                        actor
+                )
+        );
+
+        verifyNoInteractions(workflowRepository);
+    }
+
+    @Test
+    void allowsAuthorizedCheckerToReject() {
+        AuthenticatedActor checker = actor(
                 "user_approver",
-                "qa.approver",
-                "Demo Approver",
-                Set.of("APPROVER"),
-                Set.of("LABEL.APPROVE")
+                "LABEL.REJECT"
+        );
+
+        when(workflowRepository.findVersion("label_test"))
+                .thenReturn(Optional.of(
+                        new LabelWorkflowRepository.LabelWorkflowVersion(
+                                "label_test",
+                                "PENDING_REVIEW",
+                                true
+                        )
+                ));
+
+        service.recordDecision(
+                "label_test",
+                "REJECT",
+                "Rejected by checker",
+                checker
+        );
+
+        verify(workflowRepository).recordDecision(
+                "label_test",
+                "REJECT",
+                "user_approver",
+                "Rejected by checker"
+        );
+    }
+
+    @Test
+    void rejectsRejectionWithoutRejectPermission() {
+        AuthenticatedActor actor = actor(
+                "user_label_officer"
+        );
+
+        assertThrows(
+                AuthorizationDeniedException.class,
+                () -> service.recordDecision(
+                        "label_test",
+                        "REJECT",
+                        "Unauthorized rejection",
+                        actor
+                )
+        );
+
+        verifyNoInteractions(workflowRepository);
+    }
+
+    @Test
+    void rejectsNullActor() {
+        assertThrows(
+                AuthorizationDeniedException.class,
+                () -> service.submitForReview(
+                        "label_test",
+                        null
+                )
+        );
+
+        verifyNoInteractions(workflowRepository);
+    }
+
+    @Test
+    void rejectsNullDecision() {
+        AuthenticatedActor actor = actor(
+                "user_approver",
+                "LABEL.APPROVE"
         );
 
         assertThrows(
@@ -97,12 +248,9 @@ class LabelWorkflowServiceTest {
 
     @Test
     void rejectsBlankDecision() {
-        AuthenticatedActor actor = new AuthenticatedActor(
+        AuthenticatedActor actor = actor(
                 "user_approver",
-                "qa.approver",
-                "Demo Approver",
-                Set.of("APPROVER"),
-                Set.of("LABEL.APPROVE")
+                "LABEL.APPROVE"
         );
 
         assertThrows(
@@ -119,43 +267,30 @@ class LabelWorkflowServiceTest {
     }
 
     @Test
-    void allowsSubmitForCurrentLabelVersion() {
-        AuthenticatedActor actor = new AuthenticatedActor(
-                "user_label_officer",
-                "label.officer",
-                "Demo Label Officer",
-                Set.of("LABEL_OFFICER"),
-                Set.of("LABEL.SUBMIT_REVIEW")
+    void rejectsUnsupportedDecision() {
+        AuthenticatedActor actor = actor(
+                "user_approver",
+                "LABEL.APPROVE"
         );
 
-        when(workflowRepository.findVersion("label_current"))
-                .thenReturn(Optional.of(
-                        new LabelWorkflowRepository.LabelWorkflowVersion(
-                                "label_current",
-                                "DRAFT",
-                                true
-                        )
-                ));
-
-        service.submitForReview(
-                "label_current",
-                actor
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.recordDecision(
+                        "label_test",
+                        "PUBLISH",
+                        null,
+                        actor
+                )
         );
 
-        verify(workflowRepository).submitForReview(
-                "label_current",
-                "user_label_officer"
-        );
+        verifyNoInteractions(workflowRepository);
     }
 
     @Test
     void rejectsSubmitForStaleLabelVersion() {
-        AuthenticatedActor actor = new AuthenticatedActor(
+        AuthenticatedActor actor = actor(
                 "user_label_officer",
-                "label.officer",
-                "Demo Label Officer",
-                Set.of("LABEL_OFFICER"),
-                Set.of("LABEL.SUBMIT_REVIEW")
+                "LABEL.SUBMIT_REVIEW"
         );
 
         when(workflowRepository.findVersion("label_stale"))
@@ -183,12 +318,9 @@ class LabelWorkflowServiceTest {
 
     @Test
     void rejectsDecisionForHistoricalLabelVersion() {
-        AuthenticatedActor actor = new AuthenticatedActor(
+        AuthenticatedActor actor = actor(
                 "user_approver",
-                "qa.approver",
-                "Demo Approver",
-                Set.of("APPROVER"),
-                Set.of("LABEL.APPROVE")
+                "LABEL.APPROVE"
         );
 
         when(workflowRepository.findVersion("label_superseded"))
@@ -215,6 +347,19 @@ class LabelWorkflowServiceTest {
                 anyString(),
                 anyString(),
                 any()
+        );
+    }
+
+    private AuthenticatedActor actor(
+            String userId,
+            String... permissions
+    ) {
+        return new AuthenticatedActor(
+                userId,
+                userId,
+                userId,
+                Set.of(),
+                Set.of(permissions)
         );
     }
 }

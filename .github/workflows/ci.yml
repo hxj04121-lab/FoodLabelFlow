@@ -21,6 +21,16 @@ jobs:
           cache: maven
       - name: Verify backend with MySQL Testcontainers
         run: mvn -B -ntp -f backend/pom.xml verify
+      - name: Upload backend test reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: |
+            backend/target/surefire-reports/**
+            backend/target/failsafe-reports/**
+          if-no-files-found: ignore
+          retention-days: 14
 
   frontend:
     runs-on: ubuntu-latest
@@ -44,6 +54,89 @@ jobs:
         run: docker compose config --quiet
       - name: Build application images
         run: docker compose build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install browser test dependencies
+        working-directory: frontend
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: Start full stack
+        run: docker compose up -d mysql backend frontend
+      - name: Validate PASS and blocking FAIL through the browser
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:5173
+          LIVE_VALIDATION: '1'
+        run: npx playwright test tests/validation-live.spec.ts
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose ps -a && docker compose logs --no-color mysql backend frontend
+      - name: Upload browser validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-browser-evidence
+          path: frontend/test-results
+          if-no-files-found: warn
+      - name: Stop full stack
+        if: always()
+        run: docker compose down -v
+
+  sonarqube:
+    name: SonarQube analysis
+    runs-on: ubuntu-latest
+    # SonarCloud computes a quality gate only for main and pull requests.
+    # Waiting on a short-lived branch push fails with a misleading
+    # "Not authorized or project not found" error after a successful upload.
+    if: ${{ vars.SONARQUBE_ENABLED == 'true' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main') }}
+    needs: [backend, frontend]
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Compile backend for analysis
+        run: mvn -B -ntp -f backend/pom.xml -DskipTests package
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Generate frontend coverage from browser tests
+        working-directory: frontend
+        env:
+          VITE_COVERAGE: 'true'
+        run: |
+          npx playwright install chromium
+          npx playwright test --grep-invert 'captures.*live'
+          npx nyc report --reporter=lcov --reporter=text-summary
+      - name: Cache SonarQube packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: |
+            ${{ runner.os }}-sonar
+      - name: SonarQube scan
+        uses: SonarSource/sonarqube-scan-action@v7
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+        with:
+          args: >-
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300
 
   security:
     runs-on: ubuntu-latest
