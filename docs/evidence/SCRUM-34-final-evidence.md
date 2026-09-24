@@ -2,29 +2,29 @@
 
 Jira: SCRUM-34
 Scope: S2-M5.8
-Observed: 2026-09-21 (Asia/Singapore)
+Observed: 2026-09-24 (Asia/Singapore)
 
 ## Verification binding
 
-- Verified commit SHA: `7993da01a749ddd2e02dba3d843257c7d10aadd9`
-- Base SHA: `7993da01a749ddd2e02dba3d843257c7d10aadd9` (`origin/main` at audit)
-- Local verification used the task worktree after rebasing onto `origin/main`.
-- No remote push or current-HEAD GitHub Actions run was performed in this
-  local-only pass; no historical run is presented as current evidence.
+- Verified code SHA: `870e9fe6fe05d61c5b9ce40e05cc7aaff712e010`.
+- Base SHA after rebase: `f2b31db39f16b55bbb69fc5a522b06ebdc6848c5` (`origin/main`), including merged PRs #33 and #36.
+- PR: https://github.com/hxj04121-lab/FoodLabelFlow/pull/34
+- Final CI Run for the rebased code: https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/35975225568
+- The CI Run completed successfully for the verified code SHA; the follow-up evidence-only commit is not presented as a different code verification target.
 
 ## Dependency status
 
 - SCRUM-29 / M5.6: READY — its merge commit `8aecc731a91929607ad8451412120fb85274ead0` is an ancestor of the verified main snapshot.
 - SCRUM-33 / M5.5: SUPERSEDED ON MAIN — the attempted `493ff2f` API commit was not replayed because main already contains the later SCRUM-45 API integration (`5b6b172`); this avoids duplicate controllers and DTOs.
-- SCRUM-35 / M5.7: BLOCKED — no SCRUM-35 completion commit is present in the verified main history. Existing architecture tests were executed; SCRUM-34 did not recreate the missing M5.7 implementation.
+- SCRUM-35 / M5.7: IMPLEMENTED / MERGED — PR #36 (`test(architecture): guard validation module boundaries`) merged as `bb7b153dd14d423894cf806038c5a7a5dc8b8ca5`; its head commit was `9692f44f3e40b72b0d99d79d14db1cc7272d1b40` and is an ancestor of the verified main snapshot. Jira currently remains `正在进行`; the Jira activity records implementation complete and the status was not changed.
 
 ## Existing CI and changes
 
-The main workflow already had backend, frontend, and containers jobs. The
-backend job runs the canonical `mvn -B -ntp -f backend/pom.xml verify` command;
-the frontend job runs `npm ci && npm run build`; the containers job runs
-`docker compose config --quiet` and `docker compose build`. None uses
-`continue-on-error: true`.
+The workflow runs backend, frontend, containers, security, and conditional
+SonarQube analysis jobs. The backend job runs the canonical
+`mvn -B -ntp -f backend/pom.xml verify` command; the frontend job runs
+`npm ci && npm run build`; the containers job validates Compose, builds the
+images, and runs the live browser validation. None uses `continue-on-error: true`.
 
 SCRUM-34 adds an `always()` `backend-test-reports` artifact upload covering
 Surefire and Failsafe report directories, while ignoring absent directories
@@ -32,90 +32,44 @@ without hiding the verify exit status.
 
 ## Backend
 
-Command:
+Remote CI result from the verified code SHA:
 
-```text
-DOCKER_HOST=unix:///Users/shj/.docker/run/docker.sock mvn -B -ntp -f backend/pom.xml verify
-```
+- PASS — `Tests run: 227, Failures: 0, Errors: 0, Skipped: 0`.
+- PASS — `BUILD SUCCESS`.
+- The backend job executed the MySQL Testcontainers verification path and uploaded `backend-test-reports`.
 
-Result: PASS — `Tests run: 218, Failures: 0, Errors: 0, Skipped: 0`,
-`BUILD SUCCESS`.
+The suite includes validation domain/API/golden/persistence tests, MySQL
+integration, OpenAPI and shared API error contracts, identity/workflow tests,
+and the current ArchUnit boundary suites.
 
-The run compiled the current 46 test sources and executed validation domain,
-golden, API, transaction/persistence, MySQL integration, OpenAPI, shared API
-error, and ArchUnit suites through Surefire. There is no Failsafe configuration
-in the current `backend/pom.xml`; all current tests are therefore executed by
-Surefire during `verify`.
+## Frontend and browser evidence
 
-Key Surefire report counts from that run:
+- `npm ci` and `npm run build`: PASS in the final CI Run.
+- Validation-run UI: PRESENT on main after PR #33; the previous `NOT_APPLICABLE` statement is obsolete.
+- Live Playwright browser validation: PASS in the containers job for both the positive and blocking-negative paths.
+- Browser evidence artifact: [validation-browser-evidence](https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/35975225568/artifacts/10796814981).
+- Artifact files: `validation-live-pass.png` shows a completed `PASSED` run with four attributable results; `validation-live-fail.png` shows a completed `FAILED` run with blocking `ALLERGEN_DECLARATION_MISSING` results.
 
-| Evidence slice | Test classes / tests | Failures | Errors | Skipped |
-| --- | --- | ---: | ---: | ---: |
-| Validation unit/contracts | 8 classes / 42 | 0 | 0 | 0 |
-| Golden fixtures | 5 classes / 21 | 0 | 0 | 0 |
-| Validation API/OpenAPI/error | 4 classes / 60 | 0 | 0 | 0 |
-| Persistence/transaction integration | 4 classes / 32 | 0 | 0 | 0 |
-| Architecture | 3 classes / 9 | 0 | 0 | 0 |
+## Containers and local/shared staging
 
-MySQL/Testcontainers: PASS — Testcontainers `1.21.3` started real
-`mysql:8.4.11` containers during the run; Flyway validated the canonical V1-V3
-migrations. No H2 fallback was used.
-
-Architecture: PASS for the architecture tests currently present and executed.
-SCRUM-35-specific implementation: BLOCKED ON SCRUM-35 if that issue means
-additional rules not present on this main snapshot; SCRUM-34 did not recreate
-those rules.
-
-## Frontend
-
-- `npm ci`: PASS — 169 packages installed, 0 vulnerabilities reported.
-- `npm run build`: PASS — TypeScript build and Vite production build completed.
-- Playwright validation-run browser acceptance: NOT_APPLICABLE — the current
-  UI exposes the label/allergen foundation and client API helpers, but no
-  validation-run UI flow is present. No screenshot or browser PASS is claimed.
-  Owner/next step: the validation UI owner should add the flow, then run its
-  Playwright acceptance against the real API.
-
-## Containers and local smoke
-
-- `DOCKER_HOST=unix:///Users/shj/.docker/run/docker.sock docker compose config
-  --quiet`: PASS.
-- `DOCKER_HOST=unix:///Users/shj/.docker/run/docker.sock docker compose build`:
-  PASS — backend and frontend images built.
-- Local container smoke: PASS — using non-conflicting local ports
-  `BACKEND_HOST_PORT=18080` and `FRONTEND_HOST_PORT=15173`, the MySQL, backend,
-  and frontend services were healthy; `/api/health` returned
-  `{"status":"ok","database":"ok"}` and the frontend served its HTML.
-- This local Docker smoke is not shared staging evidence.
+- `docker compose config --quiet`: PASS in the final CI Run.
+- `docker compose build`: PASS in the final CI Run.
+- Full-stack container smoke plus live browser validation: PASS in the containers job.
+- Shared staging: NOT_CONFIGURED — no shared deployment URL, credentials, or deployment workflow was available. Local Compose and GitHub Actions containers are not claimed as shared staging.
 
 ## Sonar
 
-Status: NOT_CONFIGURED
-Owner: repository/project maintainers
-Evidence: `sonar-project.properties` has source/test mappings, but no Sonar
-server, project binding, or `SONAR_TOKEN`/`SONAR_HOST_URL` configuration was
-available in this task environment, and no scan was run.
-Next step: configure the repository Sonar connection and run a scan for the
-exact pushed commit; record its URL and quality-gate result.
-
-## Shared staging
-
-Status: NOT_CONFIGURED
-Owner: deployment/staging owner
-Evidence: no shared staging URL, credentials, or deployment workflow was
-available. Local Compose is explicitly excluded from this claim.
-Next step: provide the shared deployment target and run the validation smoke
-against the deployed commit.
+- SonarQube analysis job: PASS — https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/35975225568/job/107554741353
+- SonarCloud Code Analysis: PASS — https://sonarcloud.io/dashboard?id=hxj04121-lab_FoodLabelFlow&pullRequest=34
 
 ## Remote CI and artifacts
 
-- Current HEAD GitHub Actions URL: NOT_VERIFIED — this branch was not pushed
-  or remotely triggered during this pass.
-- Workflow artifact intended for the next remote run: `backend-test-reports`.
-- Local Maven reports observed under `backend/target/surefire-reports/`; they
-  are generated output and are not committed.
-- No browser screenshots/traces were created for validation UI because that UI
-  is not present.
+- Final CI Run: https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/35975225568
+- Backend job: PASS — https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/35975225568/job/107554008476
+- Frontend job: PASS — https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/35975225568/job/107554008633
+- Security job: PASS — https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/35975225568/job/107554008669
+- Containers/browser job: PASS — https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/35975225568/job/107554741200
+- Backend report artifact: [backend-test-reports](https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/35975225568/artifacts/10797133988)
 
 ## Persistence / scope checks
 
@@ -128,7 +82,8 @@ against the deployed commit.
 
 ## Final status
 
-SCRUM-34: PARTIAL — BLOCKED by remote CI run visibility, Sonar configuration,
-shared staging configuration, and the absent validation-run UI/browser flow.
-The local backend/frontend/container gates and MySQL Testcontainers evidence
-are real and reproducible; the blocked items are not marked PASS.
+SCRUM-34 evidence is updated against the rebased code SHA and the completed
+final CI Run. Remote CI, Sonar, containers, and browser evidence are verified;
+the validation UI is present and SCRUM-35 is implemented/merged. Shared staging
+remains explicitly `NOT_CONFIGURED`. PR #34 remains OPEN and has not been
+merged in this evidence-update pass.

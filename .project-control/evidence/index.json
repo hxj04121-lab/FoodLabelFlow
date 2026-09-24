@@ -6,8 +6,8 @@
       "id": "EVID-SCRUM-34-001",
       "kind": "sprint2_validation_ci_evidence",
       "path": "docs/evidence/SCRUM-34-final-evidence.md",
-      "status": "BLOCKED",
-      "binding": "SCRUM-34 / S2-M5.8; see verification SHA and exact results in the evidence document"
+      "status": "PASS",
+      "binding": "SCRUM-34 / S2-M5.8 / SHA 870e9fe6fe05d61c5b9ce40e05cc7aaff712e010 / CI run 35975225568"
     },
     {
       "id": "EVID-DB0-V3-001",
