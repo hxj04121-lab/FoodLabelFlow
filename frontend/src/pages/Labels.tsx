@@ -8,6 +8,8 @@ import {
 } from '@/api/labels'
 import { Panel, SectionHead, SourceBadge } from '@/components/catalog-shared'
 import { LabelValidationPanel } from '@/components/LabelValidationPanel'
+import { LabelAllergenPanel } from '@/components/LabelAllergenPanel'
+import { LabelDeclarationsPanel } from '@/components/LabelDeclarationsPanel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { data } from '@/data/catalog'
@@ -166,7 +168,7 @@ export function Labels() {
           <h1>Labels</h1>
           <p>Create and reopen a versioned label draft from the current formula.</p>
         </div>
-        <Badge variant="outline">SCRUM-18 · Partial integration</Badge>
+        <Badge variant="outline">Version-bound label context</Badge>
       </div>
 
       <div className="source-notice">
@@ -348,19 +350,23 @@ export function Labels() {
           )}
           <div className="label-dependency-note">
             <FileText size={23} />
-            <h2>Derived facts and declarations pending</h2>
+            <h2>Version-bound label inputs</h2>
             <p>
-              The merged draft response does not expose declarations or derived allergen facts. This UI does not invent them or read another module's database.
+              The sections below read the selected label's declarations and derived allergens from their owning APIs. They show distinct inputs to validation.
             </p>
-            <div className="label-dependencies">
-              <Badge variant="outline">SCRUM-42 · Core merged</Badge>
-              <Badge variant="outline">SCRUM-45 · HTTP pending</Badge>
-            </div>
           </div>
         </Panel>
       </div>
+      <LabelAllergenPanel
+        key={`derived:${productId}:${draft?.labelVersionId ?? ''}:${draft?.formulaVersionId ?? ''}:${draft?.ruleSetVersionId ?? ''}:${draft?.jurisdictionCode ?? ''}`}
+        draft={draft}
+      />
+      <LabelDeclarationsPanel
+        key={`declarations:${productId}:${draft?.labelVersionId ?? ''}:${draft?.formulaVersionId ?? ''}:${draft?.ruleSetVersionId ?? ''}:${draft?.jurisdictionCode ?? ''}`}
+        draft={draft}
+      />
       <LabelValidationPanel
-        key={`${productId}:${draft?.labelVersionId ?? ''}:${draft?.ruleSetVersionId ?? ''}`}
+        key={`validation:${productId}:${draft?.labelVersionId ?? ''}:${draft?.ruleSetVersionId ?? ''}`}
         draft={draft}
       />
     </>

@@ -101,7 +101,7 @@ export function LabelValidationPanel({ draft }: { draft: LabelDraft | null }) {
     <Panel className="validation-panel">
       <SectionHead
         title="Validation feedback"
-        caption="Frozen response contract; live HTTP adapter remains an upstream dependency"
+        caption="Run and read validation for this exact label version"
         action={
           <Badge variant="outline">
             {draft ? `Rule set ${draft.ruleSetVersionId}` : 'Select a label draft'}

@@ -30,6 +30,15 @@ const draft = {
   dataProvenanceId: 'prov_project_seed',
 }
 
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/label-versions/*/derived-allergens', (route) =>
+    route.fulfill({ json: { ...draft, facts: [], unresolvedComponents: [] } }),
+  )
+  await page.route('**/api/labels/*/declarations', (route) =>
+    route.fulfill({ json: { ...draft, declarations: [] } }),
+  )
+})
+
 test('shows a loading state and renders canonical allergens from the API', async ({ page }) => {
   // Create the gate before navigation: loading can render before the route runs.
   let releaseResponse!: () => void
@@ -77,7 +86,7 @@ test('shows API errors without seed fallback and retries the request', async ({ 
 
   await page.goto('/labels')
   await expect(page.getByRole('alert')).toHaveText('Validation service is unavailable.')
-  await expect(page.getByText('Derived facts and declarations pending')).toBeVisible()
+  await expect(page.getByText('Version-bound label inputs')).toBeVisible()
 
   serviceAvailable = true
   await page.getByRole('button', { name: 'Retry check' }).click()

@@ -19,6 +19,18 @@ test('validates a seeded PASS and a new blocking FAIL through the browser and pe
   await expect(page.getByRole('region', { name: 'Label draft details' })).toContainText(
     'label_1106285_v1',
   )
+  const derived = page.getByRole('region', { name: 'Derived allergen facts', exact: true })
+  await expect(derived.getByRole('heading', { name: 'SOY', exact: true })).toBeVisible()
+  await expect(derived.getByRole('heading', { name: 'WHEAT', exact: true })).toBeVisible()
+  await expect(derived).toContainText('0 unresolved component(s)')
+  const declarations = page.getByRole('region', { name: 'Structured label declarations' })
+  await expect(declarations).toContainText('2 declaration(s)')
+  await expect(declarations).toContainText('all_soy')
+  await expect(declarations).toContainText('all_wheat')
+  await expect(declarations).toContainText('FORMULA_DERIVED')
+  await derived.getByText(/Derivation evidence for SOY/).click()
+  await expect(derived.getByText('Data provenance', { exact: true }).first()).toBeVisible()
+  await derived.screenshot({ path: 'test-results/derived-allergens-live.png' })
   await page
     .getByRole('checkbox', {
       name: 'Enable the local demo label-officer identity to validate this exact version',
@@ -56,6 +68,9 @@ test('validates a seeded PASS and a new blocking FAIL through the browser and pe
     .check()
   await page.getByRole('button', { name: 'Create label draft' }).click()
   await expect(page.getByText(/Label draft V\d+ created and read from the server/)).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Structured label declarations' })).toContainText(
+    '0 declaration(s) for this label version',
+  )
   await page
     .getByRole('checkbox', {
       name: 'Enable the local demo label-officer identity to validate this exact version',
