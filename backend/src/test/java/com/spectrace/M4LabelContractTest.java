@@ -331,6 +331,9 @@ class M4LabelContractTest {
                         "$.ruleSetVersionId"
                 ).value("ruleset_test"))
                 .andExpect(jsonPath(
+                        "$.jurisdictionCode"
+                ).value("SG"))
+                .andExpect(jsonPath(
                         "$.declarations.length()"
                 ).value(1))
                 .andExpect(jsonPath(
@@ -341,7 +344,7 @@ class M4LabelContractTest {
                 ).value("CONTAINS"))
                 .andExpect(jsonPath(
                         "$.declarations[0].declarationSource"
-                ).value("LABEL"))
+                ).value("FORMULA_DERIVED"))
                 .andExpect(jsonPath(
                         "$.declarations[0].displayText"
                 ).value("Contains milk"));
@@ -356,11 +359,12 @@ class M4LabelContractTest {
                 "label_contract_test",
                 "formula_test",
                 "ruleset_test",
+                "SG",
                 List.of(
                         new LabelValidationSnapshot.AllergenDeclaration(
                                 "allergen_milk",
                                 "CONTAINS",
-                                "LABEL",
+                                "FORMULA_DERIVED",
                                 "Contains milk"
                         )
                 )

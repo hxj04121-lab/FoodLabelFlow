@@ -1,0 +1,97 @@
+openapi: 3.1.0
+info:
+  title: Version-bound Label Declarations API
+  version: 1.0.0
+  description: >-
+    M4 structured declarations for SCRUM-18. Read the exact label version;
+    never substitute latest/current versions. Combine with M1 derived facts
+    only after matching labelVersionId, formulaVersionId, ruleSetVersionId
+    and jurisdictionCode. Declarations are label data, not derived facts or
+    a PASSED/FAILED validation outcome.
+paths:
+  /api/labels/{labelVersionId}/declarations:
+    get:
+      operationId: getLabelDeclarations
+      summary: Read structured declarations for an exact label version.
+      description: >-
+        Requires an active identity through X-Auth-Provider and
+        X-External-Subject, as with label GET. Historical versions are
+        readable. An existing label without declarations returns 200 and
+        an empty list; a missing label returns 404 LABEL_NOT_FOUND.
+        The read creates no validation run, result, approval or audit event.
+        No query-parameter overrides are defined; bindings come from the label.
+      parameters:
+        - name: labelVersionId
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        '200':
+          description: The exact label binding and its declarations.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabelDeclarationFacts'
+              example:
+                labelVersionId: label_1106285_v1
+                formulaVersionId: formula_1106285_v1
+                ruleSetVersionId: ruleset_us_falcpa_demo_v1
+                jurisdictionCode: US
+                declarations:
+                  - allergenId: all_soy
+                    declarationType: CONTAINS
+                    declarationSource: FORMULA_DERIVED
+                    displayText: 'Contains: Soy'
+                  - allergenId: all_wheat
+                    declarationType: CONTAINS
+                    declarationSource: FORMULA_DERIVED
+                    displayText: 'Contains: Wheat'
+        '401':
+          $ref: './allergen-validation-api-v1.yaml#/components/responses/AuthenticationRequired'
+        '404':
+          description: LABEL_NOT_FOUND using the shared ApiError envelope.
+          content:
+            application/json:
+              schema:
+                $ref: './allergen-validation-api-v1.yaml#/components/schemas/ApiError'
+        '500':
+          $ref: './allergen-validation-api-v1.yaml#/components/responses/InternalError'
+components:
+  schemas:
+    LabelDeclarationFacts:
+      type: object
+      additionalProperties: false
+      required: [labelVersionId, formulaVersionId, ruleSetVersionId, jurisdictionCode, declarations]
+      properties:
+        labelVersionId:
+          type: string
+        formulaVersionId:
+          type: string
+        ruleSetVersionId:
+          type: string
+        jurisdictionCode:
+          type: string
+        declarations:
+          type: array
+          description: Ordered by declarationType, then allergenId. Empty does not mean allergen-free.
+          items:
+            $ref: '#/components/schemas/AllergenDeclaration'
+    AllergenDeclaration:
+      type: object
+      additionalProperties: false
+      required: [allergenId, declarationType, declarationSource, displayText]
+      properties:
+        allergenId:
+          type: string
+        declarationType:
+          type: string
+          enum: [CONTAINS]
+        declarationSource:
+          type: string
+          description: Exact values allowed by chk_label_declaration_source_v3. LABEL is not valid.
+          enum: [MIGRATED_PUBLIC_LABEL, FORMULA_DERIVED, SYSTEM_PROPOSED, USER_ENTERED]
+        displayText:
+          type: [string, 'null']
+          description: Stored display text; may be empty or null.

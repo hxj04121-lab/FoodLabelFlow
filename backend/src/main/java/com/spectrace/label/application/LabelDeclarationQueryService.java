@@ -3,6 +3,7 @@ package com.spectrace.label.application;
 import com.spectrace.label.application.port.LabelSnapshotPort;
 import com.spectrace.label.application.port.LabelValidationSnapshot;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class LabelDeclarationQueryService {
@@ -15,6 +16,8 @@ public class LabelDeclarationQueryService {
         this.labels = labels;
     }
 
+    // Snapshot ports use locking reads; keep one transaction, not JDBC read-only mode.
+    @Transactional
     public LabelDeclarationFacts getByLabelVersionId(
             String labelVersionId
     ) {
@@ -30,6 +33,7 @@ public class LabelDeclarationQueryService {
                 label.labelVersionId(),
                 label.formulaVersionId(),
                 label.ruleSetVersionId(),
+                label.jurisdictionCode(),
                 label.declarations()
         );
     }
