@@ -8,6 +8,7 @@ public record LabelDeclarationFacts(
         String labelVersionId,
         String formulaVersionId,
         String ruleSetVersionId,
+        String jurisdictionCode,
         List<LabelValidationSnapshot.AllergenDeclaration> declarations
 ) {
     public LabelDeclarationFacts {
