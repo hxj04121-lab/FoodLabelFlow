@@ -1,4 +1,4 @@
-﻿package com.spectrace.label.infrastructure;
+package com.spectrace.label.infrastructure;
 
 import com.spectrace.label.application.port.LabelDraftRepository;
 import com.spectrace.label.domain.LabelDraft;
