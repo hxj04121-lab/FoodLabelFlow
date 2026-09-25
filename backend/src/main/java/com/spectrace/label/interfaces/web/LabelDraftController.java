@@ -3,6 +3,8 @@ package com.spectrace.label.interfaces.web;
 import com.spectrace.identity.application.IdentityService;
 import com.spectrace.identity.application.UnknownIdentityException;
 import com.spectrace.identity.domain.AuthenticatedActor;
+import com.spectrace.label.application.LabelDeclarationFacts;
+import com.spectrace.label.application.LabelDeclarationQueryService;
 import com.spectrace.label.application.LabelDraftService;
 import com.spectrace.label.domain.LabelDraft;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,13 +30,16 @@ public class LabelDraftController {
 
     private final LabelDraftService service;
     private final IdentityService identityService;
+    private final LabelDeclarationQueryService declarations;
 
     public LabelDraftController(
             LabelDraftService service,
-            IdentityService identityService
+            IdentityService identityService,
+            LabelDeclarationQueryService declarations
     ) {
         this.service = service;
         this.identityService = identityService;
+        this.declarations = declarations;
     }
 
     @PostMapping("/drafts")
@@ -69,6 +74,20 @@ public class LabelDraftController {
 
         return ResponseEntity.ok(
                 service.getById(labelVersionId)
+        );
+    }
+
+    @GetMapping("/{labelVersionId}/declarations")
+    public ResponseEntity<LabelDeclarationFacts> getDeclarations(
+            @PathVariable String labelVersionId,
+            HttpServletRequest request
+    ) {
+        authenticate(request);
+
+        return ResponseEntity.ok(
+                declarations.getByLabelVersionId(
+                        labelVersionId
+                )
         );
     }
 
