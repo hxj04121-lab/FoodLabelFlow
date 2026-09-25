@@ -1,4 +1,4 @@
-package com.spectrace.label.infrastructure;
+﻿package com.spectrace.label.infrastructure;
 
 import com.spectrace.label.application.port.LabelDraftRepository;
 import com.spectrace.label.domain.LabelDraft;
@@ -35,10 +35,11 @@ public class JdbcLabelDraftRepository implements LabelDraftRepository {
                     p.data_provenance_id,
                     fv.lifecycle_status,
                     fv.is_current_released
-                FROM product p
-                JOIN formula_version fv
-                  ON fv.formula_version_id = p.current_formula_version_id
-                WHERE p.product_id = ?
+              FROM product p
+          JOIN formula_version fv
+           ON fv.formula_version_id = p.current_formula_version_id
+          WHERE p.product_id = ?
+          FOR UPDATE
                 """,
                 rs -> {
                     if (!rs.next()) {

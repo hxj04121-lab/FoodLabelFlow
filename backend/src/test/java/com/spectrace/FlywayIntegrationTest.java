@@ -25,7 +25,7 @@ class FlywayIntegrationTest extends MySqlIntegrationTestSupport {
 
         assertThat(productCount).isEqualTo(60);
         assertThat(impactCount).isZero();
-        assertThat(migrationCount).isEqualTo(3);
+        assertThat(migrationCount).isEqualTo(4);
         assertThat(jdbcTemplate.queryForObject("SELECT 1", Integer.class)).isEqualTo(1);
     }
 }
