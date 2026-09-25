@@ -12,7 +12,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -78,6 +80,86 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
         cleanUpTestData();
     }
 
+    @Test
+    void identifiesLatestDraftAsCurrent() {
+        LabelWorkflowRepository.LabelWorkflowVersion version =
+                workflowRepository.findVersion(LABEL_ID)
+                        .orElseThrow();
+
+        assertEquals("DRAFT", version.lifecycleStatus());
+        assertTrue(version.current());
+    }
+
+    @Test
+    void identifiesOlderDraftAsStaleWhenNewerVersionExists() {
+        jdbcTemplate.update(
+                """
+                INSERT INTO label_version (
+                    label_version_id,
+                    product_id,
+                    formula_version_id,
+                    rule_set_version_id,
+                    jurisdiction_code,
+                    version_number,
+                    raw_ingredient_text,
+                    lifecycle_status,
+                    is_current_published,
+                    created_by_user_id,
+                    created_at,
+                    data_provenance_id
+                )
+                SELECT
+                    'label_scrum39_newer',
+                    product_id,
+                    formula_version_id,
+                    rule_set_version_id,
+                    jurisdiction_code,
+                    1000,
+                    raw_ingredient_text,
+                    'DRAFT',
+                    'N',
+                    'user_label_officer',
+                    NOW(),
+                    data_provenance_id
+                FROM label_version
+                WHERE label_version_id = ?
+                """,
+                LABEL_ID
+        );
+
+        try {
+            LabelWorkflowRepository.LabelWorkflowVersion version =
+                    workflowRepository.findVersion(LABEL_ID)
+                            .orElseThrow();
+
+            assertEquals("DRAFT", version.lifecycleStatus());
+            assertFalse(version.current());
+        } finally {
+            jdbcTemplate.update(
+                    "DELETE FROM label_version WHERE label_version_id = 'label_scrum39_newer'"
+            );
+        }
+    }
+
+    @Test
+    void identifiesSupersededLabelAsHistorical() {
+        jdbcTemplate.update(
+                """
+                UPDATE label_version
+                SET lifecycle_status = 'SUPERSEDED',
+                    is_current_published = 'N'
+                WHERE label_version_id = ?
+                """,
+                LABEL_ID
+        );
+
+        LabelWorkflowRepository.LabelWorkflowVersion version =
+                workflowRepository.findVersion(LABEL_ID)
+                        .orElseThrow();
+
+        assertEquals("SUPERSEDED", version.lifecycleStatus());
+        assertFalse(version.current());
+    }
     @Test
     void rejectsSubmitWithoutPassedValidation() {
         assertThrows(

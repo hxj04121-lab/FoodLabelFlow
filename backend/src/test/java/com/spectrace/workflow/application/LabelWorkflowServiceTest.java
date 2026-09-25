@@ -3,6 +3,7 @@ package com.spectrace.workflow.application;
 import com.spectrace.identity.application.AuthorizationDeniedException;
 import com.spectrace.identity.application.AuthorizationService;
 import com.spectrace.identity.domain.AuthenticatedActor;
+import com.spectrace.label.application.LabelVersionConflictException;
 import com.spectrace.workflow.application.port.LabelWorkflowRepository;
 import com.spectrace.workflow.domain.MakerCheckerPolicy;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,15 @@ class LabelWorkflowServiceTest {
                 "LABEL.SUBMIT_REVIEW"
         );
 
+        when(workflowRepository.findVersion("label_test"))
+                .thenReturn(Optional.of(
+                        new LabelWorkflowRepository.LabelWorkflowVersion(
+                                "label_test",
+                                "DRAFT",
+                                true
+                        )
+                ));
+
         service.submitForReview("label_test", actor);
 
         verify(workflowRepository).submitForReview(
@@ -70,6 +80,15 @@ class LabelWorkflowServiceTest {
                 "LABEL.APPROVE"
         );
 
+        when(workflowRepository.findVersion("label_test"))
+                .thenReturn(Optional.of(
+                        new LabelWorkflowRepository.LabelWorkflowVersion(
+                                "label_test",
+                                "PENDING_REVIEW",
+                                true
+                        )
+                ));
+
         when(workflowRepository.findCreatorUserId("label_test"))
                 .thenReturn(Optional.of("user_label_officer"));
 
@@ -94,6 +113,15 @@ class LabelWorkflowServiceTest {
                 "user_approver",
                 "LABEL.APPROVE"
         );
+
+        when(workflowRepository.findVersion("label_self"))
+                .thenReturn(Optional.of(
+                        new LabelWorkflowRepository.LabelWorkflowVersion(
+                                "label_self",
+                                "PENDING_REVIEW",
+                                true
+                        )
+                ));
 
         when(workflowRepository.findCreatorUserId("label_self"))
                 .thenReturn(Optional.of("user_approver"));
@@ -141,6 +169,15 @@ class LabelWorkflowServiceTest {
                 "user_approver",
                 "LABEL.REJECT"
         );
+
+        when(workflowRepository.findVersion("label_test"))
+                .thenReturn(Optional.of(
+                        new LabelWorkflowRepository.LabelWorkflowVersion(
+                                "label_test",
+                                "PENDING_REVIEW",
+                                true
+                        )
+                ));
 
         service.recordDecision(
                 "label_test",
@@ -247,6 +284,70 @@ class LabelWorkflowServiceTest {
         );
 
         verifyNoInteractions(workflowRepository);
+    }
+
+    @Test
+    void rejectsSubmitForStaleLabelVersion() {
+        AuthenticatedActor actor = actor(
+                "user_label_officer",
+                "LABEL.SUBMIT_REVIEW"
+        );
+
+        when(workflowRepository.findVersion("label_stale"))
+                .thenReturn(Optional.of(
+                        new LabelWorkflowRepository.LabelWorkflowVersion(
+                                "label_stale",
+                                "DRAFT",
+                                false
+                        )
+                ));
+
+        assertThrows(
+                LabelVersionConflictException.class,
+                () -> service.submitForReview(
+                        "label_stale",
+                        actor
+                )
+        );
+
+        verify(workflowRepository, never()).submitForReview(
+                anyString(),
+                anyString()
+        );
+    }
+
+    @Test
+    void rejectsDecisionForHistoricalLabelVersion() {
+        AuthenticatedActor actor = actor(
+                "user_approver",
+                "LABEL.APPROVE"
+        );
+
+        when(workflowRepository.findVersion("label_superseded"))
+                .thenReturn(Optional.of(
+                        new LabelWorkflowRepository.LabelWorkflowVersion(
+                                "label_superseded",
+                                "SUPERSEDED",
+                                false
+                        )
+                ));
+
+        assertThrows(
+                LabelVersionConflictException.class,
+                () -> service.recordDecision(
+                        "label_superseded",
+                        "APPROVE",
+                        "Historical labels are immutable",
+                        actor
+                )
+        );
+
+        verify(workflowRepository, never()).recordDecision(
+                anyString(),
+                anyString(),
+                anyString(),
+                any()
+        );
     }
 
     private AuthenticatedActor actor(

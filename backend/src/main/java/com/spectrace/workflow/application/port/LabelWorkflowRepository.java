@@ -6,6 +6,8 @@ public interface LabelWorkflowRepository {
 
     Optional<String> findCreatorUserId(String labelVersionId);
 
+    Optional<LabelWorkflowVersion> findVersion(String labelVersionId);
+
     void submitForReview(
             String labelVersionId,
             String actorUserId
@@ -17,4 +19,11 @@ public interface LabelWorkflowRepository {
             String actorUserId,
             String comments
     );
+
+    record LabelWorkflowVersion(
+            String labelVersionId,
+            String lifecycleStatus,
+            boolean current
+    ) {
+    }
 }
