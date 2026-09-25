@@ -1,6 +1,7 @@
 DROP PROCEDURE IF EXISTS sp_assert_current_label_version;
 DROP PROCEDURE IF EXISTS sp_submit_label_for_review;
 DROP PROCEDURE IF EXISTS sp_record_label_decision;
+DROP PROCEDURE IF EXISTS sp_publish_label;
 
 DELIMITER $$
 
@@ -336,6 +337,151 @@ BEGIN
       p_decision,
       'helper',
       'sp_record_label_decision'
+    ),
+    p_label_version_id,
+    'prov_validation_fixture'
+  );
+
+  COMMIT;
+END$$
+CREATE PROCEDURE sp_publish_label(
+  IN p_label_version_id VARCHAR(120),
+  IN p_actor_user_id VARCHAR(80)
+)
+BEGIN
+  DECLARE v_permission_count INT DEFAULT 0;
+  DECLARE v_product_id VARCHAR(100);
+  DECLARE v_jurisdiction_code VARCHAR(40);
+
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+    RESIGNAL;
+  END;
+
+  START TRANSACTION;
+
+  /*
+   * Re-check the current-version invariant while holding the
+   * product serialization lock. The lock remains held until
+   * this publication transaction commits or rolls back.
+   */
+  CALL sp_assert_current_label_version(
+    p_label_version_id
+  );
+
+  SELECT COUNT(*)
+  INTO v_permission_count
+  FROM user_account ua
+  JOIN user_role ur
+    ON ur.user_id = ua.user_id
+  JOIN role_permission rp
+    ON rp.role_id = ur.role_id
+  JOIN permission p
+    ON p.permission_id = rp.permission_id
+  WHERE ua.user_id = p_actor_user_id
+    AND ua.is_active = 'Y'
+    AND p.permission_code = 'LABEL.PUBLISH';
+
+  IF v_permission_count < 1 THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT =
+        'Actor lacks LABEL.PUBLISH permission';
+  END IF;
+
+  SELECT product_id, jurisdiction_code
+  INTO v_product_id, v_jurisdiction_code
+  FROM label_version
+  WHERE label_version_id = p_label_version_id
+    AND lifecycle_status = 'APPROVED';
+
+  IF v_product_id IS NULL THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT =
+        'Label must be APPROVED before publication';
+  END IF;
+
+  UPDATE label_version
+  SET lifecycle_status = 'SUPERSEDED',
+      is_current_published = 'N'
+  WHERE product_id = v_product_id
+    AND jurisdiction_code = v_jurisdiction_code
+    AND lifecycle_status = 'PUBLISHED'
+    AND is_current_published = 'Y';
+
+  UPDATE label_version
+  SET lifecycle_status = 'PUBLISHED',
+      is_current_published = 'Y'
+  WHERE label_version_id = p_label_version_id
+    AND lifecycle_status = 'APPROVED';
+
+  IF ROW_COUNT() <> 1 THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT =
+        'Publication state transition failed';
+  END IF;
+
+  UPDATE product
+  SET current_published_label_version_id =
+        p_label_version_id
+  WHERE product_id = v_product_id;
+
+  INSERT INTO publication_record (
+    publication_record_id,
+    label_version_id,
+    published_by_user_id,
+    published_at,
+    publication_channel,
+    data_provenance_id
+  ) VALUES (
+    CONCAT(
+      'publication_',
+      p_label_version_id
+    ),
+    p_label_version_id,
+    p_actor_user_id,
+    NOW(),
+    'DEMO_RELEASE',
+    'prov_validation_fixture'
+  );
+
+  INSERT INTO audit_event (
+    audit_event_id,
+    event_type,
+    entity_type,
+    entity_id,
+    event_at,
+    actor_user_id,
+    before_value,
+    after_value,
+    event_payload,
+    correlation_id,
+    data_provenance_id
+  ) VALUES (
+    CONCAT(
+      'audit_label_publish_',
+      REPLACE(UUID(), '-', '')
+    ),
+    'LABEL_PUBLISHED',
+    'LABEL_VERSION',
+    p_label_version_id,
+    NOW(),
+    p_actor_user_id,
+    JSON_OBJECT(
+      'lifecycle_status',
+      'APPROVED',
+      'is_current_published',
+      'N'
+    ),
+    JSON_OBJECT(
+      'lifecycle_status',
+      'PUBLISHED',
+      'is_current_published',
+      'Y'
+    ),
+    JSON_OBJECT(
+      'helper',
+      'sp_publish_label'
     ),
     p_label_version_id,
     'prov_validation_fixture'
