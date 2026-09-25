@@ -30,6 +30,7 @@ public class LabelDeclarationQueryService {
                 label.labelVersionId(),
                 label.formulaVersionId(),
                 label.ruleSetVersionId(),
+                label.jurisdictionCode(),
                 label.declarations()
         );
     }

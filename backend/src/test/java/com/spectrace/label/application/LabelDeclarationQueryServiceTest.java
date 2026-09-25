@@ -27,7 +27,7 @@ class LabelDeclarationQueryServiceTest {
                 new LabelValidationSnapshot.AllergenDeclaration(
                         "allergen_milk",
                         "CONTAINS",
-                        "LABEL",
+                        "FORMULA_DERIVED",
                         "Contains milk"
                 );
 
@@ -66,6 +66,11 @@ class LabelDeclarationQueryServiceTest {
         );
 
         assertEquals(
+                "SG",
+                result.jurisdictionCode()
+        );
+
+        assertEquals(
                 1,
                 result.declarations().size()
         );
@@ -81,7 +86,7 @@ class LabelDeclarationQueryServiceTest {
         );
 
         assertEquals(
-                "LABEL",
+                "FORMULA_DERIVED",
                 result.declarations().get(0).declarationSource()
         );
 
@@ -138,7 +143,7 @@ class LabelDeclarationQueryServiceTest {
                 new LabelValidationSnapshot.AllergenDeclaration(
                         "allergen_soy",
                         "CONTAINS",
-                        "LABEL",
+                        "FORMULA_DERIVED",
                         "Contains soy"
                 )
         );
@@ -148,6 +153,7 @@ class LabelDeclarationQueryServiceTest {
                         "label_v1",
                         "formula_v1",
                         "ruleset_v1",
+                        "SG",
                         source
                 );
 
