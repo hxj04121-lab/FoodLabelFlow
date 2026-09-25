@@ -3,6 +3,7 @@ package com.spectrace.validation.infrastructure;
 import com.spectrace.allergen.application.port.AllergenFactsPort;
 import com.spectrace.catalog.application.port.FormulaCompositionPort;
 import com.spectrace.label.application.port.LabelSnapshotPort;
+import com.spectrace.validation.application.LabelAllergenQueryService;
 import com.spectrace.validation.application.ValidationApplicationService;
 import com.spectrace.validation.application.ValidationOrchestrator;
 import com.spectrace.validation.application.port.RuleSetVersionRepository;
@@ -22,6 +23,14 @@ import java.util.List;
 /** Spring wiring for the application-owned validation strategies and flow. */
 @Configuration(proxyBeanMethods = false)
 public class ValidationInfrastructureConfiguration {
+    @Bean
+    public LabelAllergenQueryService labelAllergenQueryService(
+            LabelSnapshotPort labels, FormulaCompositionPort formulas,
+            RuleSetVersionRepository ruleSets, AllergenFactsPort allergens
+    ) {
+        return new LabelAllergenQueryService(labels, formulas, ruleSets, allergens);
+    }
+
     @Bean
     public IngredientToAllergenEvaluator ingredientToAllergenEvaluator() {
         return new IngredientToAllergenEvaluator();
