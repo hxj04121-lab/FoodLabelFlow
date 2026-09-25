@@ -79,6 +79,7 @@ jobs:
         with:
           name: validation-browser-evidence
           path: frontend/test-results
+
           if-no-files-found: warn
       - name: Stop full stack
         if: always()
@@ -108,8 +109,8 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-    - name: Test backend and generate coverage for analysis
-  run: mvn -B -ntp -f backend/pom.xml test
+      - name: Test backend and generate coverage for analysis
+        run: mvn -B -ntp -f backend/pom.xml test
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
