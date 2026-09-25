@@ -46,6 +46,91 @@ export type LabelDraft = {
   dataProvenanceId: string
 }
 
+export type DerivationEvidence = {
+  formulaItemId: string
+  specificationVersionId: string
+  specComponentId: string
+  ingredientId: string
+  ingredientAllergenId: string
+  evidenceRule: string
+  dataProvenanceId: string
+}
+
+export type LabelAllergenFacts = {
+  labelVersionId: string
+  formulaVersionId: string
+  ruleSetVersionId: string
+  jurisdictionCode: string
+  facts: {
+    allergenId: string
+    allergenCode: string
+    derivationEvidence: DerivationEvidence[]
+  }[]
+  unresolvedComponents: {
+    formulaItemId: string
+    specificationVersionId: string
+    specComponentId: string
+    ingredientId: string
+    rawPhrase: string
+    matchRule: string
+    matchStatus: 'UNMAPPED' | 'AMBIGUOUS'
+  }[]
+}
+
+export type LabelDeclarations = {
+  labelVersionId: string
+  formulaVersionId: string
+  ruleSetVersionId: string
+  jurisdictionCode: string
+  declarations: {
+    allergenId: string
+    declarationType: 'CONTAINS'
+    declarationSource: 'MIGRATED_PUBLIC_LABEL' | 'FORMULA_DERIVED' | 'SYSTEM_PROPOSED' | 'USER_ENTERED'
+    displayText: string | null
+  }[]
+}
+
+function hasRequiredText(value: Record<string, unknown>, fields: string[]): boolean {
+  return fields.every((field) => typeof value[field] === 'string' && value[field].trim().length > 0)
+}
+
+function isLabelAllergenFacts(value: unknown): value is LabelAllergenFacts {
+  return (
+    isRecord(value) &&
+    hasRequiredText(value, ['labelVersionId', 'formulaVersionId', 'ruleSetVersionId', 'jurisdictionCode']) &&
+    Array.isArray(value.facts) &&
+    value.facts.every((fact) =>
+      isRecord(fact) && hasRequiredText(fact, ['allergenId', 'allergenCode']) &&
+      Array.isArray(fact.derivationEvidence) && fact.derivationEvidence.length > 0 &&
+      fact.derivationEvidence.every((evidence) => isRecord(evidence) && hasRequiredText(evidence, [
+        'formulaItemId', 'specificationVersionId', 'specComponentId', 'ingredientId',
+        'ingredientAllergenId', 'evidenceRule', 'dataProvenanceId',
+      ])),
+    ) &&
+    Array.isArray(value.unresolvedComponents) &&
+    value.unresolvedComponents.every((component) =>
+      isRecord(component) && hasRequiredText(component, [
+        'formulaItemId', 'specificationVersionId', 'specComponentId', 'ingredientId', 'rawPhrase', 'matchRule',
+      ]) && (component.matchStatus === 'UNMAPPED' || component.matchStatus === 'AMBIGUOUS'),
+    )
+  )
+}
+
+function isLabelDeclarations(value: unknown): value is LabelDeclarations {
+  const sources = ['MIGRATED_PUBLIC_LABEL', 'FORMULA_DERIVED', 'SYSTEM_PROPOSED', 'USER_ENTERED']
+  return (
+    isRecord(value) &&
+    hasRequiredText(value, ['labelVersionId', 'formulaVersionId', 'ruleSetVersionId', 'jurisdictionCode']) &&
+    Array.isArray(value.declarations) &&
+    value.declarations.every((declaration) =>
+      isRecord(declaration) && hasRequiredText(declaration, ['allergenId']) &&
+      declaration.declarationType === 'CONTAINS' &&
+      sources.includes(declaration.declarationSource as string) &&
+      (declaration.displayText === null || typeof declaration.displayText === 'string'),
+    )
+  )
+}
+
 export class LabelApiError extends Error {
   constructor(
     public readonly code: string,
@@ -199,12 +284,64 @@ export async function listAllergens(
 ): Promise<Allergen[]> {
   const result = await requestJson(
     `/api/v1/allergens?jurisdictionCode=${encodeURIComponent(jurisdictionCode)}`,
-    { signal },
+    { headers: labelOfficerHeaders, signal },
   )
   if (!Array.isArray(result) || !result.every(isAllergen)) {
     throw new LabelApiError(
       'INVALID_RESPONSE',
       'The label API returned an invalid allergen list.',
+      200,
+    )
+  }
+  return result
+}
+
+export async function getLabelDerivedAllergens(
+  draft: LabelDraft,
+  signal?: AbortSignal,
+): Promise<LabelAllergenFacts> {
+  const result = await requestJson(
+    `/api/v1/label-versions/${encodeURIComponent(draft.labelVersionId)}/derived-allergens`,
+    { headers: labelOfficerHeaders, signal },
+  )
+  if (!isLabelAllergenFacts(result)) {
+    throw new LabelApiError('INVALID_RESPONSE', 'The allergen API returned invalid derived facts.', 200)
+  }
+  if (
+    result.labelVersionId !== draft.labelVersionId ||
+    result.formulaVersionId !== draft.formulaVersionId ||
+    result.ruleSetVersionId !== draft.ruleSetVersionId ||
+    result.jurisdictionCode !== draft.jurisdictionCode
+  ) {
+    throw new LabelApiError(
+      'DERIVATION_TARGET_MISMATCH',
+      'The derived facts do not match the selected label, formula, rule set and jurisdiction.',
+      200,
+    )
+  }
+  return result
+}
+
+export async function getLabelDeclarations(
+  draft: LabelDraft,
+  signal?: AbortSignal,
+): Promise<LabelDeclarations> {
+  const result = await requestJson(
+    `/api/labels/${encodeURIComponent(draft.labelVersionId)}/declarations`,
+    { headers: labelOfficerHeaders, signal },
+  )
+  if (!isLabelDeclarations(result)) {
+    throw new LabelApiError('INVALID_RESPONSE', 'The label API returned invalid declarations.', 200)
+  }
+  if (
+    result.labelVersionId !== draft.labelVersionId ||
+    result.formulaVersionId !== draft.formulaVersionId ||
+    result.ruleSetVersionId !== draft.ruleSetVersionId ||
+    result.jurisdictionCode !== draft.jurisdictionCode
+  ) {
+    throw new LabelApiError(
+      'DECLARATION_TARGET_MISMATCH',
+      'The declarations do not match the selected label, formula, rule set and jurisdiction.',
       200,
     )
   }

@@ -58,6 +58,20 @@ const passedRun = {
 }
 
 async function openDraft(page: import('@playwright/test').Page) {
+  await page.route('**/api/v1/label-versions/*/derived-allergens', (route) =>
+    route.fulfill({ json: {
+      ...draft,
+      labelVersionId: new URL(route.request().url()).pathname.split('/')[4],
+      facts: [], unresolvedComponents: [],
+    } }),
+  )
+  await page.route('**/api/labels/*/declarations', (route) =>
+    route.fulfill({ json: {
+      ...draft,
+      labelVersionId: new URL(route.request().url()).pathname.split('/')[3],
+      declarations: [],
+    } }),
+  )
   await page.route('**/api/v1/allergens?*', (route) => route.fulfill({ json: [] }))
   await page.route(`**/api/labels/${draft.labelVersionId}`, (route) =>
     route.fulfill({ json: draft }),
