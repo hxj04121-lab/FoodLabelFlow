@@ -29,7 +29,7 @@ test('validates a seeded PASS and a new blocking FAIL through the browser and pe
   await expect(declarations).toContainText('all_wheat')
   await expect(declarations).toContainText('FORMULA_DERIVED')
   await derived.getByText(/Derivation evidence for SOY/).click()
-  await expect(derived.getByText('Data provenance', { exact: true })).toBeVisible()
+  await expect(derived.getByText('Data provenance', { exact: true }).first()).toBeVisible()
   await derived.screenshot({ path: 'test-results/derived-allergens-live.png' })
   await page
     .getByRole('checkbox', {

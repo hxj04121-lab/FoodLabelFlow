@@ -1,44 +1,11 @@
-import { useEffect, useState } from 'react'
-import { getLabelDerivedAllergens, LabelApiError, type LabelAllergenFacts, type LabelDraft } from '@/api/labels'
+import { getLabelDerivedAllergens, type LabelDraft } from '@/api/labels'
 import { Panel, SectionHead } from '@/components/catalog-shared'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-
-type ReadState =
-  | { status: 'loading' }
-  | { status: 'ready'; data: LabelAllergenFacts }
-  | { status: 'error'; message: string }
+import { useLabelRead } from '@/components/useLabelRead'
 
 export function LabelAllergenPanel({ draft }: { draft: LabelDraft | null }) {
-  const [attempt, setAttempt] = useState(0)
-  const [state, setState] = useState<ReadState>({ status: 'loading' })
-
-  useEffect(() => {
-    if (!draft) return
-    const controller = new AbortController()
-    let active = true
-    const timeout = setTimeout(() => controller.abort(), 15_000)
-    setState({ status: 'loading' })
-    getLabelDerivedAllergens(draft, controller.signal)
-      .then((data) => { if (active) setState({ status: 'ready', data }) })
-      .catch((error: unknown) => {
-        if (!active) return
-        setState({
-          status: 'error',
-          message: controller.signal.aborted
-            ? 'The derived allergen request timed out. Try again.'
-            : error instanceof LabelApiError
-              ? `${error.code}: ${error.message}`
-              : 'Unable to connect to the derived allergen service. Try again.',
-        })
-      })
-      .finally(() => clearTimeout(timeout))
-    return () => {
-      active = false
-      clearTimeout(timeout)
-      controller.abort()
-    }
-  }, [draft, attempt])
+  const { state, retry } = useLabelRead(draft, getLabelDerivedAllergens, 'derived allergen')
 
   return (
     <Panel className="derived-panel">
@@ -51,7 +18,7 @@ export function LabelAllergenPanel({ draft }: { draft: LabelDraft | null }) {
           {state.status === 'loading' && <p role="status">Loading derived allergens…</p>}
           {state.status === 'error' && <>
             <p role="alert" className="error-notice">{state.message}</p>
-            <Button variant="outline" onClick={() => setAttempt((value) => value + 1)}>Retry derived allergens</Button>
+            <Button variant="outline" onClick={retry}>Retry derived allergens</Button>
           </>}
           {state.status === 'ready' && <>
             <p>{state.data.facts.length} derived allergen(s) · {state.data.unresolvedComponents.length} unresolved component(s)</p>
