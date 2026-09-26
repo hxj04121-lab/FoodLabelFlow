@@ -11,6 +11,16 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 
+import com.spectrace.identity.domain.AuthenticatedActor;
+import com.spectrace.workflow.application.LabelPublicationService;
+
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -22,6 +32,9 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private LabelPublicationService publicationService;
 
     @Autowired
     private LabelWorkflowRepository workflowRepository;
@@ -327,11 +340,19 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
                 LABEL_ID
         );
 
-        jdbcTemplate.update(
-                "CALL sp_publish_label(?, ?)",
-                LABEL_ID,
-                "user_publisher"
+AuthenticatedActor publisher =
+        new AuthenticatedActor(
+                "user_publisher",
+                "user_publisher",
+                "Publisher",
+                Set.of(),
+                Set.of("LABEL.PUBLISH")
         );
+
+publicationService.publishLabel(
+        LABEL_ID,
+        publisher
+);
 
         assertStatus("PUBLISHED");
 
@@ -359,6 +380,211 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
         assertEquals("N", oldCurrentFlag);
     }
 
+    @Test
+    void rejectsJavaPublicationWithoutApproveRecord() {
+        jdbcTemplate.update(
+                """
+                UPDATE label_version
+                SET lifecycle_status = 'APPROVED'
+                WHERE label_version_id = ?
+                """,
+                LABEL_ID
+        );
+
+        AuthenticatedActor publisher =
+                new AuthenticatedActor(
+                        "user_publisher",
+                        "user_publisher",
+                        "Publisher",
+                        Set.of(),
+                        Set.of("LABEL.PUBLISH")
+                );
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> publicationService.publishLabel(
+                        LABEL_ID,
+                        publisher
+                )
+        );
+
+        assertStatus("APPROVED");
+
+        assertEquals(
+                0,
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM publication_record
+                        WHERE label_version_id = ?
+                        """,
+                        Integer.class,
+                        LABEL_ID
+                )
+        );
+
+        assertEquals(
+                0,
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT COUNT(*)
+                        FROM audit_event
+                        WHERE entity_type = 'LABEL_VERSION'
+                          AND entity_id = ?
+                          AND event_type = 'LABEL_PUBLISHED'
+                        """,
+                        Integer.class,
+                        LABEL_ID
+                )
+        );
+    }
+
+    @Test
+    void allowsOnlyOneConcurrentJavaPublication() throws Exception {
+        createPassedValidation();
+        createReviewFixture();
+
+        workflowRepository.submitForReview(
+                LABEL_ID,
+                "user_label_officer"
+        );
+
+        workflowRepository.recordDecision(
+                LABEL_ID,
+                "APPROVE",
+                "user_approver",
+                "SCRUM-50 concurrent publication test"
+        );
+
+        assertStatus("APPROVED");
+
+        AuthenticatedActor publisher =
+                new AuthenticatedActor(
+                        "user_publisher",
+                        "user_publisher",
+                        "Publisher",
+                        Set.of(),
+                        Set.of("LABEL.PUBLISH")
+                );
+
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor =
+                Executors.newFixedThreadPool(2);
+
+        AtomicInteger successes = new AtomicInteger();
+        AtomicInteger failures = new AtomicInteger();
+
+        Future<?> first = executor.submit(() -> {
+            try {
+                start.await(10, TimeUnit.SECONDS);
+                publicationService.publishLabel(
+                        LABEL_ID,
+                        publisher
+                );
+                successes.incrementAndGet();
+            } catch (Exception error) {
+                failures.incrementAndGet();
+            }
+        });
+
+        Future<?> second = executor.submit(() -> {
+            try {
+                start.await(10, TimeUnit.SECONDS);
+                publicationService.publishLabel(
+                        LABEL_ID,
+                        publisher
+                );
+                successes.incrementAndGet();
+            } catch (Exception error) {
+                failures.incrementAndGet();
+            }
+        });
+
+        start.countDown();
+
+        try {
+            first.get(20, TimeUnit.SECONDS);
+            second.get(20, TimeUnit.SECONDS);
+
+            assertEquals(1, successes.get());
+            assertEquals(1, failures.get());
+
+            assertStatus("PUBLISHED");
+
+            assertEquals(
+                    LABEL_ID,
+                    jdbcTemplate.queryForObject(
+                            """
+                            SELECT current_published_label_version_id
+                            FROM product
+                            WHERE product_id = (
+                                SELECT product_id
+                                FROM label_version
+                                WHERE label_version_id = ?
+                            )
+                            """,
+                            String.class,
+                            LABEL_ID
+                    )
+            );
+
+            assertEquals(
+                    1,
+                    jdbcTemplate.queryForObject(
+                            """
+                            SELECT COUNT(*)
+                            FROM publication_record
+                            WHERE label_version_id = ?
+                            """,
+                            Integer.class,
+                            LABEL_ID
+                    )
+            );
+
+            assertEquals(
+                    1,
+                    jdbcTemplate.queryForObject(
+                            """
+                            SELECT COUNT(*)
+                            FROM audit_event
+                            WHERE entity_type = 'LABEL_VERSION'
+                              AND entity_id = ?
+                              AND event_type = 'LABEL_PUBLISHED'
+                            """,
+                            Integer.class,
+                            LABEL_ID
+                    )
+            );
+
+            assertEquals(
+                    LABEL_ID,
+                    jdbcTemplate.queryForObject(
+                            """
+                            SELECT target_label_version_id
+                            FROM review_task
+                            WHERE review_task_id = ?
+                            """,
+                            String.class,
+                            REVIEW_TASK_ID
+                    )
+            );
+
+            assertEquals(
+                    "CLOSED",
+                    jdbcTemplate.queryForObject(
+                            """
+                            SELECT status
+                            FROM review_task
+                            WHERE review_task_id = ?
+                            """,
+                            String.class,
+                            REVIEW_TASK_ID
+                    )
+            );
+        } finally {
+            executor.shutdownNow();
+        }
+    }
     private void createReviewFixture() {
         jdbcTemplate.update(
                 """
@@ -584,6 +810,14 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     }
 
     private void cleanUpTestData() {
+        jdbcTemplate.update(
+                """
+                DELETE FROM audit_event
+                WHERE entity_type = 'LABEL_VERSION'
+                  AND entity_id = ?
+                """,
+                LABEL_ID
+        );
         jdbcTemplate.update(
                 "DELETE FROM approval_record WHERE label_version_id = ?",
                 LABEL_ID
