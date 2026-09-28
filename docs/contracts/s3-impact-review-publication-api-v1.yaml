@@ -1,0 +1,507 @@
+openapi: 3.1.0
+info:
+  title: SpecTrace Sprint 3 Impact, Review and Publication Handoff API
+  version: 1.0.0
+  description: >-
+    M2-owned, versioned integration candidate for Sprint 3. This file defines the
+    boundary for INGREDIENT_SPEC change requests, synchronous impact analysis,
+    ReviewTask linkage and publication references. It does not define or implement
+    M1 classification/task creation, M4 review/publication transitions, or M5
+    persistence. Cross-module acceptance is pending; this version is the candidate
+    presented for integration review, not evidence that reviewers accepted it.
+x-spec-trace-contract-state: CANDIDATE_PENDING_CROSS_MODULE_ACCEPTANCE
+tags:
+  - name: change-request
+  - name: impact-analysis
+paths:
+  /api/v1/change-requests:
+    post:
+      tags: [change-request]
+      operationId: createChangeRequest
+      summary: Record an INGREDIENT_SPEC version change for impact analysis.
+      description: >-
+        M1 owns creation behavior. Both specification versions must belong to the
+        changed supplier material; only INGREDIENT_SPEC is in the Sprint 3 scope.
+        The response is the direct resource, not a generic envelope.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeRequestCreate'
+      responses:
+        '201':
+          description: Change request created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangeRequest'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/AuthorizationDenied'
+        '404':
+          $ref: '#/components/responses/ResourceNotFound'
+        '409':
+          $ref: '#/components/responses/DataConflict'
+        '422':
+          $ref: '#/components/responses/DomainPreconditionFailed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
+  /api/v1/change-requests/{changeRequestId}:
+    get:
+      tags: [change-request]
+      operationId: getChangeRequest
+      summary: Retrieve the immutable before/after specification references.
+      parameters:
+        - $ref: '#/components/parameters/ChangeRequestId'
+      responses:
+        '200':
+          description: Change request resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangeRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/AuthorizationDenied'
+        '404':
+          $ref: '#/components/responses/ResourceNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
+  /api/v1/change-requests/{changeRequestId}/impact-analyses:
+    post:
+      tags: [impact-analysis]
+      operationId: runChangeImpactAnalysis
+      summary: Run the impact analysis for a recorded change request.
+      description: >-
+        The run is synchronous in this contract candidate. ruleSetVersionId is
+        explicit, matching the S2 validation request convention and the M1 integration
+        proposal. A first run returns 201; repeating the command for the same immutable
+        changeRequestId and ruleSetVersionId returns 200 with the existing run and findings.
+        Repeating must not create duplicate runs, findings or ReviewTasks. Products are included only when their current
+        FormulaVersion contains the changed supplier material. Findings are ordered
+        by productId for deterministic consumers and golden tests.
+      parameters:
+        - $ref: '#/components/parameters/ChangeRequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImpactAnalysisTriggerRequest'
+      responses:
+        '200':
+          description: Existing impact analysis returned for an idempotent replay.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImpactAnalysis'
+        '201':
+          description: New impact analysis completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImpactAnalysis'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/AuthorizationDenied'
+        '404':
+          $ref: '#/components/responses/ResourceNotFound'
+        '409':
+          $ref: '#/components/responses/DataConflict'
+        '422':
+          $ref: '#/components/responses/DomainPreconditionFailed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
+  /api/v1/impact-analyses/{impactAnalysisId}:
+    get:
+      tags: [impact-analysis]
+      operationId: getImpactAnalysis
+      summary: Retrieve an impact analysis and its deterministic findings.
+      parameters:
+        - name: impactAnalysisId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/Identifier'
+      responses:
+        '200':
+          description: Impact analysis with review handoff references where required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImpactAnalysis'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/AuthorizationDenied'
+        '404':
+          $ref: '#/components/responses/ResourceNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DependencyUnavailable'
+components:
+  parameters:
+    ChangeRequestId:
+      name: changeRequestId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Identifier'
+  responses:
+    InvalidRequest:
+      description: Malformed request or missing required value; caller may correct and retry.
+      content:
+        application/json:
+          schema:
+            $ref: './allergen-validation-api-v1.yaml#/components/schemas/ApiError'
+          example:
+            code: INVALID_REQUEST
+            message: Required change request fields are missing.
+            traceId: null
+            evidenceId: null
+    AuthenticationRequired:
+      description: Identity is absent, invalid, or cannot be mapped to an active actor.
+      content:
+        application/json:
+          schema:
+            $ref: './allergen-validation-api-v1.yaml#/components/schemas/ApiError'
+          example:
+            code: AUTHENTICATION_REQUIRED
+            message: Authentication is required.
+            traceId: null
+            evidenceId: null
+    AuthorizationDenied:
+      description: A known actor lacks the permission selected by the M4 identity contract.
+      content:
+        application/json:
+          schema:
+            $ref: './allergen-validation-api-v1.yaml#/components/schemas/ApiError'
+          example:
+            code: AUTHORIZATION_DENIED
+            message: The actor is not permitted to run impact analysis.
+            traceId: null
+            evidenceId: null
+    ResourceNotFound:
+      description: Change request, analysis, supplier material or specification version does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: './allergen-validation-api-v1.yaml#/components/schemas/ApiError'
+          example:
+            code: RESOURCE_NOT_FOUND
+            message: The requested resource was not found.
+            traceId: null
+            evidenceId: null
+    DataConflict:
+      description: The immutable change reference is stale or conflicts with existing data.
+      content:
+        application/json:
+          schema:
+            $ref: './allergen-validation-api-v1.yaml#/components/schemas/ApiError'
+          examples:
+            staleSpecification:
+              value:
+                code: CURRENT_FORMULA_CHANGED
+                message: The product formula changed; reload the current version.
+                traceId: null
+                evidenceId: null
+            conflictingReplay:
+              value:
+                code: DATA_CONFLICT
+                message: The change request conflicts with an existing immutable request.
+                traceId: null
+                evidenceId: null
+    DomainPreconditionFailed:
+      description: The request is valid but its domain prerequisites are not satisfied.
+      content:
+        application/json:
+          schema:
+            $ref: './allergen-validation-api-v1.yaml#/components/schemas/ApiError'
+          examples:
+            materialMismatch:
+              value:
+                code: SPECIFICATION_MATERIAL_MISMATCH
+                message: The specification belongs to a different supplier material.
+                traceId: null
+                evidenceId: null
+            specificationNotReleased:
+              value:
+                code: SPECIFICATION_NOT_RELEASED
+                message: Formula items require released specifications.
+                traceId: null
+                evidenceId: null
+            specificationNotEffective:
+              value:
+                code: SPECIFICATION_NOT_EFFECTIVE
+                message: The specification effective date has not started.
+                traceId: null
+                evidenceId: null
+    InternalError:
+      description: Unexpected server failure; internal implementation details are not exposed.
+      content:
+        application/json:
+          schema:
+            $ref: './allergen-validation-api-v1.yaml#/components/schemas/ApiError'
+          example:
+            code: INTERNAL_ERROR
+            message: An unexpected error occurred.
+            traceId: null
+            evidenceId: null
+    DependencyUnavailable:
+      description: A required integration is temporarily unavailable; retry policy requires M1/M5 review.
+      content:
+        application/json:
+          schema:
+            $ref: './allergen-validation-api-v1.yaml#/components/schemas/ApiError'
+          example:
+            code: CATALOG_INTEGRATION_UNAVAILABLE
+            message: A required catalog integration is temporarily unavailable.
+            traceId: null
+            evidenceId: null
+  schemas:
+    Identifier:
+      type: string
+      minLength: 1
+    ChangeRequestCreate:
+      type: object
+      additionalProperties: false
+      required:
+        - changeType
+        - supplierMaterialId
+        - previousSpecificationVersionId
+        - targetSpecificationVersionId
+      properties:
+        changeType:
+          type: string
+          enum: [INGREDIENT_SPEC]
+        supplierMaterialId:
+          $ref: '#/components/schemas/Identifier'
+        previousSpecificationVersionId:
+          $ref: '#/components/schemas/Identifier'
+        targetSpecificationVersionId:
+          $ref: '#/components/schemas/Identifier'
+    ImpactAnalysisTriggerRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - ruleSetVersionId
+      properties:
+        ruleSetVersionId:
+          $ref: '#/components/schemas/Identifier'
+    ChangeRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - changeRequestId
+        - changeType
+        - supplierMaterialId
+        - previousSpecificationVersionId
+        - targetSpecificationVersionId
+        - status
+        - createdAt
+      properties:
+        changeRequestId:
+          $ref: '#/components/schemas/Identifier'
+        changeType:
+          type: string
+          enum: [INGREDIENT_SPEC]
+        supplierMaterialId:
+          $ref: '#/components/schemas/Identifier'
+        previousSpecificationVersionId:
+          $ref: '#/components/schemas/Identifier'
+        targetSpecificationVersionId:
+          $ref: '#/components/schemas/Identifier'
+        status:
+          type: string
+          enum: [SUBMITTED, ANALYZED, COMPLETED]
+          description: >-
+            Candidate M1 status proposal; M1/M4/M5 must confirm ownership and
+            transition semantics before acceptance.
+        createdAt:
+          type: string
+          format: date-time
+    ImpactAnalysis:
+      type: object
+      additionalProperties: false
+      required:
+        - impactAnalysisId
+        - changeRequestId
+        - ruleSetVersionId
+        - status
+        - completedAt
+        - relevantProductCount
+        - noActionCount
+        - reviewRequiredCount
+        - findings
+      properties:
+        impactAnalysisId:
+          $ref: '#/components/schemas/Identifier'
+        changeRequestId:
+          $ref: '#/components/schemas/Identifier'
+        ruleSetVersionId:
+          $ref: '#/components/schemas/Identifier'
+        status:
+          type: string
+          enum: [COMPLETED]
+        completedAt:
+          type: string
+          format: date-time
+        relevantProductCount:
+          type: integer
+          minimum: 0
+        noActionCount:
+          type: integer
+          minimum: 0
+        reviewRequiredCount:
+          type: integer
+          minimum: 0
+        findings:
+          type: array
+          description: Only products using the changed supplier material; sorted by productId.
+          items:
+            $ref: '#/components/schemas/ImpactFinding'
+    ImpactFinding:
+      oneOf:
+        - $ref: '#/components/schemas/NoActionFinding'
+        - $ref: '#/components/schemas/ReviewRequiredFinding'
+      discriminator:
+        propertyName: outcome
+        mapping:
+          NO_ACTION: '#/components/schemas/NoActionFinding'
+          REVIEW_REQUIRED: '#/components/schemas/ReviewRequiredFinding'
+    NoActionFinding:
+      type: object
+      additionalProperties: false
+      required:
+        - impactFindingId
+        - productId
+        - outcome
+        - currentFormulaVersionId
+        - proposedFormulaVersionId
+        - currentLabelVersionId
+      properties:
+        impactFindingId:
+          $ref: '#/components/schemas/Identifier'
+        productId:
+          $ref: '#/components/schemas/Identifier'
+        outcome:
+          type: string
+          const: NO_ACTION
+        currentFormulaVersionId:
+          $ref: '#/components/schemas/Identifier'
+        proposedFormulaVersionId:
+          $ref: '#/components/schemas/Identifier'
+        currentLabelVersionId:
+          type: [string, 'null']
+          minLength: 1
+        explanationCode:
+          type: string
+          description: Stable, machine-readable reason; exact values require M1 review.
+    ReviewRequiredFinding:
+      type: object
+      additionalProperties: false
+      required:
+        - impactFindingId
+        - productId
+        - outcome
+        - currentFormulaVersionId
+        - proposedFormulaVersionId
+        - currentLabelVersionId
+        - reviewTask
+      properties:
+        impactFindingId:
+          $ref: '#/components/schemas/Identifier'
+        productId:
+          $ref: '#/components/schemas/Identifier'
+        outcome:
+          type: string
+          const: REVIEW_REQUIRED
+        currentFormulaVersionId:
+          $ref: '#/components/schemas/Identifier'
+        proposedFormulaVersionId:
+          $ref: '#/components/schemas/Identifier'
+        currentLabelVersionId:
+          type: [string, 'null']
+          minLength: 1
+        reviewTask:
+          $ref: '#/components/schemas/ReviewTaskHandoff'
+    ReviewTaskHandoff:
+      type: object
+      additionalProperties: false
+      description: >-
+        Opaque cross-module identifiers only. M1 creates the task; M4 owns its
+        lifecycle, assignment, decisions and permissions. The required assigned-user
+        rule is pending M4 review. draftLabelVersionId remains null
+        until a replacement label draft is linked. This field name follows the M1 PR
+        #47 proposal to match the existing review_task draft label column; acceptance
+        remains pending.
+      required:
+        - reviewTaskId
+        - impactFindingId
+        - productId
+        - currentFormulaVersionId
+        - currentLabelVersionId
+        - draftLabelVersionId
+      properties:
+        reviewTaskId:
+          $ref: '#/components/schemas/Identifier'
+        impactFindingId:
+          $ref: '#/components/schemas/Identifier'
+        productId:
+          $ref: '#/components/schemas/Identifier'
+        currentFormulaVersionId:
+          $ref: '#/components/schemas/Identifier'
+        currentLabelVersionId:
+          type: [string, 'null']
+          minLength: 1
+        draftLabelVersionId:
+          type: [string, 'null']
+          minLength: 1
+    PublicationHandoff:
+      type: object
+      additionalProperties: false
+      description: >-
+        Reference fields for an M4/M5 publication response. This schema defines no
+        review state machine, permission rule, publication endpoint or persistence shape.
+        Field names are presented for cross-module review before acceptance.
+      required:
+        - reviewTaskId
+        - sourceLabelVersionId
+        - publishedLabelVersionId
+        - supersededLabelVersionId
+        - validationRunId
+        - publicationRecordId
+        - publishedAt
+      properties:
+        reviewTaskId:
+          $ref: '#/components/schemas/Identifier'
+        sourceLabelVersionId:
+          $ref: '#/components/schemas/Identifier'
+        publishedLabelVersionId:
+          $ref: '#/components/schemas/Identifier'
+        supersededLabelVersionId:
+          $ref: '#/components/schemas/Identifier'
+        validationRunId:
+          $ref: '#/components/schemas/Identifier'
+        publicationRecordId:
+          $ref: '#/components/schemas/Identifier'
+        publishedAt:
+          type: string
+          format: date-time
+    ApiError:
+      $ref: './allergen-validation-api-v1.yaml#/components/schemas/ApiError'
