@@ -74,7 +74,7 @@ class S3ImpactApiContractTest {
         assertThat(valueAt(analysis, "properties", "status", "enum")).isEqualTo(List.of("COMPLETED"));
         assertThat(valueAt(analysis, "properties", "findings", "items", "$ref"))
                 .isEqualTo("#/components/schemas/ImpactFinding");
-        assertThat(at(schemas, "ImpactFinding", "oneOf")).hasSize(2);
+        assertThat((List<?>) valueAt(schemas, "ImpactFinding", "oneOf")).hasSize(2);
         assertThat(at(schemas, "NoActionFinding", "properties")).doesNotContainKey("reviewTask");
         assertThat(((List<?>) valueAt(schemas, "NoActionFinding", "required"))
                 .contains("proposedFormulaVersionId")).isTrue();
@@ -125,7 +125,8 @@ class S3ImpactApiContractTest {
                     .isEqualTo("./allergen-validation-api-v1.yaml#/components/schemas/ApiError");
         });
         assertThat(valueAt(candidate, "components", "responses", "DependencyUnavailable",
-                "content", "application/json", "example", "code")).isEqualTo("SERVICE_UNAVAILABLE");
+                "content", "application/json", "example", "code"))
+                .isEqualTo("CATALOG_INTEGRATION_UNAVAILABLE");
         Path root = repositoryRoot();
         String matrix = Files.readString(root.resolve("docs/contracts/s3-impact-api-error-matrix-v1.md"));
         Map.of("400", List.of("INVALID_REQUEST"), "401", List.of("AUTHENTICATION_REQUIRED"),
