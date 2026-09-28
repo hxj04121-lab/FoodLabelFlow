@@ -76,11 +76,11 @@ class S3ImpactApiContractTest {
                 .isEqualTo("#/components/schemas/ImpactFinding");
         assertThat(at(schemas, "ImpactFinding", "oneOf")).hasSize(2);
         assertThat(at(schemas, "NoActionFinding", "properties")).doesNotContainKey("reviewTask");
-        assertThat((List<?>) valueAt(schemas, "NoActionFinding", "required"))
-                .contains("proposedFormulaVersionId");
+        assertThat(((List<?>) valueAt(schemas, "NoActionFinding", "required"))
+                .contains("proposedFormulaVersionId")).isTrue();
         assertThat(valueAt(schemas, "NoActionFinding", "properties", "outcome", "const")).isEqualTo("NO_ACTION");
-        assertThat((List<?>) valueAt(schemas, "ReviewRequiredFinding", "required"))
-                .contains("reviewTask", "proposedFormulaVersionId");
+        assertThat(((List<?>) valueAt(schemas, "ReviewRequiredFinding", "required"))
+                .containsAll(List.of("reviewTask", "proposedFormulaVersionId"))).isTrue();
         assertThat(valueAt(schemas, "ReviewRequiredFinding", "properties", "outcome", "const"))
                 .isEqualTo("REVIEW_REQUIRED");
         assertThat(valueAt(schemas, "ReviewTaskHandoff", "properties", "draftLabelVersionId", "type"))
