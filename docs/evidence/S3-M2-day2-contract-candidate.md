@@ -1,8 +1,8 @@
 # Sprint 3 M2 Day 2 — impact and handoff contract candidate
 
-**Observed:** 2026-09-28, Asia/Shanghai  
-**Owner:** Cai Runchen / M2  
-**Jira:** SCRUM-48 / SCRUM-53  
+**Observed:** 2026-09-28, Asia/Shanghai
+**Owner:** Cai Runchen / M2
+**Jira:** SCRUM-48 / SCRUM-53
 **State:** executable candidate; cross-module acceptance and contract freeze remain pending.
 
 ## Live baseline and ownership
