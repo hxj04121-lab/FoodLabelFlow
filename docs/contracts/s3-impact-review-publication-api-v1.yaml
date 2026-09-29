@@ -19,10 +19,13 @@ paths:
       tags: [change-request]
       operationId: createChangeRequest
       summary: Record an INGREDIENT_SPEC version change for impact analysis.
+      x-required-permission: CHANGE_REQUEST.CREATE
       description: >-
         M1 owns creation behavior. Both specification versions must belong to the
         changed supplier material; only INGREDIENT_SPEC is in the Sprint 3 scope.
-        The response is the direct resource, not a generic envelope.
+        Missing body references are domain precondition failures (422), not path
+        resource misses. A duplicate supplier-material / previous-version / target-version
+        tuple conflicts (409). The response is the direct resource, not a generic envelope.
       requestBody:
         required: true
         content:
@@ -42,16 +45,12 @@ paths:
           $ref: '#/components/responses/AuthenticationRequired'
         '403':
           $ref: '#/components/responses/AuthorizationDenied'
-        '404':
-          $ref: '#/components/responses/ResourceNotFound'
         '409':
           $ref: '#/components/responses/DataConflict'
         '422':
           $ref: '#/components/responses/DomainPreconditionFailed'
         '500':
           $ref: '#/components/responses/InternalError'
-        '503':
-          $ref: '#/components/responses/DependencyUnavailable'
   /api/v1/change-requests/{changeRequestId}:
     get:
       tags: [change-request]
@@ -74,21 +73,28 @@ paths:
           $ref: '#/components/responses/ResourceNotFound'
         '500':
           $ref: '#/components/responses/InternalError'
-        '503':
-          $ref: '#/components/responses/DependencyUnavailable'
   /api/v1/change-requests/{changeRequestId}/impact-analyses:
     post:
       tags: [impact-analysis]
       operationId: runChangeImpactAnalysis
       summary: Run the impact analysis for a recorded change request.
+      x-required-permission: IMPACT.RUN
       description: >-
         The run is synchronous in this contract candidate. ruleSetVersionId is
         explicit, matching the S2 validation request convention and the M1 integration
-        proposal. A first run returns 201; repeating the command for the same immutable
-        changeRequestId and ruleSetVersionId returns 200 with the existing run and findings.
-        Repeating must not create duplicate runs, findings or ReviewTasks. Products are included only when their current
-        FormulaVersion contains the changed supplier material. Findings are ordered
-        by productId for deterministic consumers and golden tests.
+        proposal. A first run returns 201. Replaying a changeRequestId with the same
+        ruleSetVersionId returns 200 and the existing analysis; at most one analysis
+        exists per changeRequestId. Replaying it with a different ruleSetVersionId
+        returns 409 DATA_CONFLICT. Products are included
+        only when their current FormulaVersion contains the changed supplier material.
+        Before any write, every included product must have a published current label
+        and an adopted target-spec FormulaVersion. If either prerequisite is missing,
+        return 422 without creating an analysis, finding or ReviewTask. The current
+        FormulaVersion backs the published label at specification version N; the
+        proposed FormulaVersion is the adopted target-spec N+1 version. Findings are
+        ordered by productId for deterministic consumers and golden tests. Analysis,
+        findings, ReviewTasks and audit records are atomic; an unexpected integration
+        or audit failure returns 500 and rolls back the complete operation.
       parameters:
         - $ref: '#/components/parameters/ChangeRequestId'
       requestBody:
@@ -124,8 +130,6 @@ paths:
           $ref: '#/components/responses/DomainPreconditionFailed'
         '500':
           $ref: '#/components/responses/InternalError'
-        '503':
-          $ref: '#/components/responses/DependencyUnavailable'
   /api/v1/impact-analyses/{impactAnalysisId}:
     get:
       tags: [impact-analysis]
@@ -152,8 +156,6 @@ paths:
           $ref: '#/components/responses/ResourceNotFound'
         '500':
           $ref: '#/components/responses/InternalError'
-        '503':
-          $ref: '#/components/responses/DependencyUnavailable'
 components:
   parameters:
     ChangeRequestId:
@@ -197,7 +199,7 @@ components:
             traceId: null
             evidenceId: null
     ResourceNotFound:
-      description: Change request, analysis, supplier material or specification version does not exist.
+      description: A resource named by a path identifier does not exist.
       content:
         application/json:
           schema:
@@ -208,22 +210,22 @@ components:
             traceId: null
             evidenceId: null
     DataConflict:
-      description: The immutable change reference is stale or conflicts with existing data.
+      description: The immutable request or replay key conflicts with existing data.
       content:
         application/json:
           schema:
             $ref: './allergen-validation-api-v1.yaml#/components/schemas/ApiError'
           examples:
-            staleSpecification:
-              value:
-                code: CURRENT_FORMULA_CHANGED
-                message: The product formula changed; reload the current version.
-                traceId: null
-                evidenceId: null
-            conflictingReplay:
+            replayWithDifferentRuleSet:
               value:
                 code: DATA_CONFLICT
-                message: The change request conflicts with an existing immutable request.
+                message: This change request already has an analysis for a different rule set.
+                traceId: null
+                evidenceId: null
+            duplicateChangeRequest:
+              value:
+                code: DATA_CONFLICT
+                message: The supplier-material and specification-version tuple already exists.
                 traceId: null
                 evidenceId: null
     DomainPreconditionFailed:
@@ -251,6 +253,36 @@ components:
                 message: The specification effective date has not started.
                 traceId: null
                 evidenceId: null
+            changeReferenceNotFound:
+              value:
+                code: CHANGE_REFERENCE_NOT_FOUND
+                message: A referenced supplier material or specification version was not found.
+                traceId: null
+                evidenceId: null
+            ruleSetNotActive:
+              value:
+                code: RULE_SET_NOT_ACTIVE
+                message: The requested rule set is unknown or not active.
+                traceId: null
+                evidenceId: null
+            specificationVersionUnchanged:
+              value:
+                code: SPECIFICATION_VERSION_UNCHANGED
+                message: The target specification version must differ from the previous version.
+                traceId: null
+                evidenceId: null
+            publishedLabelMissing:
+              value:
+                code: PUBLISHED_LABEL_MISSING
+                message: An included product has no published current label version.
+                traceId: null
+                evidenceId: null
+            formulaAdoptionPending:
+              value:
+                code: FORMULA_ADOPTION_PENDING
+                message: The target-specification FormulaVersion has not been adopted.
+                traceId: null
+                evidenceId: null
     InternalError:
       description: Unexpected server failure; internal implementation details are not exposed.
       content:
@@ -260,17 +292,6 @@ components:
           example:
             code: INTERNAL_ERROR
             message: An unexpected error occurred.
-            traceId: null
-            evidenceId: null
-    DependencyUnavailable:
-      description: A required integration is temporarily unavailable; retry policy requires M1/M5 review.
-      content:
-        application/json:
-          schema:
-            $ref: './allergen-validation-api-v1.yaml#/components/schemas/ApiError'
-          example:
-            code: CATALOG_INTEGRATION_UNAVAILABLE
-            message: A required catalog integration is temporarily unavailable.
             traceId: null
             evidenceId: null
   schemas:
@@ -285,6 +306,7 @@ components:
         - supplierMaterialId
         - previousSpecificationVersionId
         - targetSpecificationVersionId
+        - description
       properties:
         changeType:
           type: string
@@ -295,6 +317,10 @@ components:
           $ref: '#/components/schemas/Identifier'
         targetSpecificationVersionId:
           $ref: '#/components/schemas/Identifier'
+        description:
+          type: string
+          minLength: 1
+          maxLength: 1000
     ImpactAnalysisTriggerRequest:
       type: object
       additionalProperties: false
@@ -312,6 +338,7 @@ components:
         - supplierMaterialId
         - previousSpecificationVersionId
         - targetSpecificationVersionId
+        - description
         - status
         - createdAt
       properties:
@@ -326,6 +353,10 @@ components:
           $ref: '#/components/schemas/Identifier'
         targetSpecificationVersionId:
           $ref: '#/components/schemas/Identifier'
+        description:
+          type: string
+          minLength: 1
+          maxLength: 1000
         status:
           type: string
           enum: [SUBMITTED, ANALYZED, COMPLETED]
@@ -394,6 +425,8 @@ components:
         - currentFormulaVersionId
         - proposedFormulaVersionId
         - currentLabelVersionId
+        - missingAllergenCodes
+        - explanation
       properties:
         impactFindingId:
           $ref: '#/components/schemas/Identifier'
@@ -407,11 +440,19 @@ components:
         proposedFormulaVersionId:
           $ref: '#/components/schemas/Identifier'
         currentLabelVersionId:
-          type: [string, 'null']
-          minLength: 1
-        explanationCode:
+          $ref: '#/components/schemas/Identifier'
+        missingAllergenCodes:
+          type: array
+          description: Sorted unique allergen codes absent from the proposed formula; empty for NO_ACTION.
+          minItems: 0
+          maxItems: 0
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Identifier'
+        explanation:
           type: string
-          description: Stable, machine-readable reason; exact values require M1 review.
+          minLength: 1
+          description: Caller-safe explanation persisted in the non-null impact_finding.explanation column.
     ReviewRequiredFinding:
       type: object
       additionalProperties: false
@@ -422,6 +463,8 @@ components:
         - currentFormulaVersionId
         - proposedFormulaVersionId
         - currentLabelVersionId
+        - missingAllergenCodes
+        - explanation
         - reviewTask
       properties:
         impactFindingId:
@@ -436,8 +479,18 @@ components:
         proposedFormulaVersionId:
           $ref: '#/components/schemas/Identifier'
         currentLabelVersionId:
-          type: [string, 'null']
+          $ref: '#/components/schemas/Identifier'
+        missingAllergenCodes:
+          type: array
+          description: Sorted unique allergen codes absent from the proposed formula; non-empty for REVIEW_REQUIRED.
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/Identifier'
+        explanation:
+          type: string
           minLength: 1
+          description: Caller-safe explanation persisted in the non-null impact_finding.explanation column.
         reviewTask:
           $ref: '#/components/schemas/ReviewTaskHandoff'
     ReviewTaskHandoff:
@@ -467,8 +520,7 @@ components:
         currentFormulaVersionId:
           $ref: '#/components/schemas/Identifier'
         currentLabelVersionId:
-          type: [string, 'null']
-          minLength: 1
+          $ref: '#/components/schemas/Identifier'
         draftLabelVersionId:
           type: [string, 'null']
           minLength: 1

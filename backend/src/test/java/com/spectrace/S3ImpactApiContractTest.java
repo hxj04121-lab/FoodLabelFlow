@@ -40,11 +40,17 @@ class S3ImpactApiContractTest {
         assertThat(at(contract, "paths", "/api/v1/change-requests/{changeRequestId}/impact-analyses", "post", "responses"))
                 .containsKeys("200", "201");
         assertThat(at(contract, "paths", "/api/v1/change-requests", "post", "responses"))
-                .containsOnlyKeys("201", "400", "401", "403", "404", "409", "422", "500", "503");
+                .containsOnlyKeys("201", "400", "401", "403", "409", "422", "500");
         assertThat(at(contract, "paths", "/api/v1/change-requests/{changeRequestId}", "get", "responses"))
-                .containsOnlyKeys("200", "401", "403", "404", "500", "503");
+                .containsOnlyKeys("200", "401", "403", "404", "500");
         assertThat(at(contract, "paths", "/api/v1/change-requests/{changeRequestId}/impact-analyses", "post", "responses"))
-                .containsOnlyKeys("200", "201", "400", "401", "403", "404", "409", "422", "500", "503");
+                .containsOnlyKeys("200", "201", "400", "401", "403", "404", "409", "422", "500");
+        assertThat(at(contract, "paths", "/api/v1/impact-analyses/{impactAnalysisId}", "get", "responses"))
+                .containsOnlyKeys("200", "401", "403", "404", "500");
+        assertThat(valueAt(contract, "paths", "/api/v1/change-requests", "post", "x-required-permission"))
+                .isEqualTo("CHANGE_REQUEST.CREATE");
+        assertThat(valueAt(contract, "paths", "/api/v1/change-requests/{changeRequestId}/impact-analyses",
+                "post", "x-required-permission")).isEqualTo("IMPACT.RUN");
         assertThat(valueAt(contract, "paths", "/api/v1/change-requests/{changeRequestId}/impact-analyses",
                 "post", "requestBody", "required")).isEqualTo(true);
         assertThat(valueAt(contract, "paths", "/api/v1/change-requests/{changeRequestId}/impact-analyses",
@@ -62,8 +68,16 @@ class S3ImpactApiContractTest {
         var create = at(schemas, "ChangeRequestCreate");
         assertThat(create.get("additionalProperties")).isEqualTo(false);
         assertThat(create.get("required")).isEqualTo(List.of(
-                "changeType", "supplierMaterialId", "previousSpecificationVersionId", "targetSpecificationVersionId"));
+                "changeType", "supplierMaterialId", "previousSpecificationVersionId",
+                "targetSpecificationVersionId", "description"));
         assertThat(valueAt(create, "properties", "changeType", "enum")).isEqualTo(List.of("INGREDIENT_SPEC"));
+        assertThat(valueAt(create, "properties", "description", "minLength")).isEqualTo(1);
+        assertThat(valueAt(create, "properties", "description", "maxLength")).isEqualTo(1000);
+
+        var changeRequest = at(schemas, "ChangeRequest");
+        assertThat((List<?>) changeRequest.get("required")).contains("description");
+        assertThat(valueAt(changeRequest, "properties", "description", "minLength")).isEqualTo(1);
+        assertThat(valueAt(changeRequest, "properties", "description", "maxLength")).isEqualTo(1000);
 
         assertThat(valueAt(schemas, "ImpactAnalysisTriggerRequest", "required"))
                 .isEqualTo(List.of("ruleSetVersionId"));
@@ -77,12 +91,33 @@ class S3ImpactApiContractTest {
         assertThat((List<?>) valueAt(schemas, "ImpactFinding", "oneOf")).hasSize(2);
         assertThat(at(schemas, "NoActionFinding", "properties")).doesNotContainKey("reviewTask");
         assertThat(((List<?>) valueAt(schemas, "NoActionFinding", "required"))
-                .contains("proposedFormulaVersionId")).isTrue();
+                .containsAll(List.of("proposedFormulaVersionId", "currentLabelVersionId",
+                        "missingAllergenCodes", "explanation"))).isTrue();
         assertThat(valueAt(schemas, "NoActionFinding", "properties", "outcome", "const")).isEqualTo("NO_ACTION");
         assertThat(((List<?>) valueAt(schemas, "ReviewRequiredFinding", "required"))
-                .containsAll(List.of("reviewTask", "proposedFormulaVersionId"))).isTrue();
+                .containsAll(List.of("reviewTask", "proposedFormulaVersionId", "currentLabelVersionId",
+                        "missingAllergenCodes", "explanation"))).isTrue();
         assertThat(valueAt(schemas, "ReviewRequiredFinding", "properties", "outcome", "const"))
                 .isEqualTo("REVIEW_REQUIRED");
+        assertThat(valueAt(schemas, "NoActionFinding", "properties", "currentLabelVersionId", "$ref"))
+                .isEqualTo("#/components/schemas/Identifier");
+        assertThat(valueAt(schemas, "ReviewRequiredFinding", "properties", "currentLabelVersionId", "$ref"))
+                .isEqualTo("#/components/schemas/Identifier");
+        assertThat(valueAt(schemas, "ReviewTaskHandoff", "properties", "currentLabelVersionId", "$ref"))
+                .isEqualTo("#/components/schemas/Identifier");
+        assertThat(valueAt(schemas, "NoActionFinding", "properties", "missingAllergenCodes", "maxItems"))
+                .isEqualTo(0);
+        assertThat(valueAt(schemas, "NoActionFinding", "properties", "missingAllergenCodes", "minItems"))
+                .isEqualTo(0);
+        assertThat(valueAt(schemas, "NoActionFinding", "properties", "missingAllergenCodes", "uniqueItems"))
+                .isEqualTo(true);
+        assertThat(valueAt(schemas, "ReviewRequiredFinding", "properties", "missingAllergenCodes", "minItems"))
+                .isEqualTo(1);
+        assertThat(valueAt(schemas, "ReviewRequiredFinding", "properties", "missingAllergenCodes", "uniqueItems"))
+                .isEqualTo(true);
+        assertThat(at(schemas, "NoActionFinding", "properties")).doesNotContainKey("explanationCode");
+        assertThat(at(schemas, "ReviewRequiredFinding", "properties", "proposedFormulaVersionId"))
+                .containsEntry("$ref", "#/components/schemas/Identifier");
         assertThat(valueAt(schemas, "ReviewTaskHandoff", "properties", "draftLabelVersionId", "type"))
                 .isEqualTo(List.of("string", "null"));
         assertThat(at(schemas, "ReviewTaskHandoff", "properties")).containsOnlyKeys(
@@ -115,7 +150,7 @@ class S3ImpactApiContractTest {
         var responses = at(candidate, "components", "responses");
         assertThat(responses).containsOnlyKeys(
                 "InvalidRequest", "AuthenticationRequired", "AuthorizationDenied", "ResourceNotFound",
-                "DataConflict", "DomainPreconditionFailed", "InternalError", "DependencyUnavailable");
+                "DataConflict", "DomainPreconditionFailed", "InternalError");
         responses.forEach((name, value) -> {
             @SuppressWarnings("unchecked")
             Map<String, Object> response = (Map<String, Object>) value;
@@ -124,19 +159,27 @@ class S3ImpactApiContractTest {
                     .as("response %s must use the frozen S2 ApiError schema", name)
                     .isEqualTo("./allergen-validation-api-v1.yaml#/components/schemas/ApiError");
         });
-        assertThat(valueAt(candidate, "components", "responses", "DependencyUnavailable",
-                "content", "application/json", "example", "code"))
-                .isEqualTo("CATALOG_INTEGRATION_UNAVAILABLE");
         Path root = repositoryRoot();
         String matrix = Files.readString(root.resolve("docs/contracts/s3-impact-api-error-matrix-v1.md"));
         Map.of("400", List.of("INVALID_REQUEST"), "401", List.of("AUTHENTICATION_REQUIRED"),
                 "403", List.of("AUTHORIZATION_DENIED"), "404", List.of("RESOURCE_NOT_FOUND"),
-                "409", List.of("CURRENT_FORMULA_CHANGED", "DATA_CONFLICT"),
-                "422", List.of("SPECIFICATION_MATERIAL_MISMATCH", "SPECIFICATION_NOT_RELEASED",
-                        "SPECIFICATION_NOT_EFFECTIVE"),
-                "500", List.of("INTERNAL_ERROR"), "503", List.of("CATALOG_INTEGRATION_UNAVAILABLE"))
+                "409", List.of("DATA_CONFLICT"),
+                "422", List.of("CHANGE_REFERENCE_NOT_FOUND", "SPECIFICATION_MATERIAL_MISMATCH",
+                        "SPECIFICATION_NOT_RELEASED", "SPECIFICATION_NOT_EFFECTIVE",
+                        "SPECIFICATION_VERSION_UNCHANGED", "RULE_SET_NOT_ACTIVE",
+                        "PUBLISHED_LABEL_MISSING", "FORMULA_ADOPTION_PENDING"),
+                "500", List.of("INTERNAL_ERROR"))
                 .forEach((status, codes) -> codes.forEach(code ->
                         assertThat(matrix).contains("| " + status + " | `" + code + "` |")));
+        String serializedCandidate = candidate.toString();
+        assertThat(serializedCandidate).doesNotContain("CURRENT_FORMULA_CHANGED", "CATALOG_INTEGRATION_UNAVAILABLE");
+        assertThat(at(candidate, "paths", "/api/v1/change-requests", "post", "responses"))
+                .doesNotContainKey("404");
+        assertThat(valueAt(candidate, "paths", "/api/v1/change-requests/{changeRequestId}/impact-analyses",
+                "post", "description").toString())
+                .contains("different ruleSetVersionId returns 409 DATA_CONFLICT")
+                .contains("without creating an analysis")
+                .contains("returns 500 and rolls back the complete operation");
         assertAllReferencesResolve(candidate, s2);
     }
 
