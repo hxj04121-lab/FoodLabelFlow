@@ -75,7 +75,7 @@ class S3ImpactApiContractTest {
         assertThat(valueAt(create, "properties", "description", "maxLength")).isEqualTo(1000);
 
         var changeRequest = at(schemas, "ChangeRequest");
-        assertThat((List<?>) changeRequest.get("required")).contains("description");
+        assertThat(((List<?>) changeRequest.get("required")).contains("description")).isTrue();
         assertThat(valueAt(changeRequest, "properties", "description", "minLength")).isEqualTo(1);
         assertThat(valueAt(changeRequest, "properties", "description", "maxLength")).isEqualTo(1000);
 
