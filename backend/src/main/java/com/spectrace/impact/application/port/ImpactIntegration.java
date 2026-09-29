@@ -6,6 +6,9 @@ public interface ImpactIntegration {
     /** Resolve a trusted active identity holding the permission; never a client-supplied actor. */
     String requireActor(Permission permission);
 
+    /** Resolve a trusted active identity for reads, which need no extra permission yet. */
+    String authenticate();
+
     /**
      * Append attributable audit events in the caller's transaction (MANDATORY).
      * Throw on failure so the change request, or the run with its findings and

@@ -1,23 +1,28 @@
 package com.spectrace.impact.support;
 
+import com.spectrace.catalog.application.port.RelevantProductLookupPort;
+import com.spectrace.catalog.application.port.SpecificationVersionLookupPort;
 import com.spectrace.impact.application.port.ChangeRequestRepository;
 import com.spectrace.impact.application.port.ImpactAnalysisRunRepository;
 import com.spectrace.impact.application.port.ImpactFindingRepository;
-import com.spectrace.impact.application.port.RelevantProductLookupPort;
 import com.spectrace.impact.application.port.ReviewTaskPort;
-import com.spectrace.impact.application.port.SpecificationVersionLookupPort;
 import com.spectrace.impact.domain.ChangeRequest;
+import com.spectrace.impact.domain.ChangeRequest.VersionChange;
+import com.spectrace.impact.domain.ChangeRequestStatus;
+import com.spectrace.impact.domain.ChangeType;
 import com.spectrace.impact.domain.ImpactAnalysisRun;
 import com.spectrace.impact.domain.ImpactFinding;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Unit-test fakes for every impact port, so the impact core can be built before the
@@ -44,6 +49,19 @@ public final class InMemoryImpactPorts {
         @Override
         public Optional<ChangeRequest> findById(String changeRequestId) {
             return Optional.ofNullable(byId.get(changeRequestId));
+        }
+
+        @Override
+        public Optional<ChangeRequest> findOpenByVersionChange(ChangeType changeType, VersionChange versionChange) {
+            return byId.values().stream()
+                    .filter(saved -> saved.changeType() == changeType
+                            && saved.versionChange().equals(versionChange)
+                            && saved.status() != ChangeRequestStatus.CANCELLED)
+                    .findFirst();
+        }
+
+        public List<ChangeRequest> saved() {
+            return List.copyOf(byId.values());
         }
     }
 
@@ -138,16 +156,40 @@ public final class InMemoryImpactPorts {
     }
 
     public static final class SpecificationVersions implements SpecificationVersionLookupPort {
+        private final Set<String> materials = new HashSet<>();
         private final Map<String, SpecificationVersionFacts> byId = new HashMap<>();
+        private final List<String> locked = new ArrayList<>();
 
+        public SpecificationVersions addMaterial(String supplierMaterialId) {
+            materials.add(supplierMaterialId);
+            return this;
+        }
+
+        /** Adds the version and its supplier material. */
         public SpecificationVersions add(SpecificationVersionFacts facts) {
+            materials.add(facts.supplierMaterialId());
             byId.put(facts.specificationVersionId(), facts);
             return this;
         }
 
         @Override
+        public boolean supplierMaterialExists(String supplierMaterialId) {
+            return materials.contains(supplierMaterialId);
+        }
+
+        @Override
         public Optional<SpecificationVersionFacts> findById(String specificationVersionId) {
             return Optional.ofNullable(byId.get(specificationVersionId));
+        }
+
+        @Override
+        public Optional<SpecificationVersionFacts> lockById(String specificationVersionId) {
+            locked.add(specificationVersionId);
+            return findById(specificationVersionId);
+        }
+
+        public List<String> locked() {
+            return List.copyOf(locked);
         }
     }
 }

@@ -49,17 +49,22 @@ finding (SCRUM-77 defines the explicit outcome); and the seed has no
 | `ImpactAnalysisRun` | `completedAt` is present exactly for COMPLETED/FAILED and never precedes `startedAt`. |
 | `ImpactFinding` | NO_ACTION has no missing allergen codes and REVIEW_REQUIRED has at least one; codes are copied, sorted and unique; the proposed formula is optional but never the current one. |
 
-## Application ports (`com.spectrace.impact.application.port`)
+## Application ports
+
+Impact-owned ports live in `com.spectrace.impact.application.port`. The two catalog-backed
+lookups live in `com.spectrace.catalog.application.port`, following the Sprint 2 rule that
+the module owning the data owns the port and its adapter; SCRUM-76 moved them there so
+catalog never depends on impact.
 
 | Port | Implemented by | Contract |
 | --- | --- | --- |
 | `ChangeRequestRepository` | M1 (SCRUM-76) | Save/find by ID; the adapter maps `VersionChange` to the typed columns. |
 | `ImpactAnalysisRunRepository` | M5 (SCRUM-51) | Save/find by ID; list a change request's runs oldest first, which is the basis for idempotent re-triggering. |
 | `ImpactFindingRepository` | M5 (SCRUM-51) | Save a run's findings; read them ordered by product, at most one per run and product. |
-| `SpecificationVersionLookupPort` | M1 catalog read (SCRUM-76) | Exact spec version read: material, version number, released flag. Empty means 404. |
-| `RelevantProductLookupPort` | M2 (SCRUM-48) | Products whose **current released** formula uses the material, ordered by product; historical formulas excluded; no mapping table; a null label pointer is reported, not dropped. |
+| `catalog…SpecificationVersionLookupPort` | M1 catalog adapter (SCRUM-76) | Material existence and exact spec version read (material, version number, lifecycle, effective date); `lockById` locks the row. Empty means 404. |
+| `catalog…RelevantProductLookupPort` | M2 (SCRUM-48) | Products whose **current released** formula uses the material, ordered by product; historical formulas excluded; no mapping table; a null label pointer is reported, not dropped. |
 | `ReviewTaskPort` | M4/M5 (SCRUM-50/51) | Open one OPEN task per finding in the caller's transaction. `OpenReviewTask` holds the finding and rejects NO_ACTION, so a NO_ACTION task cannot be requested. |
-| `ImpactIntegration` | M1 adapter over identity/audit (SCRUM-76); run atomicity verified by M5 (SCRUM-51) | `requireActor(CREATE_CHANGE_REQUEST \| RUN_IMPACT)` using the seeded codes `CHANGE_REQUEST.CREATE` / `IMPACT.RUN`; audit writes are MANDATORY-transaction and throw on failure. |
+| `ImpactIntegration` | M1 adapter over identity and `audit…ImpactAuditPort` (SCRUM-76); run atomicity verified by M5 (SCRUM-51) | `requireActor(CREATE_CHANGE_REQUEST \| RUN_IMPACT)` using the seeded codes `CHANGE_REQUEST.CREATE` / `IMPACT.RUN`; audit writes are MANDATORY-transaction and throw on failure. |
 
 Reused unchanged from Sprint 2: `catalog.application.port.FormulaCompositionPort`,
 `allergen.application.port.AllergenFactsPort` (an empty derivation is a completed

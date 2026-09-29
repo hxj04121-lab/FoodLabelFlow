@@ -1,4 +1,4 @@
-package com.spectrace.impact.application.port;
+package com.spectrace.catalog.application.port;
 
 import java.util.HashSet;
 import java.util.List;
