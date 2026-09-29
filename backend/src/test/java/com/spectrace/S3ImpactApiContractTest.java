@@ -57,7 +57,7 @@ class S3ImpactApiContractTest {
                 "post", "requestBody", "content", "application/json", "schema", "$ref"))
                 .isEqualTo("#/components/schemas/ImpactAnalysisTriggerRequest");
         assertThat(at(contract, "paths", "/api/v1/impact-analyses/{impactAnalysisId}", "get", "responses"))
-                .containsOnlyKeys("200", "401", "403", "404", "500", "503");
+                .containsOnlyKeys("200", "401", "403", "404", "500");
     }
 
     @Test

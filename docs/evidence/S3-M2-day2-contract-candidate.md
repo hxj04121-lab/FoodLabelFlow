@@ -45,6 +45,7 @@ The candidate incorporates the field proposals from M1 PR #47: explicit `ruleSet
 | Existing PR-head CI [36370616509](https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/36370616509), head `bef975d` | PASS before this review-fix revision — backend 301 tests with 0 failures/errors/skips; frontend, security, SonarQube and containers all passed. |
 | Local focused Maven run | Environment-blocked: installed JDK is 17; the project requires Java 21 (`release version 21 not supported`). |
 | Review-fix CI [36535824308](https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/36535824308), head `d5cde88` | Failed test compilation because AssertJ could not accept a value through `List<?>.contains`; corrected by asserting the standard `List.contains` result. Frontend and security jobs passed; backend-dependent jobs were skipped. |
+| Review-fix CI [36536050973](https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/36536050973), head `7ec3750` | Backend compiled and ran 301 tests; one contract test retained the old 503 expectation on the impact-analysis GET route. Corrected the duplicate assertion to expect the new response set. Frontend and security passed; backend-dependent jobs were skipped. |
 | Corrected review-fix validation | Pending updated PR CI. |
 
 ## Remaining acceptance gate
