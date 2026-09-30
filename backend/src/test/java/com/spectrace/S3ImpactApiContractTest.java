@@ -6,6 +6,7 @@ import org.yaml.snakeyaml.Yaml;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +31,7 @@ class S3ImpactApiContractTest {
                 "/api/v1/change-requests/{changeRequestId}",
                 "/api/v1/change-requests/{changeRequestId}/impact-analyses",
                 "/api/v1/impact-analyses/{impactAnalysisId}");
-        assertThat(at(contract, "paths", "/api/v1/change-requests")).containsOnlyKeys("post");
+        assertThat(at(contract, "paths", "/api/v1/change-requests")).containsOnlyKeys("get", "post");
         assertThat(at(contract, "paths", "/api/v1/change-requests/{changeRequestId}")).containsOnlyKeys("get");
         assertThat(at(contract, "paths", "/api/v1/change-requests/{changeRequestId}/impact-analyses"))
                 .containsOnlyKeys("post");
@@ -58,6 +59,73 @@ class S3ImpactApiContractTest {
                 .isEqualTo("#/components/schemas/ImpactAnalysisTriggerRequest");
         assertThat(at(contract, "paths", "/api/v1/impact-analyses/{impactAnalysisId}", "get", "responses"))
                 .containsOnlyKeys("200", "401", "403", "404", "500");
+    }
+
+    @Test
+    void selectorCollectionUsesBoundedCatalogPaginationAndTheExistingResource() throws IOException {
+        Map<String, Object> contract = load(CONTRACT);
+        var list = at(contract, "paths", "/api/v1/change-requests", "get");
+
+        assertThat(list.get("operationId")).isEqualTo("listChangeRequests");
+        assertThat(list).doesNotContainKeys("requestBody", "x-required-permission");
+        assertThat(list.get("parameters")).isEqualTo(List.of(
+                Map.of("$ref", "#/components/parameters/ChangeRequestListLimit"),
+                Map.of("$ref", "#/components/parameters/ChangeRequestListOffset")));
+        var limit = at(contract, "components", "parameters", "ChangeRequestListLimit");
+        assertThat(limit).containsEntry("name", "limit").containsEntry("in", "query")
+                .containsEntry("required", false);
+        assertThat(at(limit, "schema")).containsExactlyInAnyOrderEntriesOf(
+                Map.of("type", "integer", "minimum", 1, "maximum", 100, "default", 50));
+        var offset = at(contract, "components", "parameters", "ChangeRequestListOffset");
+        assertThat(offset).containsEntry("name", "offset").containsEntry("in", "query")
+                .containsEntry("required", false);
+        assertThat(at(offset, "schema")).containsExactlyInAnyOrderEntriesOf(
+                Map.of("type", "integer", "minimum", 0, "default", 0));
+        assertThat(at(list, "responses")).containsOnlyKeys("200", "400", "401", "403", "500");
+        Map.of("400", "InvalidRequest", "401", "AuthenticationRequired",
+                "403", "AuthorizationDenied", "500", "InternalError")
+                .forEach((status, response) -> assertThat(valueAt(list, "responses", status, "$ref"))
+                        .isEqualTo("#/components/responses/" + response));
+        assertThat(valueAt(list, "responses", "200", "content", "application/json", "schema", "$ref"))
+                .isEqualTo("#/components/schemas/ChangeRequestList");
+        var page = at(contract, "components", "schemas", "ChangeRequestList");
+        assertThat(page).containsEntry("type", "array").containsEntry("minItems", 0)
+                .containsEntry("maxItems", 100);
+        assertThat(valueAt(page, "items", "$ref")).isEqualTo("#/components/schemas/ChangeRequest");
+        assertThat(list.get("description").toString())
+                .contains("same active identity", "M4 acceptance", "changeRequestId ascending",
+                        "SUBMITTED, ANALYZED or COMPLETED", "Filtering occurs before limit and offset",
+                        "200 with []", "never a successful empty array", "not a cross-request snapshot");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void collectionExamplesDistinguishAnEmptyReadFromACompleteRecordedChange() throws IOException {
+        Map<String, Object> contract = load(CONTRACT);
+        var examples = at(contract, "paths", "/api/v1/change-requests", "get", "responses", "200",
+                "content", "application/json", "examples");
+        assertThat(valueAt(examples, "emptyPage", "value")).isEqualTo(List.of());
+        var changes = (List<Map<String, Object>>) valueAt(examples, "recordedChanges", "value");
+        var resource = at(contract, "components", "schemas", "ChangeRequest");
+        assertThat(changes).isNotEmpty();
+        for (var change : changes) {
+            assertThat(change.keySet()).containsExactlyInAnyOrderElementsOf(
+                    (List<String>) resource.get("required"));
+            assertThat(change.get("changeType")).isEqualTo("INGREDIENT_SPEC");
+            assertThat(List.of("SUBMITTED", "ANALYZED", "COMPLETED").contains(change.get("status")))
+                    .isTrue();
+            for (String field : List.of("changeRequestId", "supplierMaterialId",
+                    "previousSpecificationVersionId", "targetSpecificationVersionId", "description")) {
+                assertThat(change.get(field)).isInstanceOf(String.class);
+                assertThat((String) change.get(field)).isNotBlank();
+            }
+            assertThat(change.get("previousSpecificationVersionId"))
+                    .isNotEqualTo(change.get("targetSpecificationVersionId"));
+            assertThat((String) change.get("description")).hasSizeLessThanOrEqualTo(1000);
+            assertThat(Instant.parse((String) change.get("createdAt"))).isNotNull();
+        }
+        assertThat(changes.stream().map(change -> (String) change.get("changeRequestId")).toList())
+                .isSorted().doesNotHaveDuplicates();
     }
 
     @Test
