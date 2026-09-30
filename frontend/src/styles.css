@@ -238,6 +238,32 @@ th,.source-notice,.results-count,.pagination,.detail-summary,.trace-row p,.bar-l
 th { position:relative; }
 @media(max-width:800px) { .table-scroll table { min-width:720px; }.product-cell { min-width:220px; } }
 .detail-dialog { overflow-wrap:anywhere; }
+.impact-page { color:var(--foreground); }
+.impact-page .page-title p,.impact-page p,.impact-page dd { color:#61546f; }
+.impact-page p { max-width:72ch; }
+.impact-notice { color:#514961; }
+.impact-notice p { margin-top:4px; }
+.impact-layout { display:grid; grid-template-columns:minmax(260px,1fr) minmax(0,1.8fr); gap:24px; }
+.impact-content { display:flex; flex-direction:column; gap:12px; padding:20px 24px 24px; }
+.impact-content label { font-weight:600; }
+.impact-content select { width:100%; min-width:0; border:1px solid var(--color-input); border-radius:var(--radius-md); padding:10px 12px; background:var(--color-muted); color:#61546f; }
+.impact-content>p { font-size:12px; }
+.impact-context { margin:8px 0; }
+.impact-context>div { padding:10px 0; border-top:1px solid var(--color-border); }
+.impact-context dt { font-size:12px; color:#61546f; }
+.impact-context dd { margin:4px 0 0; }
+.impact-results { padding:48px 24px; display:flex; flex-direction:column; align-items:flex-start; gap:16px; }
+.impact-results>svg { color:var(--primary); }
+.impact-results h3 { font-size:20px; }
+.impact-guide { margin-top:32px; }
+.impact-guide>p { margin-top:8px; }
+.impact-guide dl { margin:20px 0; }
+.impact-guide dl>div { display:grid; grid-template-columns:minmax(180px,1fr) minmax(0,3fr); gap:24px; padding:16px 0; border-top:1px solid var(--color-border); }
+.impact-guide dt { font-weight:600; }
+.impact-guide code { display:block; margin-top:4px; color:#61546f; font-weight:400; }
+.impact-guide dd { margin:0; max-width:72ch; }
+@media(max-width:1000px) { .impact-layout { grid-template-columns:minmax(0,1fr); } }
+@media(max-width:560px) { .impact-content,.impact-results { padding:20px; }.impact-guide dl>div { grid-template-columns:minmax(0,1fr); gap:8px; } }
 .derived-panel { margin-top:23px; }
 .declaration-panel { margin-top:23px; }
 .declaration-content { padding:20px 24px 24px; display:grid; gap:16px; color:#71667e; overflow-wrap:anywhere; }
