@@ -624,6 +624,7 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
                     impact_analysis_run_id,
                     run_code,
                     change_request_id,
+                    idempotency_key,
                     rule_set_version_id,
                     status,
                     started_at,
@@ -634,6 +635,7 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
                 SELECT
                     ?,
                     'IMPACT-SCRUM-37-TEST',
+                    ?,
                     ?,
                     rule_set_version_id,
                     'COMPLETED',
@@ -646,6 +648,7 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
                 """,
                 IMPACT_RUN_ID,
                 CHANGE_REQUEST_ID,
+                "impact-analysis:" + CHANGE_REQUEST_ID,
                 LABEL_ID
         );
 
