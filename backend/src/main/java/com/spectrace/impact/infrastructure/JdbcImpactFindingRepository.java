@@ -1,8 +1,8 @@
 package com.spectrace.impact.infrastructure;
 
 import com.spectrace.impact.application.port.ImpactFindingRepository;
+import com.spectrace.impact.domain.ImpactClassification;
 import com.spectrace.impact.domain.ImpactFinding;
-import com.spectrace.impact.domain.ImpactFindingClassification;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -31,7 +31,7 @@ public class JdbcImpactFindingRepository implements ImpactFindingRepository {
                    explanation, data_provenance_id
             FROM impact_finding
             WHERE impact_analysis_run_id = ?
-            ORDER BY impact_finding_id ASC
+            ORDER BY product_id ASC, impact_finding_id ASC
             """;
 
     private final JdbcTemplate jdbcTemplate;
@@ -96,7 +96,7 @@ public class JdbcImpactFindingRepository implements ImpactFindingRepository {
                 resultSet.getString("current_formula_version_id"),
                 resultSet.getString("proposed_formula_version_id"),
                 resultSet.getString("current_label_version_id"),
-                ImpactFindingClassification.fromDatabase(resultSet.getString("classification")),
+                ImpactClassification.fromDatabase(resultSet.getString("classification")),
                 ImpactJsonMapping.readStrings(resultSet.getString("missing_allergen_codes")),
                 resultSet.getString("explanation"),
                 resultSet.getString("data_provenance_id")

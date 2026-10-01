@@ -3,7 +3,6 @@ package com.spectrace.impact.infrastructure;
 import com.spectrace.impact.application.port.ImpactAnalysisRunRepository;
 import com.spectrace.impact.domain.ImpactAnalysisRun;
 import com.spectrace.impact.domain.ImpactRunStatus;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -22,7 +21,7 @@ public class JdbcImpactAnalysisRunRepository implements ImpactAnalysisRunReposit
             """;
 
     private static final String SELECT = """
-            SELECT impact_analysis_run_id, run_code, change_request_id, idempotency_key,
+            SELECT impact_analysis_run_id, run_code, change_request_id,
                    rule_set_version_id, status, started_at, completed_at,
                    executed_by_user_id, data_provenance_id
             FROM impact_analysis_run
@@ -36,35 +35,22 @@ public class JdbcImpactAnalysisRunRepository implements ImpactAnalysisRunReposit
     }
 
     @Override
-    public ImpactAnalysisRun saveOrGetExisting(ImpactAnalysisRun run) {
-        Optional<ImpactAnalysisRun> existing = findByChangeRequestId(run.changeRequestId())
-                .or(() -> findByIdempotencyKey(run.idempotencyKey()));
-        if (existing.isPresent()) {
-            return existing.get();
-        }
-
-        try {
-            int updated = jdbcTemplate.update(
-                    INSERT,
-                    run.impactAnalysisRunId(),
-                    run.runCode(),
-                    run.changeRequestId(),
-                    run.idempotencyKey(),
-                    run.ruleSetVersionId(),
-                    run.status().name(),
-                    ImpactJdbcValueMapping.writeUtcDateTime(run.startedAt()),
-                    run.completedAt() == null ? null : ImpactJdbcValueMapping.writeUtcDateTime(run.completedAt()),
-                    run.executedByUserId(),
-                    run.dataProvenanceId()
-            );
-            if (updated != 1) {
-                throw new IllegalStateException("Expected one impact analysis run row to be inserted");
-            }
-            return run;
-        } catch (DuplicateKeyException duplicate) {
-            return findByChangeRequestId(run.changeRequestId())
-                    .or(() -> findByIdempotencyKey(run.idempotencyKey()))
-                    .orElseThrow(() -> duplicate);
+    public void save(ImpactAnalysisRun run) {
+        int updated = jdbcTemplate.update(
+                INSERT,
+                run.impactAnalysisRunId(),
+                run.runCode(),
+                run.changeRequestId(),
+                idempotencyKey(run),
+                run.ruleSetVersionId(),
+                run.status().name(),
+                ImpactJdbcValueMapping.writeUtcDateTime(run.startedAt()),
+                run.completedAt() == null ? null : ImpactJdbcValueMapping.writeUtcDateTime(run.completedAt()),
+                run.executedByUserId(),
+                run.dataProvenanceId()
+        );
+        if (updated != 1) {
+            throw new IllegalStateException("Expected one impact analysis run row to be inserted");
         }
     }
 
@@ -74,13 +60,13 @@ public class JdbcImpactAnalysisRunRepository implements ImpactAnalysisRunReposit
     }
 
     @Override
-    public Optional<ImpactAnalysisRun> findByChangeRequestId(String changeRequestId) {
-        return find("change_request_id", changeRequestId);
-    }
-
-    @Override
-    public Optional<ImpactAnalysisRun> findByIdempotencyKey(String idempotencyKey) {
-        return find("idempotency_key", idempotencyKey);
+    public List<ImpactAnalysisRun> findByChangeRequestId(String changeRequestId) {
+        return jdbcTemplate.query(
+                SELECT.formatted("change_request_id")
+                        + " ORDER BY started_at ASC, impact_analysis_run_id ASC",
+                this::mapImpactAnalysisRun,
+                changeRequestId
+        );
     }
 
     private Optional<ImpactAnalysisRun> find(String column, String value) {
@@ -103,8 +89,11 @@ public class JdbcImpactAnalysisRunRepository implements ImpactAnalysisRunReposit
                 ImpactJdbcValueMapping.readUtcDateTime(resultSet, "started_at"),
                 ImpactJdbcValueMapping.readUtcDateTime(resultSet, "completed_at"),
                 resultSet.getString("executed_by_user_id"),
-                resultSet.getString("data_provenance_id"),
-                resultSet.getString("idempotency_key")
+                resultSet.getString("data_provenance_id")
         );
+    }
+
+    private static String idempotencyKey(ImpactAnalysisRun run) {
+        return "impact-analysis:" + run.runCode();
     }
 }

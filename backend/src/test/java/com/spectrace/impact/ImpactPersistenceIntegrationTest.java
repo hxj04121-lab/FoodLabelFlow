@@ -4,8 +4,8 @@ import com.spectrace.impact.application.port.ImpactAnalysisRunRepository;
 import com.spectrace.impact.application.port.ImpactFindingRepository;
 import com.spectrace.impact.application.port.ReviewTaskLinkageRepository;
 import com.spectrace.impact.domain.ImpactAnalysisRun;
+import com.spectrace.impact.domain.ImpactClassification;
 import com.spectrace.impact.domain.ImpactFinding;
-import com.spectrace.impact.domain.ImpactFindingClassification;
 import com.spectrace.impact.domain.ImpactRunStatus;
 import com.spectrace.impact.domain.ReviewTaskLinkage;
 import com.spectrace.impact.domain.ReviewTaskStatus;
@@ -15,12 +15,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 class ImpactPersistenceIntegrationTest extends MySqlIntegrationTestSupport {
@@ -29,8 +31,8 @@ class ImpactPersistenceIntegrationTest extends MySqlIntegrationTestSupport {
     private static final String CHANGE_Y = "scrum62-change-y";
     private static final String RUN_X = "scrum62-run-x";
     private static final String RUN_Y = "scrum62-run-y";
-    private static final String FINDING_X = "scrum62-finding-x";
-    private static final String FINDING_Y = "scrum62-finding-y";
+    private static final String FINDING_X = "scrum62-finding-z";
+    private static final String FINDING_Y = "scrum62-finding-a";
     private static final String REVIEW_X = "scrum62-review-x";
 
     @Autowired
@@ -56,14 +58,14 @@ class ImpactPersistenceIntegrationTest extends MySqlIntegrationTestSupport {
 
     @Test
     void roundTripsRunFindingsAndReviewTaskLinkage() {
-        ImpactAnalysisRun run = run(RUN_X, CHANGE_X, "impact-analysis:" + CHANGE_X);
-        assertThat(runs.saveOrGetExisting(run)).isEqualTo(run);
+        ImpactAnalysisRun run = run(RUN_X, CHANGE_X, Instant.parse("2026-09-28T00:00:00Z"));
+        runs.save(run);
 
         ImpactFinding first = finding(FINDING_X, run.impactAnalysisRunId(), "prod_usda_1106285",
-                "formula_1106285_v1", "label_1106285_v1", ImpactFindingClassification.REVIEW_REQUIRED,
+                "formula_1106285_v1", "label_1106285_v1", ImpactClassification.REVIEW_REQUIRED,
                 List.of("SOY"));
         ImpactFinding second = finding(FINDING_Y, run.impactAnalysisRunId(), "prod_usda_1106963",
-                "formula_1106963_v1", "label_1106963_v1", ImpactFindingClassification.NO_ACTION,
+                "formula_1106963_v1", "label_1106963_v1", ImpactClassification.NO_ACTION,
                 List.of());
         findings.saveAll(run.impactAnalysisRunId(), List.of(first, second));
 
@@ -71,51 +73,41 @@ class ImpactPersistenceIntegrationTest extends MySqlIntegrationTestSupport {
         assertThat(reviewTasks.saveOrGetExisting(linkage)).isEqualTo(linkage);
 
         assertThat(runs.findById(run.impactAnalysisRunId())).contains(run);
-        assertThat(runs.findByChangeRequestId(CHANGE_X)).contains(run);
-        assertThat(runs.findByIdempotencyKey(run.idempotencyKey())).contains(run);
+        assertThat(runs.findByChangeRequestId(CHANGE_X)).containsExactly(run);
         assertThat(findings.findByRunId(run.impactAnalysisRunId())).containsExactly(first, second);
         assertThat(reviewTasks.findByFindingId(first.impactFindingId())).contains(linkage);
     }
 
     @Test
-    void sameChangeRequestReturnsExistingRunWithoutCreatingDuplicates() {
-        ImpactAnalysisRun first = run(RUN_X, CHANGE_X, "impact-analysis:" + CHANGE_X);
-        ImpactAnalysisRun second = run("scrum62-run-x-retry", CHANGE_X, "retry-key-with-different-correlation-id");
+    void sameChangeRequestKeepsHistoryAndRejectsDuplicateRunCode() {
+        ImpactAnalysisRun first = run(RUN_X, CHANGE_X, Instant.parse("2026-09-28T00:00:00Z"));
+        ImpactAnalysisRun second = run(RUN_Y, CHANGE_X, Instant.parse("2026-09-28T00:00:02Z"));
 
-        assertThat(runs.saveOrGetExisting(first)).isEqualTo(first);
-        assertThat(runs.saveOrGetExisting(second)).isEqualTo(first);
+        runs.save(first);
+        runs.save(second);
+        assertThat(runs.findByChangeRequestId(CHANGE_X)).containsExactly(first, second);
+
+        ImpactAnalysisRun retry = run(
+                "scrum62-run-x-retry",
+                "code-" + RUN_X,
+                CHANGE_X,
+                Instant.parse("2026-09-28T00:00:03Z")
+        );
+        assertThatThrownBy(() -> runs.save(retry)).isInstanceOf(DuplicateKeyException.class);
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM impact_analysis_run WHERE change_request_id = ?",
                 Integer.class,
                 CHANGE_X
-        )).isEqualTo(1);
-
-        ImpactFinding finding = finding(FINDING_X, first.impactAnalysisRunId(), "prod_usda_1106285",
-                "formula_1106285_v1", "label_1106285_v1", ImpactFindingClassification.REVIEW_REQUIRED,
-                List.of("SOY"));
-        findings.saveAll(first.impactAnalysisRunId(), List.of(finding));
-        assertThat(reviewTasks.saveOrGetExisting(linkage(finding.impactFindingId(), REVIEW_X)))
-                .isEqualTo(linkage(finding.impactFindingId(), REVIEW_X));
-
-        assertThat(jdbc.queryForObject(
-                "SELECT COUNT(*) FROM impact_finding WHERE impact_analysis_run_id = ?",
-                Integer.class,
-                first.impactAnalysisRunId()
-        )).isEqualTo(1);
-        assertThat(jdbc.queryForObject(
-                "SELECT COUNT(*) FROM review_task WHERE impact_finding_id = ?",
-                Integer.class,
-                finding.impactFindingId()
-        )).isEqualTo(1);
+        )).isEqualTo(2);
     }
 
     @Test
     void differentChangeRequestsCreateIndependentRuns() {
-        ImpactAnalysisRun first = run(RUN_X, CHANGE_X, "impact-analysis:" + CHANGE_X);
-        ImpactAnalysisRun second = run(RUN_Y, CHANGE_Y, "impact-analysis:" + CHANGE_Y);
+        ImpactAnalysisRun first = run(RUN_X, CHANGE_X);
+        ImpactAnalysisRun second = run(RUN_Y, CHANGE_Y);
 
-        assertThat(runs.saveOrGetExisting(first)).isEqualTo(first);
-        assertThat(runs.saveOrGetExisting(second)).isEqualTo(second);
+        runs.save(first);
+        runs.save(second);
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM impact_analysis_run WHERE impact_analysis_run_id IN (?, ?)",
                 Integer.class,
@@ -126,11 +118,11 @@ class ImpactPersistenceIntegrationTest extends MySqlIntegrationTestSupport {
 
     @Test
     void reviewTaskLinkageReturnsExistingLinkForSameFinding() {
-        ImpactAnalysisRun run = run(RUN_X, CHANGE_X, "impact-analysis:" + CHANGE_X);
-        runs.saveOrGetExisting(run);
+        ImpactAnalysisRun run = run(RUN_X, CHANGE_X);
+        runs.save(run);
         findings.saveAll(run.impactAnalysisRunId(), List.of(finding(
                 FINDING_X, run.impactAnalysisRunId(), "prod_usda_1106285",
-                "formula_1106285_v1", "label_1106285_v1", ImpactFindingClassification.REVIEW_REQUIRED,
+                "formula_1106285_v1", "label_1106285_v1", ImpactClassification.REVIEW_REQUIRED,
                 List.of("SOY"))));
 
         ReviewTaskLinkage first = linkage(FINDING_X, REVIEW_X);
@@ -144,18 +136,30 @@ class ImpactPersistenceIntegrationTest extends MySqlIntegrationTestSupport {
         )).isEqualTo(1);
     }
 
-    private ImpactAnalysisRun run(String runId, String changeRequestId, String idempotencyKey) {
+    private ImpactAnalysisRun run(String runId, String changeRequestId) {
+        return run(runId, "code-" + runId, changeRequestId, Instant.parse("2026-09-28T00:00:00Z"));
+    }
+
+    private ImpactAnalysisRun run(String runId, String changeRequestId, Instant startedAt) {
+        return run(runId, "code-" + runId, changeRequestId, startedAt);
+    }
+
+    private ImpactAnalysisRun run(
+            String runId,
+            String runCode,
+            String changeRequestId,
+            Instant startedAt
+    ) {
         return new ImpactAnalysisRun(
                 runId,
-                "code-" + runId,
+                runCode,
                 changeRequestId,
                 "ruleset_us_falcpa_demo_v1",
                 ImpactRunStatus.COMPLETED,
-                Instant.parse("2026-09-28T00:00:00Z"),
-                Instant.parse("2026-09-28T00:00:01Z"),
+                startedAt,
+                startedAt.plusSeconds(1),
                 "user_label_officer",
-                "prov_project_seed",
-                idempotencyKey
+                "prov_project_seed"
         );
     }
 
@@ -165,7 +169,7 @@ class ImpactPersistenceIntegrationTest extends MySqlIntegrationTestSupport {
             String productId,
             String formulaId,
             String labelId,
-            ImpactFindingClassification classification,
+            ImpactClassification classification,
             List<String> missingCodes
     ) {
         return new ImpactFinding(
@@ -173,11 +177,11 @@ class ImpactPersistenceIntegrationTest extends MySqlIntegrationTestSupport {
                 runId,
                 productId,
                 formulaId,
-                formulaId,
+                null,
                 labelId,
                 classification,
                 missingCodes,
-                classification == ImpactFindingClassification.REVIEW_REQUIRED
+                classification == ImpactClassification.REVIEW_REQUIRED
                         ? "Soy coverage requires review"
                         : "Existing label coverage is sufficient",
                 "prov_project_seed"

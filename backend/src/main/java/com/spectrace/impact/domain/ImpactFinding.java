@@ -1,7 +1,10 @@
 package com.spectrace.impact.domain;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+
+import static com.spectrace.shared.contract.ContractValues.requiredText;
 
 public record ImpactFinding(
         String impactFindingId,
@@ -10,27 +13,45 @@ public record ImpactFinding(
         String currentFormulaVersionId,
         String proposedFormulaVersionId,
         String currentLabelVersionId,
-        ImpactFindingClassification classification,
+        ImpactClassification classification,
         List<String> missingAllergenCodes,
         String explanation,
         String dataProvenanceId
 ) {
     public ImpactFinding {
-        impactFindingId = required(impactFindingId, "impactFindingId");
-        impactAnalysisRunId = required(impactAnalysisRunId, "impactAnalysisRunId");
-        productId = required(productId, "productId");
-        currentFormulaVersionId = required(currentFormulaVersionId, "currentFormulaVersionId");
-        currentLabelVersionId = required(currentLabelVersionId, "currentLabelVersionId");
+        impactFindingId = requiredText(impactFindingId, "impactFindingId");
+        impactAnalysisRunId = requiredText(impactAnalysisRunId, "impactAnalysisRunId");
+        productId = requiredText(productId, "productId");
+        currentFormulaVersionId = requiredText(currentFormulaVersionId, "currentFormulaVersionId");
+        if (proposedFormulaVersionId != null) {
+            proposedFormulaVersionId = requiredText(proposedFormulaVersionId, "proposedFormulaVersionId");
+            if (proposedFormulaVersionId.equals(currentFormulaVersionId)) {
+                throw new IllegalArgumentException("proposedFormulaVersionId must differ from the current formula");
+            }
+        }
+        currentLabelVersionId = requiredText(currentLabelVersionId, "currentLabelVersionId");
         classification = Objects.requireNonNull(classification, "classification");
-        missingAllergenCodes = List.copyOf(Objects.requireNonNull(missingAllergenCodes, "missingAllergenCodes"));
-        explanation = required(explanation, "explanation");
-        dataProvenanceId = required(dataProvenanceId, "dataProvenanceId");
+        missingAllergenCodes = sortedDistinctCodes(missingAllergenCodes);
+        if (classification.requiresReviewTask() == missingAllergenCodes.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "REVIEW_REQUIRED needs missing allergen codes and NO_ACTION must have none");
+        }
+        explanation = requiredText(explanation, "explanation");
+        dataProvenanceId = requiredText(dataProvenanceId, "dataProvenanceId");
     }
 
-    private static String required(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + " is required");
+    public boolean requiresReviewTask() {
+        return classification.requiresReviewTask();
+    }
+
+    private static List<String> sortedDistinctCodes(List<String> codes) {
+        Objects.requireNonNull(codes, "missingAllergenCodes");
+        var seen = new HashSet<String>();
+        for (String code : codes) {
+            if (!seen.add(requiredText(code, "missingAllergenCode"))) {
+                throw new IllegalArgumentException("Duplicate missing allergen code: " + code);
+            }
         }
-        return value;
+        return codes.stream().sorted().toList();
     }
 }

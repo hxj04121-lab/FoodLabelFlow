@@ -6,6 +6,10 @@ public enum ImpactRunStatus {
     COMPLETED,
     FAILED;
 
+    public boolean isTerminal() {
+        return this == COMPLETED || this == FAILED;
+    }
+
     public static ImpactRunStatus fromDatabase(String value) {
         if (value == null || value.isBlank()) {
             throw new IllegalStateException("impact run status is missing");
