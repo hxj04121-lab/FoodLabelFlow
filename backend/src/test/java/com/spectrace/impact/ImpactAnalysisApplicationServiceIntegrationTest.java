@@ -1,6 +1,7 @@
 package com.spectrace.impact;
 
 import com.spectrace.impact.application.ImpactAnalysisApplicationService;
+import com.spectrace.impact.application.ImpactFailure;
 import com.spectrace.impact.application.port.ImpactAnalysisRunRepository;
 import com.spectrace.impact.application.port.ImpactFindingRepository;
 import com.spectrace.impact.application.port.ReviewTaskLinkageRepository;
@@ -17,11 +18,20 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 class ImpactAnalysisApplicationServiceIntegrationTest extends MySqlIntegrationTestSupport {
@@ -42,6 +52,8 @@ class ImpactAnalysisApplicationServiceIntegrationTest extends MySqlIntegrationTe
     private ReviewTaskLinkageRepository reviewTasks;
     @Autowired
     private JdbcTemplate jdbc;
+    @Autowired
+    private PlatformTransactionManager transactionManager;
     @BeforeEach
     void prepareFixtures() {
         cleanUp();
@@ -94,10 +106,128 @@ class ImpactAnalysisApplicationServiceIntegrationTest extends MySqlIntegrationTe
                 .isEqualTo("IMPACT_ANALYSIS");
     }
 
+    @Test
+    void sequentialReplayWithFreshIdentifiersReturnsTheOriginalWithoutWritingAnything() {
+        ImpactAnalysisRun original = executeReviewRun(run(), "");
+        ImpactAnalysisRun replay = run(RUN + "-retry", "ruleset_us_falcpa_demo_v1");
+
+        assertThat(executeReviewRun(replay, "-retry")).isEqualTo(original);
+        assertSingleResult(original);
+        assertThat(runs.findById(replay.impactAnalysisRunId())).isEmpty();
+        assertThat(reviewTasks.findByFindingId(REVIEW_FINDING + "-retry")).isEmpty();
+    }
+
+    @Test
+    void anotherRuleSetConflictsWithoutChangingTheExistingResult() {
+        ImpactAnalysisRun original = executeReviewRun(run(), "");
+        ImpactAnalysisRun conflict = run(RUN + "-retry", "ruleset_us_falcpa_demo_v2");
+
+        assertThatThrownBy(() -> executeReviewRun(conflict, "-retry"))
+                .isInstanceOfSatisfying(ImpactFailure.class, failure -> {
+                    assertThat(failure.status()).isEqualTo(409);
+                    assertThat(failure.code()).isEqualTo("DATA_CONFLICT");
+                });
+        assertSingleResult(original);
+    }
+
+    @Test
+    void replaySeesACommittedWinnerEvenAfterAnOlderRepeatableReadSnapshot() throws Exception {
+        CountDownLatch snapshotReady = new CountDownLatch(1);
+        CountDownLatch winnerCommitted = new CountDownLatch(1);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<ImpactAnalysisRun> replay = executor.submit(() -> repeatableRead().execute(status -> {
+                assertThat(runs.findByChangeRequestId(CHANGE)).isEmpty();
+                snapshotReady.countDown();
+                await(winnerCommitted);
+                return executeReviewRun(run(RUN + "-retry", "ruleset_us_falcpa_demo_v1"), "-retry");
+            }));
+            assertThat(snapshotReady.await(10, TimeUnit.SECONDS)).isTrue();
+            ImpactAnalysisRun original = executeReviewRun(run(), "");
+            winnerCommitted.countDown();
+
+            assertThat(replay.get(10, TimeUnit.SECONDS)).isEqualTo(original);
+            assertSingleResult(original);
+        } finally {
+            winnerCommitted.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void simultaneousTriggersCommitOneRunFindingTaskAndAudit() throws Exception {
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<ImpactAnalysisRun> first = executor.submit(() -> repeatableRead().execute(status -> {
+                assertThat(runs.findByChangeRequestId(CHANGE)).isEmpty();
+                ready.countDown();
+                await(start);
+                return executeReviewRun(run(), "");
+            }));
+            Future<ImpactAnalysisRun> second = executor.submit(() -> repeatableRead().execute(status -> {
+                assertThat(runs.findByChangeRequestId(CHANGE)).isEmpty();
+                ready.countDown();
+                await(start);
+                return executeReviewRun(run(RUN + "-retry", "ruleset_us_falcpa_demo_v1"), "-retry");
+            }));
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            ImpactAnalysisRun winner = first.get(10, TimeUnit.SECONDS);
+            assertThat(second.get(10, TimeUnit.SECONDS)).isEqualTo(winner);
+            assertSingleResult(winner);
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    private ImpactAnalysisRun executeReviewRun(ImpactAnalysisRun run, String suffix) {
+        ImpactFinding review = finding(REVIEW_FINDING + suffix, run,
+                ImpactClassification.REVIEW_REQUIRED, List.of("SOY"));
+        return service.execute(run, List.of(review), List.of(linkage(review, REVIEW_TASK + suffix)));
+    }
+
+    private void assertSingleResult(ImpactAnalysisRun winner) {
+        assertThat(runs.findByChangeRequestId(CHANGE)).containsExactly(winner);
+        assertThat(findings.findByRunId(winner.impactAnalysisRunId())).hasSize(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM review_task rt
+                JOIN impact_finding f ON f.impact_finding_id = rt.impact_finding_id
+                JOIN impact_analysis_run r ON r.impact_analysis_run_id = f.impact_analysis_run_id
+                WHERE r.change_request_id = ?
+                """, Integer.class, CHANGE)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM audit_event WHERE correlation_id LIKE 'scrum59-run%'
+                """, Integer.class)).isEqualTo(1);
+    }
+
+    private TransactionTemplate repeatableRead() {
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        transaction.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        return transaction;
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(10, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Timed out waiting for the other trigger");
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting for the other trigger", interrupted);
+        }
+    }
+
     private ImpactAnalysisRun run() {
+        return run(RUN, "ruleset_us_falcpa_demo_v1");
+    }
+
+    private ImpactAnalysisRun run(String runId, String ruleSetId) {
         Instant started = Instant.parse("2026-10-01T00:00:00Z");
         return new ImpactAnalysisRun(
-                RUN, "code-" + RUN, CHANGE, "ruleset_us_falcpa_demo_v1", ImpactRunStatus.COMPLETED,
+                runId, "code-" + runId, CHANGE, ruleSetId, ImpactRunStatus.COMPLETED,
                 started, started.plusSeconds(1), "user_label_officer", "prov_project_seed");
     }
 
@@ -121,17 +251,21 @@ class ImpactAnalysisApplicationServiceIntegrationTest extends MySqlIntegrationTe
     }
 
     private ReviewTaskLinkage linkage(ImpactFinding finding) {
+        return linkage(finding, REVIEW_TASK);
+    }
+
+    private ReviewTaskLinkage linkage(ImpactFinding finding, String taskId) {
         return new ReviewTaskLinkage(
-                REVIEW_TASK, finding.impactFindingId(), finding.productId(), finding.currentLabelVersionId(), null,
+                taskId, finding.impactFindingId(), finding.productId(), finding.currentLabelVersionId(), null,
                 ReviewTaskStatus.OPEN, "user_approver", "user_label_officer",
                 Instant.parse("2026-10-01T00:00:00Z"), "prov_project_seed");
     }
 
     private void cleanUp() {
-        jdbc.update("DELETE FROM audit_event WHERE correlation_id = ?", RUN);
-        jdbc.update("DELETE FROM review_task WHERE review_task_id = ?", REVIEW_TASK);
-        jdbc.update("DELETE FROM impact_finding WHERE impact_finding_id IN (?, ?)", REVIEW_FINDING, NO_ACTION_FINDING);
-        jdbc.update("DELETE FROM impact_analysis_run WHERE impact_analysis_run_id = ?", RUN);
+        jdbc.update("DELETE FROM audit_event WHERE correlation_id LIKE 'scrum59-run%'");
+        jdbc.update("DELETE FROM review_task WHERE review_task_id LIKE 'scrum59-review-task%'");
+        jdbc.update("DELETE FROM impact_finding WHERE impact_finding_id LIKE 'scrum59-finding-%'");
+        jdbc.update("DELETE FROM impact_analysis_run WHERE change_request_id = ?", CHANGE);
         jdbc.update("DELETE FROM change_request WHERE change_request_id = ?", CHANGE);
     }
 }

@@ -50,7 +50,15 @@ public class ImpactAnalysisApplicationService {
                 Objects.requireNonNull(reviewTaskLinks, "reviewTaskLinks"));
         validate(run, persistedFindings, persistedLinks);
 
-        runs.save(run);
+        try {
+            runs.save(run);
+        } catch (ImpactRunAlreadyExistsException replay) {
+            ImpactAnalysisRun existing = replay.existingRun();
+            if (!existing.ruleSetVersionId().equals(run.ruleSetVersionId())) {
+                throw ImpactFailure.conflict("The change request already has an analysis under a different rule set");
+            }
+            return existing;
+        }
         findings.saveAll(run.impactAnalysisRunId(), persistedFindings);
         persistedLinks.forEach(reviewTasks::saveOrGetExisting);
         audit.recordImpactEvent(
