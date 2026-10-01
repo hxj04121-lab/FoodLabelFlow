@@ -3,10 +3,11 @@
 Implementation date: **2026-09-29 (Asia/Shanghai)**. Estimate: **2 story points**.
 Parent: SCRUM-47 / S3-M1. Builds on SCRUM-75 ([PR #47](https://github.com/hxj04121-lab/FoodLabelFlow/pull/47)).
 
-Status: **implemented and verified locally; team review pending**. The HTTP shape follows
-M2's S3 candidate `docs/contracts/s3-impact-review-publication-api-v1.yaml`
-([PR #48](https://github.com/hxj04121-lab/FoodLabelFlow/pull/48)). That candidate is not frozen,
-and M1's review comments on it are still open. Flyway V1–V4 are unchanged.
+Status: **implemented and verified locally; team review pending**. The HTTP shape and error
+codes follow M2's S3 contract `docs/contracts/s3-impact-review-publication-api-v1.yaml` and
+`docs/contracts/s3-impact-api-error-matrix-v1.md` as merged in
+[PR #48](https://github.com/hxj04121-lab/FoodLabelFlow/pull/48), which took M1's review fixes.
+The contract is still marked `CANDIDATE_PENDING_CROSS_MODULE_ACCEPTANCE`. Flyway V1–V4 are unchanged.
 
 ## HTTP boundary
 
@@ -16,9 +17,10 @@ and M1's review comments on it are still open. Flyway V1–V4 are unchanged.
 | `GET /api/v1/change-requests/{changeRequestId}` | any active identity (M4 has not chosen a read permission) | 200, direct `ChangeRequest` |
 
 The request body must contain exactly `changeType` (`INGREDIENT_SPEC`), `supplierMaterialId`,
-`previousSpecificationVersionId` and `targetSpecificationVersionId`, as non-blank strings.
-The response contains exactly the seven candidate fields. The actor, code, description and
-provenance are stored but not returned.
+`previousSpecificationVersionId`, `targetSpecificationVersionId` and `description`, as non-blank
+strings; `description` is at most 1000 characters (counted as code points, matching the
+`VARCHAR(1000)` column). The response contains exactly the eight contract fields, including
+`description`. The actor, code and provenance are stored but not returned.
 
 ## Checks, in order
 
@@ -27,11 +29,12 @@ can surface as a 500. Errors use the frozen four-field `ApiError`.
 
 | Check | Status / code |
 | --- | --- |
-| Malformed JSON, duplicate or extra field, missing or blank value, non-string value, a `changeType` other than INGREDIENT_SPEC | 400 `INVALID_REQUEST` |
+| Malformed JSON, duplicate or extra field, missing or blank value, non-string value, description over 1000 characters, a `changeType` other than INGREDIENT_SPEC | 400 `INVALID_REQUEST` |
 | Missing or unknown identity | 401 `AUTHENTICATION_REQUIRED` |
 | Active actor without `CHANGE_REQUEST.CREATE` | 403 `AUTHORIZATION_DENIED` |
-| Previous and target versions are the same | 400 `INVALID_REQUEST` |
-| Unknown supplier material or specification version; unknown change request on GET | 404 `RESOURCE_NOT_FOUND` |
+| Previous and target versions are the same | 422 `SPECIFICATION_VERSION_UNCHANGED` |
+| Unknown supplier material or specification version in the body | 422 `CHANGE_REFERENCE_NOT_FOUND` |
+| Unknown change request in the GET path | 404 `RESOURCE_NOT_FOUND` |
 | A version belongs to another material | 422 `SPECIFICATION_MATERIAL_MISMATCH` |
 | Target not RELEASED, or previous still DRAFT (RETIRED is allowed) | 422 `SPECIFICATION_NOT_RELEASED` |
 | Target effective date is in the future (UTC) | 422 `SPECIFICATION_NOT_EFFECTIVE` |
@@ -57,28 +60,29 @@ A created request is SUBMITTED, requested by the trusted actor, stamped with pro
   The existing single-method `AuditEventPort` is used as a lambda in
   `Scrum29MySqlIntegrationTest`, so it is left unchanged.
 
-## Differences from the SCRUM-76 Jira text and open contract items
+## Difference from the SCRUM-76 Jira text
 
-- **FORMULA / RULE_SET.** Jira said "explicit 422". The M2 candidate restricts `changeType`
-  to the enum `[INGREDIENT_SPEC]`, so these types are 400 `INVALID_REQUEST`, following the contract.
-- **Description.** `change_request.description` is NOT NULL but the candidate has no
-  description field, so the server generates one from the material and versions. M1 has
-  asked M2 to add a request field (PR #48 review).
-- **404 for IDs in the body.** The candidate uses 404 for unknown specification versions and
-  materials sent in the body. This implementation follows it. M1 has proposed 422 instead,
-  to match S2; if that is accepted, only the mapping changes.
+The Jira done criteria say FORMULA / RULE_SET return an "explicit 422". The merged contract
+restricts `changeType` to the enum `[INGREDIENT_SPEC]`, so those types are 400
+`INVALID_REQUEST`, following the contract. The earlier gaps (server-generated description,
+404 for body references, 400 for unchanged versions) were resolved by the merged contract
+and this implementation now follows it.
 
 ## Verification
 
-Local, 2026-09-29, Java 21 and Colima:
+Local, 2026-10-01, Java 21 and Colima, after merging `origin/main@0755d06` (contract from #48):
 
-- `ChangeRequestServiceTest` (12 tests): check order, authorization before any lookup, each
-  precondition, duplicate 409, nothing written on failure, reads and type filtering.
-- `ChangeRequestApiMySqlTest` (17 tests; real HTTP on MySQL 8.4.11 via Testcontainers):
-  - create and read-back by another active user, with the stored row, typed columns and
-    the audit row checked;
-  - 10 invalid bodies returning 400, plus 401, 403, 404, 422 and 409;
+- `ChangeRequestServiceTest` (13 tests): check order, authorization before any lookup, each
+  precondition and its contract code, description bounds, duplicate 409, nothing written on
+  failure, reads and type filtering.
+- `ChangeRequestApiMySqlTest` (21 tests; real HTTP on MySQL 8.4.11 via Testcontainers):
+  - create and read-back by another active user, with the stored row (including
+    `description`), typed columns and the audit row checked;
+  - 12 invalid bodies returning 400 (including missing, blank and 1001-character
+    descriptions), plus 401, 403, 404 (path only), 422 and 409;
+  - a 1000-character description ending in an emoji is stored and returned intact;
+  - request fields, response fields and every emitted error code are checked against the
+    merged contract YAML and error matrix;
   - four concurrent identical requests produce exactly one 201;
   - an audit failure rolls back both the request row and the audit row.
-- `mvn -B -ntp -f backend/pom.xml verify`: **344 tests, 0 failures/errors/skips, BUILD SUCCESS**
-  (315 on the SCRUM-75 baseline + 29 new).
+- `mvn -B -ntp -f backend/pom.xml verify`: **352 tests, 0 failures/errors/skips, BUILD SUCCESS**.

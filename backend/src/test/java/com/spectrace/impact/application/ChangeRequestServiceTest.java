@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -27,6 +28,7 @@ class ChangeRequestServiceTest {
     private static final Instant NOW = Instant.parse("2026-09-29T08:15:30.500Z");
     private static final LocalDate TODAY = LocalDate.of(2026, 9, 29);
     private static final String MATERIAL = "mat_chocolate_base";
+    private static final String DESCRIPTION = "Chocolate Base Spec V2 adds Soy Lecithin";
 
     private final InMemoryImpactPorts.ChangeRequests changeRequests = new InMemoryImpactPorts.ChangeRequests();
     private final InMemoryImpactPorts.SpecificationVersions specifications = new InMemoryImpactPorts.SpecificationVersions()
@@ -52,7 +54,7 @@ class ChangeRequestServiceTest {
         assertThat(saved.requestedAt()).isEqualTo(Instant.parse("2026-09-29T08:15:30Z"));
         assertThat(saved.requestedByUserId()).isEqualTo("user_change_manager");
         assertThat(saved.changeRequestCode()).isEqualTo("CR-" + saved.changeRequestId());
-        assertThat(saved.description()).contains(MATERIAL, "spec_chocolate_v1", "spec_chocolate_v2");
+        assertThat(saved.description()).isEqualTo(DESCRIPTION);
         assertThat(saved.dataProvenanceId()).isEqualTo(ChangeRequestService.CHANGE_REQUEST_PROVENANCE);
         assertThat(specifications.locked()).containsExactly("spec_chocolate_v2");
         assertThat(integration.calls).containsExactly(
@@ -72,19 +74,32 @@ class ChangeRequestServiceTest {
     }
 
     @Test
-    void identicalVersionsAreAnInvalidRequest() {
+    void identicalVersionsAreAnUnchangedSpecification() {
         assertFailure(() -> service.create(command("spec_chocolate_v2", "spec_chocolate_v2")),
-                400, "INVALID_REQUEST");
+                422, "SPECIFICATION_VERSION_UNCHANGED");
+        assertThat(specifications.locked()).isEmpty();
     }
 
     @Test
-    void unknownMaterialOrSpecificationVersionIsNotFound() {
+    void unknownBodyReferencesAre422NotPathNotFound() {
         assertFailure(() -> service.create(new CreateIngredientSpecChange(
-                "mat_unknown", "spec_chocolate_v1", "spec_chocolate_v2")), 404, "RESOURCE_NOT_FOUND");
+                        "mat_unknown", "spec_chocolate_v1", "spec_chocolate_v2", DESCRIPTION)),
+                422, "CHANGE_REFERENCE_NOT_FOUND");
         assertFailure(() -> service.create(command("spec_chocolate_v1", "spec_missing")),
-                404, "RESOURCE_NOT_FOUND");
+                422, "CHANGE_REFERENCE_NOT_FOUND");
         assertFailure(() -> service.create(command("spec_missing", "spec_chocolate_v2")),
-                404, "RESOURCE_NOT_FOUND");
+                422, "CHANGE_REFERENCE_NOT_FOUND");
+    }
+
+    @Test
+    void descriptionIsRequiredAndCappedAtTheColumnLength() {
+        String atLimit = "a".repeat(999) + "\uD83D\uDE00";
+        assertThat(new CreateIngredientSpecChange(MATERIAL, "spec-1", "spec-2", atLimit).description())
+                .isEqualTo(atLimit);
+        assertThatIllegalArgumentException().isThrownBy(() ->
+                new CreateIngredientSpecChange(MATERIAL, "spec-1", "spec-2", atLimit + "a"));
+        assertThatIllegalArgumentException().isThrownBy(() ->
+                new CreateIngredientSpecChange(MATERIAL, "spec-1", "spec-2", " "));
     }
 
     @Test
@@ -94,7 +109,7 @@ class ChangeRequestServiceTest {
         assertFailure(() -> service.create(command("spec_chocolate_v1", "spec_soy_carrier_v1")),
                 422, "SPECIFICATION_MATERIAL_MISMATCH");
         assertFailure(() -> service.create(new CreateIngredientSpecChange(
-                        "mat_soy_carrier", "spec_chocolate_v1", "spec_chocolate_v2")),
+                        "mat_soy_carrier", "spec_chocolate_v1", "spec_chocolate_v2", DESCRIPTION)),
                 422, "SPECIFICATION_MATERIAL_MISMATCH");
     }
 
@@ -167,7 +182,7 @@ class ChangeRequestServiceTest {
     }
 
     private static CreateIngredientSpecChange command(String previous, String target) {
-        return new CreateIngredientSpecChange(MATERIAL, previous, target);
+        return new CreateIngredientSpecChange(MATERIAL, previous, target, DESCRIPTION);
     }
 
     private static SpecificationVersionFacts spec(

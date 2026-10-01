@@ -4,13 +4,14 @@ import com.spectrace.impact.application.ChangeRequestView;
 import com.spectrace.impact.domain.ChangeRequestStatus;
 import com.spectrace.impact.domain.ChangeType;
 
-/** The S3 candidate ChangeRequest resource; actor, code and provenance stay internal. */
+/** The S3 contract ChangeRequest resource; actor, code and provenance stay internal. */
 public record ChangeRequestResponse(
         String changeRequestId,
         ChangeType changeType,
         String supplierMaterialId,
         String previousSpecificationVersionId,
         String targetSpecificationVersionId,
+        String description,
         ChangeRequestStatus status,
         String createdAt
 ) {
@@ -22,6 +23,7 @@ public record ChangeRequestResponse(
                 view.supplierMaterialId(),
                 request.versionChange().fromVersionId(),
                 request.versionChange().toVersionId(),
+                request.description(),
                 request.status(),
                 request.requestedAt().toString());
     }

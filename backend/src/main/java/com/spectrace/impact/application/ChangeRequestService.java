@@ -51,18 +51,21 @@ public class ChangeRequestService {
         Objects.requireNonNull(command, "command");
         String actorId = integration.requireActor(Permission.CREATE_CHANGE_REQUEST);
         if (command.previousSpecificationVersionId().equals(command.targetSpecificationVersionId())) {
-            throw ImpactFailure.invalid(
-                    "previousSpecificationVersionId and targetSpecificationVersionId must differ");
+            throw ImpactFailure.precondition("SPECIFICATION_VERSION_UNCHANGED",
+                    "The target specification version must differ from the previous one");
         }
         String materialId = command.supplierMaterialId();
+        // Unknown references in the body are 422; 404 is reserved for identifiers in the path.
         if (!specifications.supplierMaterialExists(materialId)) {
-            throw ImpactFailure.notFound("Supplier material " + materialId + " was not found");
+            throw missingReference("Supplier material " + materialId);
         }
         // Lock the target before the duplicate check so concurrent identical requests serialise.
         SpecificationVersionFacts target = specifications.lockById(command.targetSpecificationVersionId())
-                .orElseThrow(() -> missingSpecification(command.targetSpecificationVersionId()));
+                .orElseThrow(() -> missingReference(
+                        "Specification version " + command.targetSpecificationVersionId()));
         SpecificationVersionFacts previous = specifications.findById(command.previousSpecificationVersionId())
-                .orElseThrow(() -> missingSpecification(command.previousSpecificationVersionId()));
+                .orElseThrow(() -> missingReference(
+                        "Specification version " + command.previousSpecificationVersionId()));
         requireMaterial(materialId, previous);
         requireMaterial(materialId, target);
         if (previous.lifecycle() == Lifecycle.DRAFT) {
@@ -91,8 +94,7 @@ public class ChangeRequestService {
                 // The canonical MySQL DATETIME column stores whole UTC seconds.
                 clock.instant().truncatedTo(ChronoUnit.SECONDS),
                 actorId,
-                "INGREDIENT_SPEC change for supplier material " + materialId + ": "
-                        + versionChange.fromVersionId() + " -> " + versionChange.toVersionId(),
+                command.description(),
                 versionChange,
                 CHANGE_REQUEST_PROVENANCE);
         changeRequests.save(request);
@@ -122,7 +124,7 @@ public class ChangeRequestService {
         }
     }
 
-    private static ImpactFailure missingSpecification(String specificationVersionId) {
-        return ImpactFailure.notFound("Specification version " + specificationVersionId + " was not found");
+    private static ImpactFailure missingReference(String reference) {
+        return ImpactFailure.precondition("CHANGE_REFERENCE_NOT_FOUND", reference + " was not found");
     }
 }

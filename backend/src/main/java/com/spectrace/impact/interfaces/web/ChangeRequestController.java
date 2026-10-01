@@ -33,7 +33,8 @@ public class ChangeRequestController {
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
             .build();
     private static final Set<String> CREATE_FIELDS = Set.of(
-            "changeType", "supplierMaterialId", "previousSpecificationVersionId", "targetSpecificationVersionId");
+            "changeType", "supplierMaterialId", "previousSpecificationVersionId",
+            "targetSpecificationVersionId", "description");
 
     private final ChangeRequestService changeRequests;
 
@@ -62,15 +63,21 @@ public class ChangeRequestController {
         }
         if (input == null || !input.isObject() || !fieldNames(input).equals(CREATE_FIELDS)) {
             throw ImpactFailure.invalid("The request must contain exactly changeType, supplierMaterialId, "
-                    + "previousSpecificationVersionId and targetSpecificationVersionId");
+                    + "previousSpecificationVersionId, targetSpecificationVersionId and description");
         }
         if (!ChangeType.INGREDIENT_SPEC.name().equals(text(input, "changeType"))) {
             throw ImpactFailure.invalid("changeType must be INGREDIENT_SPEC; other change types are not supported");
         }
+        String description = text(input, "description");
+        if (description.codePointCount(0, description.length()) > CreateIngredientSpecChange.MAX_DESCRIPTION_LENGTH) {
+            throw ImpactFailure.invalid("description must be at most "
+                    + CreateIngredientSpecChange.MAX_DESCRIPTION_LENGTH + " characters");
+        }
         return new CreateIngredientSpecChange(
                 text(input, "supplierMaterialId"),
                 text(input, "previousSpecificationVersionId"),
-                text(input, "targetSpecificationVersionId"));
+                text(input, "targetSpecificationVersionId"),
+                description);
     }
 
     private static Set<String> fieldNames(JsonNode input) {

@@ -4,7 +4,7 @@ import com.spectrace.audit.application.AuditApplicationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -18,6 +18,7 @@ import org.springframework.test.util.AopTestUtils;
 import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.yaml.snakeyaml.Yaml;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -25,15 +26,19 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -67,6 +72,7 @@ class ChangeRequestApiMySqlTest {
     private static final String LABEL_OFFICER = "dev-external-label-officer";
     private static final String AUDITOR = "dev-external-auditor";
     private static final String MATERIAL = "mat_scrum76_base";
+    private static final String DESCRIPTION = "Chocolate Base Spec V2 adds Soy Lecithin";
 
     @Container
     private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4.11")
@@ -103,11 +109,12 @@ class ChangeRequestApiMySqlTest {
         assertThat(created.headers().firstValue("Location")).contains(PATH + "/" + id);
         assertThat(body.properties().stream().map(Map.Entry::getKey).toList()).containsExactly(
                 "changeRequestId", "changeType", "supplierMaterialId", "previousSpecificationVersionId",
-                "targetSpecificationVersionId", "status", "createdAt");
+                "targetSpecificationVersionId", "description", "status", "createdAt");
         assertThat(body.get("changeType").stringValue()).isEqualTo("INGREDIENT_SPEC");
         assertThat(body.get("supplierMaterialId").stringValue()).isEqualTo(MATERIAL);
         assertThat(body.get("previousSpecificationVersionId").stringValue()).isEqualTo("spec_scrum76_v1");
         assertThat(body.get("targetSpecificationVersionId").stringValue()).isEqualTo("spec_scrum76_v2");
+        assertThat(body.get("description").stringValue()).isEqualTo(DESCRIPTION);
         assertThat(body.get("status").stringValue()).isEqualTo("SUBMITTED");
         assertThat(body.get("createdAt").stringValue()).endsWith("Z");
 
@@ -115,6 +122,7 @@ class ChangeRequestApiMySqlTest {
                 .containsEntry("change_type", "INGREDIENT_SPEC")
                 .containsEntry("status", "SUBMITTED")
                 .containsEntry("requested_by_user_id", "user_change_manager")
+                .containsEntry("description", DESCRIPTION)
                 .containsEntry("from_specification_version_id", "spec_scrum76_v1")
                 .containsEntry("to_specification_version_id", "spec_scrum76_v2")
                 .containsEntry("from_formula_version_id", null)
@@ -136,33 +144,25 @@ class ChangeRequestApiMySqlTest {
                         .toInstant(java.time.ZoneOffset.UTC));
     }
 
+    static Stream<String> invalidBodies() {
+        Map<String, Object> valid = validBody(MATERIAL, "spec_scrum76_v1", "spec_scrum76_v2");
+        return Stream.of(
+                "not json",
+                "[]",
+                "{}",
+                json(without(valid, "targetSpecificationVersionId")),
+                json(without(valid, "description")),
+                json(with(valid, "requestedByUserId", "user_admin")),
+                json(with(valid, "supplierMaterialId", " ")),
+                json(with(valid, "supplierMaterialId", 7)),
+                json(with(valid, "description", " ")),
+                json(with(valid, "description", "a".repeat(1001))),
+                json(with(valid, "changeType", "FORMULA")),
+                "{\"changeType\":\"INGREDIENT_SPEC\"," + json(valid).substring(1));
+    }
+
     @ParameterizedTest
-    @ValueSource(strings = {
-            "not json",
-            "[]",
-            "{}",
-            "{\"changeType\":\"INGREDIENT_SPEC\",\"supplierMaterialId\":\"mat_scrum76_base\","
-                    + "\"previousSpecificationVersionId\":\"spec_scrum76_v1\"}",
-            "{\"changeType\":\"INGREDIENT_SPEC\",\"supplierMaterialId\":\"mat_scrum76_base\","
-                    + "\"previousSpecificationVersionId\":\"spec_scrum76_v1\","
-                    + "\"targetSpecificationVersionId\":\"spec_scrum76_v2\",\"requestedByUserId\":\"user_admin\"}",
-            "{\"changeType\":\"INGREDIENT_SPEC\",\"supplierMaterialId\":\" \","
-                    + "\"previousSpecificationVersionId\":\"spec_scrum76_v1\","
-                    + "\"targetSpecificationVersionId\":\"spec_scrum76_v2\"}",
-            "{\"changeType\":\"INGREDIENT_SPEC\",\"supplierMaterialId\":7,"
-                    + "\"previousSpecificationVersionId\":\"spec_scrum76_v1\","
-                    + "\"targetSpecificationVersionId\":\"spec_scrum76_v2\"}",
-            "{\"changeType\":\"FORMULA\",\"supplierMaterialId\":\"mat_scrum76_base\","
-                    + "\"previousSpecificationVersionId\":\"spec_scrum76_v1\","
-                    + "\"targetSpecificationVersionId\":\"spec_scrum76_v2\"}",
-            "{\"changeType\":\"INGREDIENT_SPEC\",\"changeType\":\"INGREDIENT_SPEC\","
-                    + "\"supplierMaterialId\":\"mat_scrum76_base\","
-                    + "\"previousSpecificationVersionId\":\"spec_scrum76_v1\","
-                    + "\"targetSpecificationVersionId\":\"spec_scrum76_v2\"}",
-            "{\"changeType\":\"INGREDIENT_SPEC\",\"supplierMaterialId\":\"mat_scrum76_base\","
-                    + "\"previousSpecificationVersionId\":\"spec_scrum76_v2\","
-                    + "\"targetSpecificationVersionId\":\"spec_scrum76_v2\"}"
-    })
+    @MethodSource("invalidBodies")
     void malformedOrUnsupportedRequestsAreInvalidAndWriteNothing(String body) throws Exception {
         assertError(request("POST", PATH, body, CHANGE_MANAGER), 400, "INVALID_REQUEST");
         assertNothingWritten();
@@ -178,17 +178,19 @@ class ChangeRequestApiMySqlTest {
     }
 
     @Test
-    void unknownReferencesAndChangeRequestsAreNotFound() throws Exception {
+    void unknownBodyReferencesAre422AndOnlyUnknownPathIdsAre404() throws Exception {
         assertError(request("POST", PATH, body("mat_missing", "spec_scrum76_v1", "spec_scrum76_v2"), CHANGE_MANAGER),
-                404, "RESOURCE_NOT_FOUND");
-        assertError(create("spec_scrum76_v1", "spec_missing", CHANGE_MANAGER), 404, "RESOURCE_NOT_FOUND");
-        assertError(create("spec_missing", "spec_scrum76_v2", CHANGE_MANAGER), 404, "RESOURCE_NOT_FOUND");
+                422, "CHANGE_REFERENCE_NOT_FOUND");
+        assertError(create("spec_scrum76_v1", "spec_missing", CHANGE_MANAGER), 422, "CHANGE_REFERENCE_NOT_FOUND");
+        assertError(create("spec_missing", "spec_scrum76_v2", CHANGE_MANAGER), 422, "CHANGE_REFERENCE_NOT_FOUND");
         assertError(request("GET", PATH + "/cr-missing", null, AUDITOR), 404, "RESOURCE_NOT_FOUND");
         assertNothingWritten();
     }
 
     @Test
     void domainPreconditionsAreCheckedBeforeAnyDatabaseConstraint() throws Exception {
+        assertError(create("spec_scrum76_v2", "spec_scrum76_v2", CHANGE_MANAGER),
+                422, "SPECIFICATION_VERSION_UNCHANGED");
         assertError(create("spec_chocolate_v1", "spec_scrum76_v2", CHANGE_MANAGER),
                 422, "SPECIFICATION_MATERIAL_MISMATCH");
         assertError(create("spec_scrum76_v2", "spec_scrum76_v3", CHANGE_MANAGER), 422, "SPECIFICATION_NOT_RELEASED");
@@ -230,6 +232,41 @@ class ChangeRequestApiMySqlTest {
     }
 
     @Test
+    void aDescriptionAtTheLengthLimitIsStoredIntact() throws Exception {
+        String atLimit = "a".repeat(999) + "\uD83D\uDE00";
+        var created = request("POST", PATH,
+                json(with(validBody(MATERIAL, "spec_scrum76_v1", "spec_scrum76_v2"), "description", atLimit)),
+                CHANGE_MANAGER);
+
+        assertThat(created.statusCode()).as(created.body()).isEqualTo(201);
+        assertThat(JSON.readTree(created.body()).get("description").stringValue()).isEqualTo(atLimit);
+        assertThat(jdbc.queryForObject("SELECT description FROM change_request", String.class)).isEqualTo(atLimit);
+    }
+
+    @Test
+    void requestResponseAndErrorCodesMatchTheMergedS3Contract() throws Exception {
+        Path root = repositoryRoot();
+        Map<String, Object> contract = new Yaml().load(
+                Files.readString(root.resolve("docs/contracts/s3-impact-review-publication-api-v1.yaml")));
+        Map<String, Object> schemas = map(map(contract.get("components")).get("schemas"));
+
+        assertThat(validBody(MATERIAL, "spec_scrum76_v1", "spec_scrum76_v2").keySet())
+                .containsExactlyInAnyOrderElementsOf(list(map(schemas.get("ChangeRequestCreate")).get("required")));
+        var created = create("spec_scrum76_v1", "spec_scrum76_v2", CHANGE_MANAGER);
+        assertThat(created.statusCode()).as(created.body()).isEqualTo(201);
+        assertThat(JSON.readTree(created.body()).properties().stream().map(Map.Entry::getKey).toList())
+                .containsExactlyElementsOf(list(map(schemas.get("ChangeRequest")).get("required")));
+
+        String matrix = Files.readString(root.resolve("docs/contracts/s3-impact-api-error-matrix-v1.md"));
+        for (String code : List.of("INVALID_REQUEST", "AUTHENTICATION_REQUIRED", "AUTHORIZATION_DENIED",
+                "RESOURCE_NOT_FOUND", "DATA_CONFLICT", "CHANGE_REFERENCE_NOT_FOUND",
+                "SPECIFICATION_MATERIAL_MISMATCH", "SPECIFICATION_NOT_RELEASED", "SPECIFICATION_NOT_EFFECTIVE",
+                "SPECIFICATION_VERSION_UNCHANGED", "INTERNAL_ERROR")) {
+            assertThat(matrix).as("error matrix lists %s", code).contains("`" + code + "`");
+        }
+    }
+
+    @Test
     void aFailedAuditRollsBackTheChangeRequestAndTheAuditRow() throws Exception {
         // Stub the spy behind the transactional proxy; the proxy itself requires an active transaction.
         AuditApplicationService target = AopTestUtils.getUltimateTargetObject(audit);
@@ -250,11 +287,53 @@ class ChangeRequestApiMySqlTest {
     }
 
     private static String body(String material, String previous, String target) {
-        return JSON.writeValueAsString(Map.of(
-                "changeType", "INGREDIENT_SPEC",
-                "supplierMaterialId", material,
-                "previousSpecificationVersionId", previous,
-                "targetSpecificationVersionId", target));
+        return json(validBody(material, previous, target));
+    }
+
+    private static Map<String, Object> validBody(String material, String previous, String target) {
+        var body = new LinkedHashMap<String, Object>();
+        body.put("changeType", "INGREDIENT_SPEC");
+        body.put("supplierMaterialId", material);
+        body.put("previousSpecificationVersionId", previous);
+        body.put("targetSpecificationVersionId", target);
+        body.put("description", DESCRIPTION);
+        return body;
+    }
+
+    private static Map<String, Object> with(Map<String, Object> body, String field, Object value) {
+        var changed = new LinkedHashMap<>(body);
+        changed.put(field, value);
+        return changed;
+    }
+
+    private static Map<String, Object> without(Map<String, Object> body, String field) {
+        var changed = new LinkedHashMap<>(body);
+        changed.remove(field);
+        return changed;
+    }
+
+    private static String json(Map<String, Object> body) {
+        return JSON.writeValueAsString(body);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> map(Object value) {
+        assertThat(value).isInstanceOf(Map.class);
+        return (Map<String, Object>) value;
+    }
+
+    private static List<String> list(Object value) {
+        assertThat(value).isInstanceOf(List.class);
+        return ((List<?>) value).stream().map(String::valueOf).toList();
+    }
+
+    private static Path repositoryRoot() {
+        Path root = Path.of("").toAbsolutePath();
+        while (root != null && !Files.isDirectory(root.resolve("docs/contracts"))) {
+            root = root.getParent();
+        }
+        assertThat(root).as("repository root containing docs/contracts").isNotNull();
+        return root;
     }
 
     private HttpResponse<String> request(String method, String path, String body, String subject) throws Exception {
