@@ -2,6 +2,7 @@ package com.spectrace.impact.support;
 
 import com.spectrace.catalog.application.port.RelevantProductLookupPort;
 import com.spectrace.catalog.application.port.SpecificationVersionLookupPort;
+import com.spectrace.impact.application.ImpactRunAlreadyExistsException;
 import com.spectrace.impact.application.port.ChangeRequestRepository;
 import com.spectrace.impact.application.port.ImpactAnalysisRunRepository;
 import com.spectrace.impact.application.port.ImpactFindingRepository;
@@ -83,6 +84,13 @@ public final class InMemoryImpactPorts {
         @Override
         public void save(ImpactAnalysisRun run) {
             Objects.requireNonNull(run, "run");
+            Optional<ImpactAnalysisRun> existing = byId.values().stream()
+                    .filter(saved -> saved.changeRequestId().equals(run.changeRequestId()))
+                    .findFirst();
+            if (existing.isPresent()) {
+                throw new ImpactRunAlreadyExistsException(existing.get(),
+                        new IllegalStateException("Duplicate change request " + run.changeRequestId()));
+            }
             boolean duplicateCode = byId.values().stream()
                     .anyMatch(saved -> saved.runCode().equals(run.runCode()));
             if (byId.containsKey(run.impactAnalysisRunId()) || duplicateCode) {

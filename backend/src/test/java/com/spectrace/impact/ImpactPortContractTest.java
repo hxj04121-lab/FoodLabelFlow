@@ -4,6 +4,7 @@ import com.spectrace.catalog.application.port.RelevantProductLookupPort.Relevant
 import com.spectrace.catalog.application.port.SpecificationVersionLookupPort.Lifecycle;
 import com.spectrace.catalog.application.port.SpecificationVersionLookupPort.SpecificationVersionFacts;
 import com.spectrace.impact.application.port.ImpactIntegration.Permission;
+import com.spectrace.impact.application.ImpactRunAlreadyExistsException;
 import com.spectrace.impact.application.port.ReviewTaskPort.OpenReviewTask;
 import com.spectrace.impact.domain.ChangeType;
 import com.spectrace.impact.domain.ChangeRequest.VersionChange;
@@ -58,19 +59,22 @@ class ImpactPortContractTest {
     }
 
     @Test
-    void runsAreListedOldestFirstPerChangeRequest() {
+    void runsKeepTheListContractAndReplayTheOriginalBusinessKey() {
         var runs = new InMemoryImpactPorts.Runs();
         var later = run("run-b", "RUN-B", "cr-1", NOW.plusSeconds(60));
         var earlier = run("run-a", "RUN-A", "cr-1", NOW);
-        runs.save(later);
         runs.save(earlier);
         runs.save(run("run-c", "RUN-C", "cr-2", NOW));
 
-        assertThat(runs.findByChangeRequestId("cr-1")).containsExactly(earlier, later);
+        assertThatThrownBy(() -> runs.save(later)).isInstanceOfSatisfying(
+                ImpactRunAlreadyExistsException.class,
+                replay -> assertThat(replay.existingRun()).isEqualTo(earlier));
+
+        assertThat(runs.findByChangeRequestId("cr-1")).containsExactly(earlier);
         assertThat(runs.findByChangeRequestId("cr-unknown")).isEmpty();
         assertThat(runs.findById("run-c")).isPresent();
         assertThatIllegalStateException().isThrownBy(() ->
-                runs.save(run("run-d", "RUN-A", "cr-1", NOW)));
+                runs.save(run("run-d", "RUN-A", "cr-3", NOW)));
     }
 
     @Test
