@@ -1,24 +1,45 @@
 package com.spectrace.workflow;
 
+import com.spectrace.identity.domain.AuthenticatedActor;
+import com.spectrace.label.application.LabelVersionConflictException;
 import com.spectrace.support.MySqlIntegrationTestSupport;
+import com.spectrace.workflow.application.LabelReviewService;
+import com.spectrace.workflow.application.port.LabelReviewCommandRepository;
 import com.spectrace.workflow.application.port.LabelWorkflowRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 
 @SpringBootTest
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
+
+    @Autowired
+    private LabelReviewService reviewService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -26,11 +47,18 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     @Autowired
     private LabelWorkflowRepository workflowRepository;
 
+    @Autowired
+    private DataSource dataSource;
+
+    @MockitoSpyBean
+    private LabelReviewCommandRepository commandRepository;
+
     private static final String LABEL_ID = "label_m4_workflow_test";
     private static final String REVIEW_TASK_ID = "review_task_scrum37";
     private static final String IMPACT_FINDING_ID = "impact_finding_scrum37";
     private static final String IMPACT_RUN_ID = "impact_run_scrum37";
     private static final String CHANGE_REQUEST_ID = "change_request_scrum37";
+    private static final String STALE_FORMULA_ID = "formula_scrum81_stale_decision";
 
     @BeforeEach
     void prepareFixture() {
@@ -163,11 +191,11 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     @Test
     void rejectsSubmitWithoutPassedValidation() {
         assertThrows(
-                DataAccessException.class,
-                () -> workflowRepository.submitForReview(
-                        LABEL_ID,
-                        "user_label_officer"
-                )
+                IllegalStateException.class,
+                () -> reviewService.submitForReview(
+                LABEL_ID,
+                reviewSubmitter()
+        )
         );
 
         assertStatus("DRAFT");
@@ -176,13 +204,13 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     @Test
     void rejectsDecisionWithoutPendingReviewTask() {
         assertThrows(
-                DataAccessException.class,
-                () -> workflowRepository.recordDecision(
-                        LABEL_ID,
-                        "APPROVE",
-                        "user_approver",
-                        "Invalid transition test"
-                )
+                IllegalStateException.class,
+                () -> reviewService.recordDecision(
+                LABEL_ID,
+                "APPROVE",
+                "Invalid transition test",
+                reviewApprover("LABEL.APPROVE")
+        )
         );
 
         assertStatus("DRAFT");
@@ -192,9 +220,9 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     void allowsDraftToPendingReviewAfterPassedValidation() {
         createPassedValidation();
 
-        workflowRepository.submitForReview(
+        reviewService.submitForReview(
                 LABEL_ID,
-                "user_label_officer"
+                reviewSubmitter()
         );
 
         assertStatus("PENDING_REVIEW");
@@ -204,19 +232,19 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     void rejectsSecondSubmitAfterPendingReview() {
         createPassedValidation();
 
-        workflowRepository.submitForReview(
+        reviewService.submitForReview(
                 LABEL_ID,
-                "user_label_officer"
+                reviewSubmitter()
         );
 
         assertStatus("PENDING_REVIEW");
 
         assertThrows(
-                DataAccessException.class,
-                () -> workflowRepository.submitForReview(
-                        LABEL_ID,
-                        "user_label_officer"
-                )
+                IllegalStateException.class,
+                () -> reviewService.submitForReview(
+                LABEL_ID,
+                reviewSubmitter()
+        )
         );
 
         assertStatus("PENDING_REVIEW");
@@ -226,21 +254,21 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     void rejectsApprovalAfterAlreadyPendingReviewWithoutReviewTask() {
         createPassedValidation();
 
-        workflowRepository.submitForReview(
+        reviewService.submitForReview(
                 LABEL_ID,
-                "user_label_officer"
+                reviewSubmitter()
         );
 
         assertStatus("PENDING_REVIEW");
 
         assertThrows(
-                DataAccessException.class,
-                () -> workflowRepository.recordDecision(
-                        LABEL_ID,
-                        "APPROVE",
-                        "user_approver",
-                        "No review task exists"
-                )
+                IllegalStateException.class,
+                () -> reviewService.recordDecision(
+                LABEL_ID,
+                "APPROVE",
+                "No review task exists",
+                reviewApprover("LABEL.APPROVE")
+        )
         );
 
         assertStatus("PENDING_REVIEW");
@@ -251,21 +279,22 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
         createPassedValidation();
         createReviewFixture();
 
-        workflowRepository.submitForReview(
+        reviewService.submitForReview(
                 LABEL_ID,
-                "user_label_officer"
+                reviewSubmitter()
         );
 
         assertStatus("PENDING_REVIEW");
 
-        workflowRepository.recordDecision(
+        reviewService.recordDecision(
                 LABEL_ID,
                 "APPROVE",
-                "user_approver",
-                "SCRUM-37 approval integration test"
+                "SCRUM-37 approval integration test",
+                reviewApprover("LABEL.APPROVE")
         );
 
         assertStatus("APPROVED");
+        assertReviewTaskStatus("CLOSED");
     }
 
     @Test
@@ -273,21 +302,218 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
         createPassedValidation();
         createReviewFixture();
 
-        workflowRepository.submitForReview(
+        reviewService.submitForReview(
                 LABEL_ID,
-                "user_label_officer"
+                reviewSubmitter()
         );
 
         assertStatus("PENDING_REVIEW");
 
-        workflowRepository.recordDecision(
+        reviewService.recordDecision(
                 LABEL_ID,
                 "REQUEST_CHANGES",
-                "user_approver",
-                "SCRUM-37 request changes integration test"
+                "SCRUM-37 request changes integration test",
+                reviewApprover("LABEL.REQUEST_CHANGES")
         );
 
         assertStatus("DRAFT");
+        assertReviewTaskStatus("OPEN");
+    }
+
+    @Test
+    void closesReviewTaskWhenLabelIsRejected() {
+        createPassedValidation();
+        createReviewFixture();
+
+        reviewService.submitForReview(
+                LABEL_ID,
+                reviewSubmitter()
+        );
+
+        assertStatus("PENDING_REVIEW");
+        assertReviewTaskStatus("IN_REVIEW");
+
+        reviewService.recordDecision(
+                LABEL_ID,
+                "REJECT",
+                "SCRUM-81 reject integration test",
+                reviewApprover("LABEL.REJECT")
+        );
+
+        assertStatus("REJECTED");
+        assertReviewTaskStatus("CLOSED");
+    }
+
+    @Test
+    void rejectsDecisionWhenFormulaWasChangedWithoutCreatingNewLabel() {
+        createPassedValidation();
+        createReviewFixture();
+        reviewService.submitForReview(LABEL_ID, reviewSubmitter());
+        assertStatus("PENDING_REVIEW");
+        assertReviewTaskStatus("IN_REVIEW");
+
+        String productId = jdbcTemplate.queryForObject(
+                "SELECT product_id FROM label_version WHERE label_version_id = ?",
+                String.class,
+                LABEL_ID
+        );
+        String originalFormulaId = jdbcTemplate.queryForObject(
+                "SELECT formula_version_id FROM label_version WHERE label_version_id = ?",
+                String.class,
+                LABEL_ID
+        );
+        jdbcTemplate.update("""
+                INSERT INTO formula_version (
+                    formula_version_id, product_id, version_number,
+                    lifecycle_status, is_current_released, created_by_user_id,
+                    released_by_user_id, released_at, data_provenance_id
+                )
+                SELECT ?, product_id, version_number + 1000, 'RELEASED', 'N',
+                       created_by_user_id, created_by_user_id, NOW(), data_provenance_id
+                FROM formula_version WHERE formula_version_id = ?
+                """,
+                STALE_FORMULA_ID,
+                originalFormulaId
+        );
+
+        try {
+            jdbcTemplate.update(
+                    "UPDATE product SET current_formula_version_id = ? WHERE product_id = ?",
+                    STALE_FORMULA_ID,
+                    productId
+            );
+            assertThrows(LabelVersionConflictException.class,
+                    () -> reviewService.recordDecision(
+                            LABEL_ID,
+                            "APPROVE",
+                            "SCRUM-81 stale formula regression",
+                            reviewApprover("LABEL.APPROVE")
+                    ));
+            assertDecisionUnchanged();
+        } finally {
+            jdbcTemplate.update(
+                    "UPDATE product SET current_formula_version_id = ? WHERE product_id = ?",
+                    originalFormulaId,
+                    productId
+            );
+            jdbcTemplate.update(
+                    "DELETE FROM formula_version WHERE formula_version_id = ?",
+                    STALE_FORMULA_ID
+            );
+        }
+    }
+
+    @Test
+    void serializesDecisionAgainstConcurrentFormulaSwitch() throws Exception {
+        createPassedValidation();
+        createReviewFixture();
+        reviewService.submitForReview(LABEL_ID, reviewSubmitter());
+        String productId = jdbcTemplate.queryForObject(
+                "SELECT product_id FROM label_version WHERE label_version_id = ?",
+                String.class,
+                LABEL_ID
+        );
+        String originalFormulaId = jdbcTemplate.queryForObject(
+                "SELECT formula_version_id FROM label_version WHERE label_version_id = ?",
+                String.class,
+                LABEL_ID
+        );
+        jdbcTemplate.update("""
+                INSERT INTO formula_version (
+                    formula_version_id, product_id, version_number,
+                    lifecycle_status, is_current_released, created_by_user_id,
+                    released_by_user_id, released_at, data_provenance_id
+                )
+                SELECT ?, product_id, version_number + 1001, 'RELEASED', 'N',
+                       created_by_user_id, created_by_user_id, NOW(), data_provenance_id
+                FROM formula_version WHERE formula_version_id = ?
+                """,
+                STALE_FORMULA_ID,
+                originalFormulaId
+        );
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        CountDownLatch decisionStarted = new CountDownLatch(1);
+        Future<?> decision;
+        try (Connection connection = dataSource.getConnection()) {
+            connection.setAutoCommit(false);
+            try (PreparedStatement lock = connection.prepareStatement(
+                    "SELECT product_id FROM product WHERE product_id = ? FOR UPDATE"
+            )) {
+                lock.setString(1, productId);
+                lock.executeQuery();
+            }
+            decision = executor.submit(() -> {
+                decisionStarted.countDown();
+                reviewService.recordDecision(
+                        LABEL_ID,
+                        "APPROVE",
+                        "SCRUM-81 concurrent formula switch",
+                        reviewApprover("LABEL.APPROVE")
+                );
+            });
+            assertTrue(decisionStarted.await(10, TimeUnit.SECONDS));
+            try (PreparedStatement update = connection.prepareStatement(
+                    "UPDATE product SET current_formula_version_id = ? WHERE product_id = ?"
+            )) {
+                update.setString(1, STALE_FORMULA_ID);
+                update.setString(2, productId);
+                assertEquals(1, update.executeUpdate());
+            }
+            connection.commit();
+            ExecutionException failure = assertThrows(
+                    ExecutionException.class,
+                    () -> decision.get(10, TimeUnit.SECONDS)
+            );
+            assertTrue(failure.getCause() instanceof LabelVersionConflictException);
+            assertDecisionUnchanged();
+        } finally {
+            executor.shutdownNow();
+            jdbcTemplate.update(
+                    "UPDATE product SET current_formula_version_id = ? WHERE product_id = ?",
+                    originalFormulaId,
+                    productId
+            );
+            jdbcTemplate.update(
+                    "DELETE FROM formula_version WHERE formula_version_id = ?",
+                    STALE_FORMULA_ID
+            );
+        }
+    }
+
+    @Test
+    void rollsBackAllDecisionWritesWhenApprovalRecordInsertFails() {
+        createPassedValidation();
+        createReviewFixture();
+        reviewService.submitForReview(LABEL_ID, reviewSubmitter());
+        doThrow(new IllegalStateException("forced approval record failure"))
+                .when(commandRepository).createApprovalRecord(
+                        eq(LABEL_ID), eq(REVIEW_TASK_ID), eq("APPROVE"),
+                        anyString(), anyString(), anyString());
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> reviewService.recordDecision(
+                        LABEL_ID,
+                        "APPROVE",
+                        "SCRUM-81 transaction rollback regression",
+                        reviewApprover("LABEL.APPROVE")
+                )
+        );
+        assertDecisionUnchanged();
+    }
+
+    private void assertDecisionUnchanged() {
+        assertStatus("PENDING_REVIEW");
+        assertReviewTaskStatus("IN_REVIEW");
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM approval_record WHERE label_version_id = ?",
+                Integer.class, LABEL_ID));
+        assertEquals(0, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM audit_event
+                WHERE entity_type = 'LABEL_VERSION' AND entity_id = ?
+                  AND event_type = 'LABEL_DECISION_RECORDED'
+                """, Integer.class, LABEL_ID));
     }
 
     @Test
@@ -295,16 +521,16 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
         createPassedValidation();
         createReviewFixture();
 
-        workflowRepository.submitForReview(
+        reviewService.submitForReview(
                 LABEL_ID,
-                "user_label_officer"
+                reviewSubmitter()
         );
 
-        workflowRepository.recordDecision(
+        reviewService.recordDecision(
                 LABEL_ID,
                 "APPROVE",
-                "user_approver",
-                "SCRUM-37 publication integration test"
+                "SCRUM-37 publication integration test",
+                reviewApprover("LABEL.APPROVE")
         );
 
         assertStatus("APPROVED");
@@ -585,6 +811,11 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
 
     private void cleanUpTestData() {
         jdbcTemplate.update(
+                "DELETE FROM audit_event WHERE entity_type = 'LABEL_VERSION' AND entity_id = ?",
+                LABEL_ID
+        );
+
+        jdbcTemplate.update(
                 "DELETE FROM approval_record WHERE label_version_id = ?",
                 LABEL_ID
         );
@@ -646,5 +877,44 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
         );
 
         assertEquals(expectedStatus, actualStatus);
+    }
+
+    private AuthenticatedActor reviewSubmitter() {
+        return new AuthenticatedActor(
+                "user_label_officer",
+                "user_label_officer",
+                "Label Officer",
+                Set.of(),
+                Set.of("LABEL.SUBMIT_REVIEW")
+        );
+    }
+
+    private AuthenticatedActor reviewApprover(
+            String permission
+    ) {
+        return new AuthenticatedActor(
+                "user_approver",
+                "user_approver",
+                "Approver",
+                Set.of(),
+                Set.of(permission)
+        );
+    }
+
+    private void assertReviewTaskStatus(
+            String expectedStatus
+    ) {
+        assertEquals(
+                expectedStatus,
+                jdbcTemplate.queryForObject(
+                        """
+                        SELECT status
+                        FROM review_task
+                        WHERE review_task_id = ?
+                        """,
+                        String.class,
+                        REVIEW_TASK_ID
+                )
+        );
     }
 }
