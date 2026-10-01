@@ -15,6 +15,56 @@ tags:
   - name: impact-analysis
 paths:
   /api/v1/change-requests:
+    get:
+      tags: [change-request]
+      operationId: listChangeRequests
+      summary: List recorded INGREDIENT_SPEC changes for the impact selector.
+      description: >-
+        M1 owns the read implementation. Requires the same active identity as the
+        single-item GET in PR #50; CHANGE_REQUEST.CREATE and IMPACT.RUN are not
+        required to read. M4 acceptance of the shared read policy remains pending.
+        Returns a direct array of ChangeRequest resources, ordered by changeRequestId
+        ascending, with no response envelope or total count. Only INGREDIENT_SPEC
+        requests in SUBMITTED, ANALYZED or COMPLETED status are included; DRAFT,
+        CANCELLED and other change types are outside this candidate. Filtering occurs
+        before limit and offset. limit defaults to 50 (1..100); offset defaults to 0
+        (nonnegative). Empty results and offsets beyond the end return 200 with [].
+        A failed or unavailable read is an ApiError, never a successful empty array.
+        Reading does not create a change request, analysis, finding or ReviewTask.
+        Consumers advance offset by limit until a page contains fewer than limit
+        items. Pages are independent reads, not a cross-request snapshot; consumers
+        should refresh from offset 0 after changes and deduplicate by changeRequestId.
+      parameters:
+        - $ref: '#/components/parameters/ChangeRequestListLimit'
+        - $ref: '#/components/parameters/ChangeRequestListOffset'
+      responses:
+        '200':
+          description: A page of recorded changes; an empty page is a successful read.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChangeRequestList'
+              examples:
+                emptyPage:
+                  value: []
+                recordedChanges:
+                  value:
+                    - changeRequestId: 8953f31e-c2f3-4af8-9d50-cc5ed1f86868
+                      changeType: INGREDIENT_SPEC
+                      supplierMaterialId: mat_chocolate_base
+                      previousSpecificationVersionId: spec_chocolate_v1
+                      targetSpecificationVersionId: spec_chocolate_v2
+                      description: Chocolate Base Spec V2 adds soy lecithin.
+                      status: SUBMITTED
+                      createdAt: '2026-09-30T02:00:00Z'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/AuthorizationDenied'
+        '500':
+          $ref: '#/components/responses/InternalError'
     post:
       tags: [change-request]
       operationId: createChangeRequest
@@ -158,6 +208,25 @@ paths:
           $ref: '#/components/responses/InternalError'
 components:
   parameters:
+    ChangeRequestListLimit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum items per page; malformed or out-of-range values return 400 INVALID_REQUEST.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    ChangeRequestListOffset:
+      name: offset
+      in: query
+      required: false
+      description: Items to skip in the filtered ordered collection; malformed or negative values return 400 INVALID_REQUEST.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
     ChangeRequestId:
       name: changeRequestId
       in: path
@@ -298,6 +367,13 @@ components:
     Identifier:
       type: string
       minLength: 1
+    ChangeRequestList:
+      type: array
+      minItems: 0
+      maxItems: 100
+      description: A direct page of ChangeRequest resources, ordered by changeRequestId ascending.
+      items:
+        $ref: '#/components/schemas/ChangeRequest'
     ChangeRequestCreate:
       type: object
       additionalProperties: false

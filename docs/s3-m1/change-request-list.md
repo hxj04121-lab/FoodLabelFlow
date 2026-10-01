@@ -2,14 +2,13 @@
 
 Implementation date: **2026-10-01 (Asia/Shanghai)**. Parent: SCRUM-47 / S3-M1.
 
-Status: **implemented and verified locally; team review pending**.
+Status: **implemented in merged PR #55; cross-module acceptance pending**.
 
 - **Contract:** the route follows M2's collection contract in
-  [PR #52](https://github.com/hxj04121-lab/FoodLabelFlow/pull/52). M1 approved #52, but it is
-  still a draft and not on main.
-- **Why it's ahead of #52:** it is implemented now so M3 can connect the SCRUM-71 selector
-  for the 2 Oct checkpoint. Once #52 merges, the contract tests can also assert this operation
-  against the YAML.
+  [PR #52](https://github.com/hxj04121-lab/FoodLabelFlow/pull/52), approved by M1.
+- **Integration:** #55 provides the backend route for M3's SCRUM-71 selector.
+  The #52 contract tests assert this operation against the YAML; M3 wiring and
+  cross-module acceptance for the 2 Oct checkpoint remain separate verification.
 
 ## Behaviour
 
