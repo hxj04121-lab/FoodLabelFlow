@@ -13,6 +13,6 @@ public interface ImpactAnalysisRunRepository {
 
     Optional<ImpactAnalysisRun> findById(String impactAnalysisRunId);
 
-    /** Every run for the change request, oldest first; the basis for idempotent re-triggering. */
+    /** List shape retained for M1 callers; live persistence permits one analysis per change request. */
     List<ImpactAnalysisRun> findByChangeRequestId(String changeRequestId);
 }
