@@ -4,20 +4,12 @@ import java.util.Optional;
 
 public interface LabelWorkflowRepository {
 
-    Optional<String> findCreatorUserId(String labelVersionId);
-
-    Optional<LabelWorkflowVersion> findVersion(String labelVersionId);
-
-    void submitForReview(
-            String labelVersionId,
-            String actorUserId
+    Optional<String> findCreatorUserId(
+            String labelVersionId
     );
 
-    void recordDecision(
-            String labelVersionId,
-            String decision,
-            String actorUserId,
-            String comments
+    Optional<LabelWorkflowVersion> findVersion(
+            String labelVersionId
     );
 
     record LabelWorkflowVersion(
