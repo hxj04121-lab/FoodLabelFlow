@@ -177,7 +177,7 @@ class Scrum29MySqlIntegrationTest extends MySqlIntegrationTestSupport {
         assertThat(ruleSets.findById("ruleset_us_falcpa_demo_v2")).isPresent();
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE success = TRUE", Integer.class))
-                .isEqualTo(5);
+                .isEqualTo(6);
     }
 
     private RequestAuthorizationAdapter adapter(
