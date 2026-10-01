@@ -14,6 +14,7 @@ import com.spectrace.impact.domain.ImpactAnalysisRun;
 import com.spectrace.impact.domain.ImpactFinding;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -58,6 +59,17 @@ public final class InMemoryImpactPorts {
                             && saved.versionChange().equals(versionChange)
                             && saved.status() != ChangeRequestStatus.CANCELLED)
                     .findFirst();
+        }
+
+        @Override
+        public List<ChangeRequest> findPage(
+                ChangeType changeType, Set<ChangeRequestStatus> statuses, int limit, int offset) {
+            return byId.values().stream()
+                    .filter(saved -> saved.changeType() == changeType && statuses.contains(saved.status()))
+                    .sorted(Comparator.comparing(ChangeRequest::changeRequestId))
+                    .skip(offset)
+                    .limit(limit)
+                    .toList();
         }
 
         public List<ChangeRequest> saved() {
@@ -186,6 +198,12 @@ public final class InMemoryImpactPorts {
         public Optional<SpecificationVersionFacts> lockById(String specificationVersionId) {
             locked.add(specificationVersionId);
             return findById(specificationVersionId);
+        }
+
+        @Override
+        public List<SpecificationVersionFacts> findAllById(Collection<String> specificationVersionIds) {
+            return specificationVersionIds.stream().distinct()
+                    .map(byId::get).filter(Objects::nonNull).toList();
         }
 
         public List<String> locked() {

@@ -1,10 +1,12 @@
 package com.spectrace.impact;
 
 import com.spectrace.audit.application.AuditApplicationService;
+import com.spectrace.catalog.infrastructure.JdbcSpecificationVersionLookupAdapter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -41,8 +43,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 
 /** SCRUM-76: real HTTP, committed MySQL rows and same-transaction audit, with no test-managed transaction. */
 @Testcontainers
@@ -92,6 +96,8 @@ class ChangeRequestApiMySqlTest {
     private JdbcTemplate jdbc;
     @MockitoSpyBean
     private AuditApplicationService audit;
+    @MockitoSpyBean
+    private JdbcSpecificationVersionLookupAdapter specifications;
 
     @BeforeEach
     void clearOutputs() {
@@ -280,6 +286,112 @@ class ChangeRequestApiMySqlTest {
         assertError(response, 500, "INTERNAL_ERROR");
         assertThat(response.body()).doesNotContain("audit store unavailable");
         assertNothingWritten();
+    }
+
+    @Test
+    void listReturnsRecordedIngredientSpecChangesInIdOrderWithTheSingleItemShape() throws Exception {
+        insertListFixture();
+
+        var listed = request("GET", PATH, null, AUDITOR);
+
+        assertThat(listed.statusCode()).as(listed.body()).isEqualTo(200);
+        JsonNode page = JSON.readTree(listed.body());
+        assertThat(ids(page)).containsExactly("cr-list-a", "cr-list-c", "cr-list-e");
+        for (JsonNode item : page) {
+            var single = request("GET", PATH + "/" + item.get("changeRequestId").stringValue(), null, AUDITOR);
+            assertThat(JSON.readTree(single.body())).isEqualTo(item);
+        }
+        assertThat(page.findValuesAsString("supplierMaterialId"))
+                .containsExactly(MATERIAL, MATERIAL, "mat_chocolate_base");
+        assertThat(page.findValuesAsString("status")).containsExactly("SUBMITTED", "COMPLETED", "ANALYZED");
+    }
+
+    @Test
+    void listFiltersBeforePagingAndEndsWithAnEmptyPage() throws Exception {
+        insertListFixture();
+
+        assertThat(listIds("?limit=2")).containsExactly("cr-list-a", "cr-list-c");
+        assertThat(listIds("?limit=2&offset=2")).containsExactly("cr-list-e");
+        assertThat(listIds("?limit=3&offset=0")).containsExactly("cr-list-a", "cr-list-c", "cr-list-e");
+        assertThat(listIds("?limit=3&offset=3")).isEmpty();
+        assertThat(listIds("?offset=5000000000")).isEmpty();
+        assertThat(listIds("?limit=100")).hasSize(3);
+    }
+
+    @Test
+    void anEmptyCollectionIsASuccessfulEmptyArray() throws Exception {
+        var listed = request("GET", PATH, null, AUDITOR);
+
+        assertThat(listed.statusCode()).as(listed.body()).isEqualTo(200);
+        assertThat(listed.body()).isEqualTo("[]");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"limit=0", "limit=101", "limit=-1", "limit=abc", "limit=1.5", "limit=",
+            "offset=-1", "offset=x", "limit=1&limit=2", "status=SUBMITTED", "limit=99999999999999999999"})
+    void invalidPagingIsRejected(String query) throws Exception {
+        assertError(request("GET", PATH + "?" + query, null, AUDITOR), 400, "INVALID_REQUEST");
+    }
+
+    @Test
+    void listingNeedsOnlyAnActiveIdentityAndWritesNothing() throws Exception {
+        insertListFixture();
+        int changeRequests = count("change_request");
+
+        assertError(request("GET", PATH, null, null), 401, "AUTHENTICATION_REQUIRED");
+        assertError(request("GET", PATH, null, "unknown-subject"), 401, "AUTHENTICATION_REQUIRED");
+        var withoutCreatePermission = request("GET", PATH, null, LABEL_OFFICER);
+        assertThat(withoutCreatePermission.statusCode()).as(withoutCreatePermission.body()).isEqualTo(200);
+        assertThat(count("change_request")).isEqualTo(changeRequests);
+        assertThat(count("audit_event")).isZero();
+    }
+
+    @Test
+    void aFailedSpecificationLookupIsAnErrorNotAnEmptyPage() throws Exception {
+        insertListFixture();
+        JdbcSpecificationVersionLookupAdapter target = AopTestUtils.getUltimateTargetObject(specifications);
+        doThrow(new IllegalStateException("catalog read failed")).when(target).findAllById(anyCollection());
+
+        var listed = request("GET", PATH, null, AUDITOR);
+
+        assertError(listed, 500, "INTERNAL_ERROR");
+        assertThat(listed.body()).doesNotContain("catalog read failed");
+    }
+
+    /** Seven rows: three listed, plus DRAFT, CANCELLED, FORMULA and RULE_SET rows that sort first or between. */
+    private void insertListFixture() {
+        insertChange("cr-list-c", "INGREDIENT_SPEC", "COMPLETED", "spec_scrum76_v1", "spec_scrum76_v2");
+        insertChange("cr-list-a", "INGREDIENT_SPEC", "SUBMITTED", "spec_scrum76_v1", "spec_scrum76_v2");
+        insertChange("cr-list-b", "INGREDIENT_SPEC", "DRAFT", "spec_scrum76_v1", "spec_scrum76_v2");
+        insertChange("cr-list-d", "INGREDIENT_SPEC", "CANCELLED", "spec_scrum76_v1", "spec_scrum76_v2");
+        insertChange("cr-list-e", "INGREDIENT_SPEC", "ANALYZED", "spec_scrum76_v2", "spec_chocolate_v1");
+        insertChange("cr-list-0f", "FORMULA", "SUBMITTED", "formula_1106285_v1", "formula_1106963_v1");
+        insertChange("cr-list-0r", "RULE_SET", "SUBMITTED", "ruleset_us_falcpa_demo_v1", "ruleset_us_falcpa_demo_v2");
+    }
+
+    private void insertChange(String id, String type, String status, String from, String to) {
+        String prefix = switch (type) {
+            case "INGREDIENT_SPEC" -> "specification";
+            case "FORMULA" -> "formula";
+            default -> "rule_set";
+        };
+        jdbc.update("INSERT INTO change_request(change_request_id, change_request_code, change_type, status, "
+                        + "requested_at, requested_by_user_id, description, from_" + prefix + "_version_id, to_"
+                        + prefix + "_version_id, data_provenance_id) "
+                        + "VALUES (?, ?, ?, ?, '2026-09-30 02:00:00', 'user_change_manager', ?, ?, ?, "
+                        + "'prov_scenario_input')",
+                id, "CR-" + id, type, status, "List fixture " + id, from, to);
+    }
+
+    private List<String> listIds(String query) throws Exception {
+        var listed = request("GET", PATH + query, null, AUDITOR);
+        assertThat(listed.statusCode()).as(listed.body()).isEqualTo(200);
+        return ids(JSON.readTree(listed.body()));
+    }
+
+    private static List<String> ids(JsonNode page) {
+        assertThat(page.isArray()).isTrue();
+        return page.findValuesAsString("changeRequestId");
     }
 
     private HttpResponse<String> create(String previous, String target, String subject) throws Exception {

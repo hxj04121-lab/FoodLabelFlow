@@ -181,6 +181,53 @@ class ChangeRequestServiceTest {
         assertThatIllegalStateException().isThrownBy(() -> service.get("cr-dangling"));
     }
 
+    @Test
+    void listFiltersBeforePagingAndOrdersByChangeRequestId() {
+        saveRequest("cr-c", ChangeType.INGREDIENT_SPEC, ChangeRequestStatus.COMPLETED, "spec_chocolate_v2");
+        saveRequest("cr-a", ChangeType.INGREDIENT_SPEC, ChangeRequestStatus.SUBMITTED, "spec_chocolate_v2");
+        saveRequest("cr-b", ChangeType.INGREDIENT_SPEC, ChangeRequestStatus.DRAFT, "spec_chocolate_v2");
+        saveRequest("cr-d", ChangeType.INGREDIENT_SPEC, ChangeRequestStatus.CANCELLED, "spec_chocolate_v2");
+        saveRequest("cr-e", ChangeType.INGREDIENT_SPEC, ChangeRequestStatus.ANALYZED, "spec_soy_carrier_v1");
+        changeRequests.save(new ChangeRequest("cr-0-formula", "CR-FORMULA", ChangeType.FORMULA,
+                ChangeRequestStatus.SUBMITTED, NOW, "user_admin", "formula change",
+                new VersionChange("formula-1", "formula-2"), "prov_scenario_input"));
+
+        assertThat(ids(service.list(50, 0))).containsExactly("cr-a", "cr-c", "cr-e");
+        assertThat(ids(service.list(2, 0))).containsExactly("cr-a", "cr-c");
+        assertThat(ids(service.list(2, 2))).containsExactly("cr-e");
+        assertThat(service.list(1, 3)).isEmpty();
+        assertThat(service.list(100, Integer.MAX_VALUE)).isEmpty();
+        assertThat(service.list(50, 0)).extracting(ChangeRequestView::supplierMaterialId)
+                .containsExactly(MATERIAL, MATERIAL, "mat_soy_carrier");
+        assertThat(integration.calls).containsOnly("authenticate");
+    }
+
+    @Test
+    void listBoundsAreCheckedBeforeAuthentication() {
+        assertFailure(() -> service.list(0, 0), 400, "INVALID_REQUEST");
+        assertFailure(() -> service.list(101, 0), 400, "INVALID_REQUEST");
+        assertFailure(() -> service.list(50, -1), 400, "INVALID_REQUEST");
+        assertThat(integration.calls).isEmpty();
+        assertThat(service.list(100, 0)).isEmpty();
+    }
+
+    @Test
+    void aListedRowWithAMissingSpecificationFailsTheWholeRead() {
+        saveRequest("cr-a", ChangeType.INGREDIENT_SPEC, ChangeRequestStatus.SUBMITTED, "spec_chocolate_v2");
+        saveRequest("cr-b", ChangeType.INGREDIENT_SPEC, ChangeRequestStatus.SUBMITTED, "spec_gone");
+
+        assertThatIllegalStateException().isThrownBy(() -> service.list(50, 0)).withMessageContaining("cr-b");
+    }
+
+    private void saveRequest(String id, ChangeType type, ChangeRequestStatus status, String target) {
+        changeRequests.save(new ChangeRequest(id, "CR-" + id, type, status, NOW, "user_admin", DESCRIPTION,
+                new VersionChange("spec_chocolate_v1", target), "prov_scenario_input"));
+    }
+
+    private static List<String> ids(List<ChangeRequestView> views) {
+        return views.stream().map(view -> view.changeRequest().changeRequestId()).toList();
+    }
+
     private static CreateIngredientSpecChange command(String previous, String target) {
         return new CreateIngredientSpecChange(MATERIAL, previous, target, DESCRIPTION);
     }

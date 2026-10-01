@@ -1,6 +1,8 @@
 package com.spectrace.catalog.application.port;
 
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -19,6 +21,9 @@ public interface SpecificationVersionLookupPort {
      * concurrent change requests that target one version are serialised.
      */
     Optional<SpecificationVersionFacts> lockById(String specificationVersionId);
+
+    /** Plain batch read; versions that do not exist are simply absent from the result. */
+    List<SpecificationVersionFacts> findAllById(Collection<String> specificationVersionIds);
 
     record SpecificationVersionFacts(
             String specificationVersionId,

@@ -12,8 +12,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /** Maps VersionChange onto the one typed column pair that chk_change_request_typed_refs_v3 allows. */
 @Repository
@@ -77,6 +81,24 @@ public class JdbcChangeRequestRepository implements ChangeRequestRepository {
                         (row, index) -> map(row),
                         changeType.name(), versionChange.fromVersionId(), versionChange.toVersionId())
                 .stream().findFirst();
+    }
+
+    @Override
+    public List<ChangeRequest> findPage(
+            ChangeType changeType, Set<ChangeRequestStatus> statuses, int limit, int offset) {
+        Objects.requireNonNull(changeType, "changeType");
+        if (statuses.isEmpty() || limit < 1 || offset < 0) {
+            throw new IllegalArgumentException("A page needs at least one status, a positive limit and offset >= 0");
+        }
+        var arguments = new ArrayList<Object>();
+        arguments.add(changeType.name());
+        statuses.stream().map(Enum::name).sorted().forEach(arguments::add);
+        arguments.add(limit);
+        arguments.add(offset);
+        return jdbc.query("SELECT " + COLUMNS + " FROM change_request WHERE change_type = ? AND status IN ("
+                        + String.join(", ", Collections.nCopies(statuses.size(), "?"))
+                        + ") ORDER BY change_request_id LIMIT ? OFFSET ?",
+                (row, index) -> map(row), arguments.toArray());
     }
 
     private static ChangeRequest map(ResultSet row) throws SQLException {

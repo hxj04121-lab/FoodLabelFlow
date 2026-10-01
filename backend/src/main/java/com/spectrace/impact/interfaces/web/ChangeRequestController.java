@@ -4,6 +4,7 @@ import com.spectrace.impact.application.ChangeRequestService;
 import com.spectrace.impact.application.CreateIngredientSpecChange;
 import com.spectrace.impact.application.ImpactFailure;
 import com.spectrace.impact.domain.ChangeType;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,8 +20,10 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.net.URI;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /** HTTP adapter for INGREDIENT_SPEC change requests; business policy stays in ChangeRequestService. */
@@ -35,6 +38,9 @@ public class ChangeRequestController {
     private static final Set<String> CREATE_FIELDS = Set.of(
             "changeType", "supplierMaterialId", "previousSpecificationVersionId",
             "targetSpecificationVersionId", "description");
+    private static final Set<String> LIST_PARAMETERS = Set.of("limit", "offset");
+    // Up to 18 digits always fits a long; the service applies the contract bounds.
+    private static final Pattern NON_NEGATIVE_INTEGER = Pattern.compile("\\d{1,18}");
 
     private final ChangeRequestService changeRequests;
 
@@ -47,6 +53,17 @@ public class ChangeRequestController {
         var created = ChangeRequestResponse.from(changeRequests.create(parseCreate(body)));
         return ResponseEntity.created(URI.create("/api/v1/change-requests/" + created.changeRequestId()))
                 .body(created);
+    }
+
+    @GetMapping
+    public List<ChangeRequestResponse> list(HttpServletRequest request) {
+        Map<String, String[]> parameters = request.getParameterMap();
+        if (!LIST_PARAMETERS.containsAll(parameters.keySet())) {
+            throw ImpactFailure.invalid("This collection accepts only the limit and offset query parameters");
+        }
+        int limit = integerParameter(parameters, "limit", ChangeRequestService.DEFAULT_PAGE_LIMIT);
+        int offset = integerParameter(parameters, "offset", 0);
+        return changeRequests.list(limit, offset).stream().map(ChangeRequestResponse::from).toList();
     }
 
     @GetMapping("/{changeRequestId}")
@@ -78,6 +95,18 @@ public class ChangeRequestController {
                 text(input, "previousSpecificationVersionId"),
                 text(input, "targetSpecificationVersionId"),
                 description);
+    }
+
+    private static int integerParameter(Map<String, String[]> parameters, String name, int defaultValue) {
+        String[] values = parameters.get(name);
+        if (values == null) {
+            return defaultValue;
+        }
+        if (values.length != 1 || !NON_NEGATIVE_INTEGER.matcher(values[0]).matches()) {
+            throw ImpactFailure.invalid(name + " must be a single nonnegative integer");
+        }
+        // A larger offset is past the end of any real table and still reads as an empty page.
+        return (int) Math.min(Long.parseLong(values[0]), Integer.MAX_VALUE);
     }
 
     private static Set<String> fieldNames(JsonNode input) {
