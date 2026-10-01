@@ -49,9 +49,9 @@ paths:
                   value: []
                 recordedChanges:
                   value:
-                    - changeRequestId: cr_chocolate_v2
+                    - changeRequestId: 8953f31e-c2f3-4af8-9d50-cc5ed1f86868
                       changeType: INGREDIENT_SPEC
-                      supplierMaterialId: sm_chocolate
+                      supplierMaterialId: mat_chocolate_base
                       previousSpecificationVersionId: spec_chocolate_v1
                       targetSpecificationVersionId: spec_chocolate_v2
                       description: Chocolate Base Spec V2 adds soy lecithin.

@@ -4,18 +4,21 @@
 
 **Owner:** Cai Runchen / M2
 
-**State:** M2 design decision; implementation and cross-module acceptance pending.
+**State:** M2 candidate approved by M1; backend collection implemented in merged PR #55.
+M3 wiring and cross-module acceptance remain pending.
 
 M2 selects option (a) in [M1's PR #51 thread](https://github.com/hxj04121-lab/FoodLabelFlow/pull/51#discussion_r4140282403):
-add `GET /api/v1/change-requests` to the existing S3 OpenAPI candidate. M1 implements
-the route on top of PR #50; M3 connects the existing selector under SCRUM-71. Loading
+add `GET /api/v1/change-requests` to the existing S3 OpenAPI candidate. M1 implemented
+the route in PR #55 on top of merged PR #50; M3 connects the existing selector under SCRUM-71. Loading
 the impact page must not create a new change request just to display one. The existing
 POST remains available for explicit creation workflows.
 
 ## Contract and rationale
 
-The current-main baseline is `0755d061ee9a0a89ce7854a147c9e49453490f13` (PR #51
-merged). `frontend/src/pages/Impact.tsx` has a disabled selector, context fields and
+The initial decision used main `0755d061ee9a0a89ce7854a147c9e49453490f13` (PR #51
+merged). The 2026-10-01 compatibility refresh uses main
+`a2467c4047783cb2f6ade4f82c4345ca5f56e126` (PR #55 merged).
+`frontend/src/pages/Impact.tsx` has a disabled selector, context fields and
 analysis action, with no API requests. It has no create form for material, before/after
 specification versions or description. A collection read fits that UI and avoids
 adding a new write workflow immediately before the 2 Oct integration checkpoint.
@@ -40,20 +43,18 @@ resource, trigger and error schemas intact. The candidate retains
 
 ## M1 implementation and compatibility
 
-PR #50 was inspected at `19d699ea8d2eb26ac3fd856f6de340214adac75b`. Its controller
-implements only POST and single-item GET; `ChangeRequestService.get` authenticates
-before reading, and filters to `INGREDIENT_SPEC`. Extend that read boundary, controller,
-repository port and JDBC adapter for the paged collection. Join/resolve the target
-specification to obtain `supplierMaterialId`, preserve the recorded immutable version
-IDs, and return the existing resource mapping. Missing required referenced data must
-fail the read rather than silently remove rows or imply no records.
+Merged PR #50 now accepts and preserves the required description on POST and
+single-item GET, and returns the candidate's 422 body-reference and unchanged-version
+errors. The earlier inspection at `19d699e` described pre-remediation differences;
+those differences were fixed before #50 merged.
 
-The new list must return the **latest candidate resource**, not merely copy PR #50's
-older DTO: `ChangeRequestResponse` there lacks the required `description` already added
-in merged PR #48. M1 should expose the stored description on list and single-item reads.
-PR #50's POST also predates the required description and the current 422 body-reference
-and unchanged-version decisions. Those are existing implementation/candidate differences;
-this M2 change does not rewrite those operations or implement their remediation.
+Merged PR #55 adds the paged collection, authenticates before reading, filters before
+paging, orders by `changeRequestId` ascending, and resolves supplier materials in one
+batch per page. List and single-item reads reuse the same eight-field response,
+including the stored description. Missing referenced specifications fail the whole
+read instead of silently dropping rows or returning an empty success. M1's optional
+newest-first ordering suggestion remains a follow-up decision; the candidate and
+implementation retain their agreed ID order.
 
 M1 verification before integration: HTTP tests for defaults, multiple pages and stable
 order, a full last page followed by `[]`, invalid/noninteger limits and offsets, no rows,
@@ -83,6 +84,14 @@ work remain pending; this clarification does not complete either Jira issue. The
 8 Oct main-path E2E and 9 Oct Sprint Review/Retrospective milestones are unchanged.
 
 ## Validation of this M2 change
+
+The 2026-10-01 refresh merged main `a2467c4`, kept the implemented ID ordering,
+updated the #50/#55 compatibility notes and example identifiers, and removed
+assertions on human-readable description wording. With the existing JDK 25.0.4
+and offline Maven cache, `S3ImpactApiContractTest`, `OpenApiContractTest`,
+`SharedApiErrorContractTest` and `ChangeRequestServiceTest` completed **28 tests,
+0 failures/errors/skips; BUILD SUCCESS**. MySQL and full-stack validation are
+provided by the refreshed PR CI, not this focused local run.
 
 Local checks on 2026-09-30 used installed JDK 25.0.4 (compiler release 21) and the
 existing Maven cache offline. No software was installed. The executed command was:

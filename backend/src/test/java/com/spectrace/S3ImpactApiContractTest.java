@@ -92,10 +92,6 @@ class S3ImpactApiContractTest {
         assertThat(page).containsEntry("type", "array").containsEntry("minItems", 0)
                 .containsEntry("maxItems", 100);
         assertThat(valueAt(page, "items", "$ref")).isEqualTo("#/components/schemas/ChangeRequest");
-        assertThat(list.get("description").toString())
-                .contains("same active identity", "M4 acceptance", "changeRequestId ascending",
-                        "SUBMITTED, ANALYZED or COMPLETED", "Filtering occurs before limit and offset",
-                        "200 with []", "never a successful empty array", "not a cross-request snapshot");
     }
 
     @Test
