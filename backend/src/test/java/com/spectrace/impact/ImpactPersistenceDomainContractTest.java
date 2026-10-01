@@ -86,4 +86,3 @@ class ImpactPersistenceDomainContractTest {
                 "label-v1", classification, missingCodes, "explanation", "provenance-1");
     }
 }
-
