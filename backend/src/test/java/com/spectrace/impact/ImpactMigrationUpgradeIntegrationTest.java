@@ -16,7 +16,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ImpactMigrationUpgradeIntegrationTest {
 
     @Container
-    private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4.11");
+    private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.4.11")
+            .withDatabaseName("spectrace");
 
     @Test
     void upgradeFromAppliedV5PreservesRunsEvenWhenOldKeysSwapDuringBackfill() {
