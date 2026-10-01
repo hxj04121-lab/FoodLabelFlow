@@ -154,6 +154,12 @@ public class LabelReviewService {
             );
         }
 
+        if (!target.currentFormula()) {
+            throw new LabelVersionConflictException(
+                    "Label formula version is no longer current: "
+                            + labelVersionId
+            );
+        }
 
         transitionPolicy.requireTransition(
                 target.lifecycleStatus(),
@@ -184,6 +190,22 @@ public class LabelReviewService {
             );
         }
 
+        String reviewTaskStatus =
+                "REQUEST_CHANGES".equals(decision)
+                        ? "OPEN"
+                        : "CLOSED";
+
+        int taskUpdated = repository.updateReviewTaskStatus(
+                target.reviewTaskId(),
+                reviewTaskStatus
+        );
+
+        if (taskUpdated != 1) {
+            throw new IllegalStateException(
+                    "ReviewTask decision transition failed"
+            );
+        }
+
         repository.createApprovalRecord(
                 labelVersionId,
                 target.reviewTaskId(),
@@ -201,4 +223,5 @@ public class LabelReviewService {
                 actor.userId(),
                 target.dataProvenanceId()
         );
-    }}
+    }
+}

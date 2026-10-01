@@ -213,44 +213,85 @@ public class JdbcLabelReviewCommandRepository
     public Optional<DecisionTarget> lockForDecision(
             String labelVersionId
     ) {
+        jdbc.query(
+            """
+            SELECT p.product_id
+            FROM product p
+            JOIN label_version lv
+              ON lv.product_id = p.product_id
+            WHERE lv.label_version_id = ?
+            FOR UPDATE
+            """,
+            rs -> rs.next()
+                    ? rs.getString("product_id")
+                    : null,
+            labelVersionId
+        );
+
         return jdbc.query(
-                """
-                SELECT
-                    lv.label_version_id,
-                    lv.lifecycle_status,
-                    lv.created_by_user_id,
-                    lv.data_provenance_id,
-                    rt.review_task_id,
-                    CASE
-                        WHEN EXISTS (
-                            SELECT 1
-                            FROM label_version newer
-                            WHERE newer.product_id = lv.product_id
-                              AND newer.jurisdiction_code = lv.jurisdiction_code
-                              AND newer.version_number > lv.version_number
-                        ) THEN 0
-                        ELSE 1
-                    END AS is_current
-                FROM label_version lv
-                LEFT JOIN review_task rt
-                  ON rt.draft_label_version_id = lv.label_version_id
-                 AND rt.status = 'IN_REVIEW'
-                WHERE lv.label_version_id = ?
-                FOR UPDATE
-                """,
-                rs -> rs.next()
-                        ? Optional.of(
-                                new DecisionTarget(
-                                        rs.getString("label_version_id"),
-                                        rs.getString("lifecycle_status"),
-                                        rs.getString("created_by_user_id"),
-                                        rs.getString("review_task_id"),
-                                        rs.getBoolean("is_current"),
-                                        rs.getString("data_provenance_id")
-                                )
-                        )
-                        : Optional.empty(),
-                labelVersionId
+            """
+            SELECT
+                lv.label_version_id,
+                lv.lifecycle_status,
+                lv.created_by_user_id,
+                lv.data_provenance_id,
+                rt.review_task_id,
+                CASE
+                    WHEN lv.formula_version_id =
+                         p.current_formula_version_id
+                    THEN 1
+                    ELSE 0
+                END AS is_current_formula,
+                CASE
+                    WHEN EXISTS (
+                        SELECT 1
+                        FROM label_version newer
+                        WHERE newer.product_id = lv.product_id
+                          AND newer.jurisdiction_code =
+                              lv.jurisdiction_code
+                          AND newer.version_number >
+                              lv.version_number
+                    ) THEN 0
+                    ELSE 1
+                END AS is_current
+            FROM label_version lv
+            JOIN product p
+              ON p.product_id = lv.product_id
+            LEFT JOIN review_task rt
+              ON rt.draft_label_version_id =
+                 lv.label_version_id
+             AND rt.status = 'IN_REVIEW'
+            WHERE lv.label_version_id = ?
+            FOR UPDATE
+            """,
+            rs -> rs.next()
+                    ? Optional.of(
+                            new DecisionTarget(
+                                    rs.getString(
+                                            "label_version_id"
+                                    ),
+                                    rs.getString(
+                                            "lifecycle_status"
+                                    ),
+                                    rs.getString(
+                                            "created_by_user_id"
+                                    ),
+                                    rs.getString(
+                                            "review_task_id"
+                                    ),
+                                    rs.getBoolean(
+                                            "is_current"
+                                    ),
+                                    rs.getBoolean(
+                                            "is_current_formula"
+                                    ),
+                                    rs.getString(
+                                            "data_provenance_id"
+                                    )
+                            )
+                    )
+                    : Optional.empty(),
+            labelVersionId
         );
     }
 
@@ -268,6 +309,22 @@ public class JdbcLabelReviewCommandRepository
                 """,
                 newStatus,
                 labelVersionId
+        );
+    }
+    @Override
+    public int updateReviewTaskStatus(
+            String reviewTaskId,
+            String newStatus
+    ) {
+        return jdbc.update(
+                """
+                UPDATE review_task
+                SET status = ?
+                WHERE review_task_id = ?
+                  AND status = 'IN_REVIEW'
+                """,
+                newStatus,
+                reviewTaskId
         );
     }
 

@@ -37,6 +37,11 @@ public interface LabelReviewCommandRepository {
             String newStatus
     );
 
+    int updateReviewTaskStatus(
+            String reviewTaskId,
+            String newStatus
+    );
+
     void createApprovalRecord(
             String labelVersionId,
             String reviewTaskId,
@@ -61,6 +66,7 @@ public interface LabelReviewCommandRepository {
             String creatorUserId,
             String reviewTaskId,
             boolean current,
+            boolean currentFormula,
             String dataProvenanceId
     ) {
     }

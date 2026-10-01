@@ -195,6 +195,7 @@ class LabelReviewServiceTest {
                                 "user_creator",
                                 "review_1",
                                 true,
+                                true,
                                 "prov_1"
                         )
                 ));
@@ -270,6 +271,7 @@ class LabelReviewServiceTest {
                                 "user_creator",
                                 "review_1",
                                 true,
+                                true,
                                 "prov_1"
                         )
                 ));
@@ -288,6 +290,11 @@ class LabelReviewServiceTest {
                 "REJECTED"
         )).thenReturn(1);
 
+        when(repository.updateReviewTaskStatus(
+                "review_1",
+                "CLOSED"
+        )).thenReturn(1);
+
         service.recordDecision(
                 "label_v1",
                 "REJECT",
@@ -298,6 +305,11 @@ class LabelReviewServiceTest {
         verify(repository).updateDecisionState(
                 "label_v1",
                 "REJECTED"
+        );
+
+        verify(repository).updateReviewTaskStatus(
+                "review_1",
+                "CLOSED"
         );
 
         verify(repository).createApprovalRecord(
@@ -317,4 +329,43 @@ class LabelReviewServiceTest {
                 "user_reviewer",
                 "prov_1"
         );
-    }}
+    }
+
+    @Test
+    void rejectsDecisionWhenCurrentFormulaIsStaleBeforeMutation() {
+        when(repository.lockForDecision("label_v1"))
+                .thenReturn(Optional.of(
+                        new LabelReviewCommandRepository.DecisionTarget(
+                                "label_v1",
+                                "PENDING_REVIEW",
+                                "user_creator",
+                                "review_1",
+                                true,
+                                false,
+                                "prov_1"
+                        )
+                ));
+        AuthenticatedActor rejector = new AuthenticatedActor(
+                "user_reviewer",
+                "reviewer",
+                "Reviewer",
+                Set.of(),
+                Set.of("LABEL.REJECT")
+        );
+
+        assertThrows(
+                LabelVersionConflictException.class,
+                () -> service.recordDecision(
+                        "label_v1",
+                        "REJECT",
+                        "stale formula",
+                        rejector
+                )
+        );
+
+        verify(repository, never())
+                .updateDecisionState(anyString(), anyString());
+        verify(repository, never())
+                .updateReviewTaskStatus(anyString(), anyString());
+    }
+}
