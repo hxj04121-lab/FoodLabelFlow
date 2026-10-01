@@ -1,8 +1,10 @@
 package com.spectrace.impact.infrastructure;
 
+import com.spectrace.impact.application.ImpactRunAlreadyExistsException;
 import com.spectrace.impact.application.port.ImpactAnalysisRunRepository;
 import com.spectrace.impact.domain.ImpactAnalysisRun;
 import com.spectrace.impact.domain.ImpactRunStatus;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -36,19 +38,33 @@ public class JdbcImpactAnalysisRunRepository implements ImpactAnalysisRunReposit
 
     @Override
     public void save(ImpactAnalysisRun run) {
-        int updated = jdbcTemplate.update(
-                INSERT,
-                run.impactAnalysisRunId(),
-                run.runCode(),
-                run.changeRequestId(),
-                idempotencyKey(run),
-                run.ruleSetVersionId(),
-                run.status().name(),
-                ImpactJdbcValueMapping.writeUtcDateTime(run.startedAt()),
-                run.completedAt() == null ? null : ImpactJdbcValueMapping.writeUtcDateTime(run.completedAt()),
-                run.executedByUserId(),
-                run.dataProvenanceId()
-        );
+        int updated;
+        try {
+            updated = jdbcTemplate.update(
+                    INSERT,
+                    run.impactAnalysisRunId(),
+                    run.runCode(),
+                    run.changeRequestId(),
+                    idempotencyKey(run),
+                    run.ruleSetVersionId(),
+                    run.status().name(),
+                    ImpactJdbcValueMapping.writeUtcDateTime(run.startedAt()),
+                    run.completedAt() == null ? null : ImpactJdbcValueMapping.writeUtcDateTime(run.completedAt()),
+                    run.executedByUserId(),
+                    run.dataProvenanceId()
+            );
+        } catch (DuplicateKeyException duplicate) {
+            // An insert waits for a concurrent winner to commit. Use a current locking
+            // read here so a previously established REPEATABLE READ snapshot cannot hide it.
+            List<ImpactAnalysisRun> existing = jdbcTemplate.query(
+                    SELECT.formatted("change_request_id") + " FOR SHARE",
+                    this::mapImpactAnalysisRun, run.changeRequestId());
+            if (!existing.isEmpty()) {
+                throw new ImpactRunAlreadyExistsException(existing.getFirst(), duplicate);
+            }
+            // A collision on another run's ID/code is not an idempotent replay.
+            throw duplicate;
+        }
         if (updated != 1) {
             throw new IllegalStateException("Expected one impact analysis run row to be inserted");
         }
@@ -94,6 +110,6 @@ public class JdbcImpactAnalysisRunRepository implements ImpactAnalysisRunReposit
     }
 
     private static String idempotencyKey(ImpactAnalysisRun run) {
-        return "impact-analysis:" + run.runCode();
+        return "impact-analysis:" + run.changeRequestId();
     }
 }

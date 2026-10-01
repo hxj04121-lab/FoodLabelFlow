@@ -8,6 +8,7 @@ import java.util.Optional;
 /** Implemented by M5 (SCRUM-51); writes join the caller's transaction. */
 public interface ImpactAnalysisRunRepository {
 
+    /** A duplicate change request raises ImpactRunAlreadyExistsException with the committed winner. */
     void save(ImpactAnalysisRun run);
 
     Optional<ImpactAnalysisRun> findById(String impactAnalysisRunId);
