@@ -16,13 +16,24 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /** Creates and reads INGREDIENT_SPEC change requests (SCRUM-76). */
 public class ChangeRequestService {
     /** Seeded provenance for change requests entered for the class scenario. */
     public static final String CHANGE_REQUEST_PROVENANCE = "prov_scenario_input";
+    public static final int DEFAULT_PAGE_LIMIT = 50;
+    public static final int MAX_PAGE_LIMIT = 100;
+    /** The collection lists recorded changes only; DRAFT and CANCELLED stay out of the selector. */
+    static final Set<ChangeRequestStatus> LISTED_STATUSES = EnumSet.of(
+            ChangeRequestStatus.SUBMITTED, ChangeRequestStatus.ANALYZED, ChangeRequestStatus.COMPLETED);
 
     private final ChangeRequestRepository changeRequests;
     private final SpecificationVersionLookupPort specifications;
@@ -114,6 +125,35 @@ public class ChangeRequestService {
                 .orElseThrow(() -> new IllegalStateException(
                         "Change request " + changeRequestId + " references a missing specification version"));
         return new ChangeRequestView(request, materialId);
+    }
+
+    /**
+     * One page of recorded INGREDIENT_SPEC changes for the impact selector. A missing
+     * specification behind a row fails the read; rows are never silently dropped.
+     */
+    @Transactional(readOnly = true)
+    public List<ChangeRequestView> list(int limit, int offset) {
+        if (limit < 1 || limit > MAX_PAGE_LIMIT || offset < 0) {
+            throw ImpactFailure.invalid("limit must be 1.." + MAX_PAGE_LIMIT + " and offset must be nonnegative");
+        }
+        integration.authenticate();
+        List<ChangeRequest> page = changeRequests.findPage(ChangeType.INGREDIENT_SPEC, LISTED_STATUSES, limit, offset);
+        Map<String, String> materialByTarget = specifications.findAllById(
+                        page.stream().map(request -> request.versionChange().toVersionId()).toList())
+                .stream()
+                .collect(Collectors.toMap(SpecificationVersionFacts::specificationVersionId,
+                        SpecificationVersionFacts::supplierMaterialId));
+        return page.stream().map(request -> new ChangeRequestView(request, requiredMaterial(
+                materialByTarget::get, request))).toList();
+    }
+
+    private static String requiredMaterial(Function<String, String> materialByTarget, ChangeRequest request) {
+        String materialId = materialByTarget.apply(request.versionChange().toVersionId());
+        if (materialId == null) {
+            throw new IllegalStateException(
+                    "Change request " + request.changeRequestId() + " references a missing specification version");
+        }
+        return materialId;
     }
 
     private static void requireMaterial(String materialId, SpecificationVersionFacts specification) {

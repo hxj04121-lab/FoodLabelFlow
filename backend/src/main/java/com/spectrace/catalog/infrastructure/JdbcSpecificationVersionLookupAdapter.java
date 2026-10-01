@@ -6,6 +6,9 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static com.spectrace.shared.contract.ContractValues.requiredText;
@@ -13,12 +16,12 @@ import static com.spectrace.shared.contract.ContractValues.requiredText;
 /** Catalog-owned specification reads behind the change-request port; callers never join these tables. */
 @Repository
 public class JdbcSpecificationVersionLookupAdapter implements SpecificationVersionLookupPort {
-    private static final String SELECT = """
+    private static final String COLUMNS = """
             SELECT specification_version_id, supplier_material_id, version_number,
                    lifecycle_status, effective_date
             FROM ingredient_specification_version
-            WHERE specification_version_id = ?
             """;
+    private static final String SELECT = COLUMNS + "WHERE specification_version_id = ?\n";
 
     private final JdbcTemplate jdbc;
 
@@ -42,6 +45,18 @@ public class JdbcSpecificationVersionLookupAdapter implements SpecificationVersi
     @Override
     public Optional<SpecificationVersionFacts> lockById(String specificationVersionId) {
         return query(SELECT + "FOR UPDATE", specificationVersionId);
+    }
+
+    @Override
+    public List<SpecificationVersionFacts> findAllById(Collection<String> specificationVersionIds) {
+        List<String> ids = specificationVersionIds.stream()
+                .map(id -> requiredText(id, "specificationVersionId")).distinct().toList();
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.query(COLUMNS + "WHERE specification_version_id IN ("
+                        + String.join(", ", Collections.nCopies(ids.size(), "?")) + ")",
+                (row, index) -> map(row), ids.toArray());
     }
 
     private Optional<SpecificationVersionFacts> query(String sql, String specificationVersionId) {
