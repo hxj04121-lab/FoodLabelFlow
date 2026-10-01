@@ -1,9 +1,11 @@
 package com.spectrace.impact;
 
+import com.spectrace.catalog.application.port.RelevantProductLookupPort.RelevantProduct;
+import com.spectrace.catalog.application.port.SpecificationVersionLookupPort.Lifecycle;
+import com.spectrace.catalog.application.port.SpecificationVersionLookupPort.SpecificationVersionFacts;
 import com.spectrace.impact.application.port.ImpactIntegration.Permission;
-import com.spectrace.impact.application.port.RelevantProductLookupPort.RelevantProduct;
 import com.spectrace.impact.application.port.ReviewTaskPort.OpenReviewTask;
-import com.spectrace.impact.application.port.SpecificationVersionLookupPort.SpecificationVersionFacts;
+import com.spectrace.impact.domain.ChangeType;
 import com.spectrace.impact.domain.ChangeRequest.VersionChange;
 import com.spectrace.impact.domain.ImpactAnalysisRun;
 import com.spectrace.impact.domain.ImpactClassification;
@@ -14,6 +16,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -45,6 +48,12 @@ class ImpactPortContractTest {
 
         assertThat(repository.findById("cr-1")).contains(request);
         assertThat(repository.findById("missing")).isEmpty();
+        assertThat(repository.findOpenByVersionChange(ChangeType.INGREDIENT_SPEC, new VersionChange("spec-1", "spec-2")))
+                .contains(request);
+        assertThat(repository.findOpenByVersionChange(ChangeType.INGREDIENT_SPEC, new VersionChange("spec-2", "spec-1")))
+                .isEmpty();
+        assertThat(repository.findOpenByVersionChange(ChangeType.FORMULA, new VersionChange("spec-1", "spec-2")))
+                .isEmpty();
         assertThatIllegalStateException().isThrownBy(() -> repository.save(request));
     }
 
@@ -126,16 +135,28 @@ class ImpactPortContractTest {
     }
 
     @Test
-    void specificationVersionsAreExactLookups() {
-        var released = new SpecificationVersionFacts("spec_chocolate_v2", "mat_chocolate_base", 2, true);
+    void specificationVersionsAreExactLookupsWithEffectiveDates() {
+        LocalDate effective = LocalDate.of(2026, 9, 1);
+        var released = new SpecificationVersionFacts(
+                "spec_chocolate_v2", "mat_chocolate_base", 2, Lifecycle.RELEASED, effective);
         var lookup = new InMemoryImpactPorts.SpecificationVersions().add(released);
 
         assertThat(lookup.findById("spec_chocolate_v2")).contains(released);
+        assertThat(lookup.lockById("spec_chocolate_v2")).contains(released);
+        assertThat(lookup.locked()).containsExactly("spec_chocolate_v2");
         assertThat(lookup.findById("spec_chocolate_v3")).isEmpty();
+        assertThat(lookup.supplierMaterialExists("mat_chocolate_base")).isTrue();
+        assertThat(lookup.supplierMaterialExists("mat_unknown")).isFalse();
+        assertThat(released.isEffectiveOn(effective)).isTrue();
+        assertThat(released.isEffectiveOn(effective.minusDays(1))).isFalse();
         assertThatIllegalArgumentException().isThrownBy(() ->
-                new SpecificationVersionFacts("spec-1", "mat-1", 0, true));
+                new SpecificationVersionFacts("spec-1", "mat-1", 0, Lifecycle.RELEASED, effective));
         assertThatIllegalArgumentException().isThrownBy(() ->
-                new SpecificationVersionFacts("spec-1", " ", 1, false));
+                new SpecificationVersionFacts("spec-1", " ", 1, Lifecycle.DRAFT, effective));
+        assertThatNullPointerException().isThrownBy(() ->
+                new SpecificationVersionFacts("spec-1", "mat-1", 1, null, effective));
+        assertThatNullPointerException().isThrownBy(() ->
+                new SpecificationVersionFacts("spec-1", "mat-1", 1, Lifecycle.RELEASED, null));
     }
 
     private static ImpactAnalysisRun run(String runId, String runCode, String changeRequestId, Instant startedAt) {
