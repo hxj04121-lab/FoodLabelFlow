@@ -1,5 +1,11 @@
 package com.spectrace.workflow;
 
+import com.spectrace.identity.domain.AuthenticatedActor;
+
+import java.util.Set;
+
+import com.spectrace.workflow.application.LabelReviewService;
+
 import com.spectrace.support.MySqlIntegrationTestSupport;
 import com.spectrace.workflow.application.port.LabelWorkflowRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -19,6 +25,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
+
+    @Autowired
+    private LabelReviewService reviewService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -163,11 +172,11 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     @Test
     void rejectsSubmitWithoutPassedValidation() {
         assertThrows(
-                DataAccessException.class,
-                () -> workflowRepository.submitForReview(
-                        LABEL_ID,
-                        "user_label_officer"
-                )
+                IllegalStateException.class,
+                () -> reviewService.submitForReview(
+                LABEL_ID,
+                reviewSubmitter()
+        )
         );
 
         assertStatus("DRAFT");
@@ -176,13 +185,13 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     @Test
     void rejectsDecisionWithoutPendingReviewTask() {
         assertThrows(
-                DataAccessException.class,
-                () -> workflowRepository.recordDecision(
-                        LABEL_ID,
-                        "APPROVE",
-                        "user_approver",
-                        "Invalid transition test"
-                )
+                IllegalStateException.class,
+                () -> reviewService.recordDecision(
+                LABEL_ID,
+                "APPROVE",
+                "Invalid transition test",
+                reviewApprover("LABEL.APPROVE")
+        )
         );
 
         assertStatus("DRAFT");
@@ -192,9 +201,9 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     void allowsDraftToPendingReviewAfterPassedValidation() {
         createPassedValidation();
 
-        workflowRepository.submitForReview(
+        reviewService.submitForReview(
                 LABEL_ID,
-                "user_label_officer"
+                reviewSubmitter()
         );
 
         assertStatus("PENDING_REVIEW");
@@ -204,19 +213,19 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     void rejectsSecondSubmitAfterPendingReview() {
         createPassedValidation();
 
-        workflowRepository.submitForReview(
+        reviewService.submitForReview(
                 LABEL_ID,
-                "user_label_officer"
+                reviewSubmitter()
         );
 
         assertStatus("PENDING_REVIEW");
 
         assertThrows(
-                DataAccessException.class,
-                () -> workflowRepository.submitForReview(
-                        LABEL_ID,
-                        "user_label_officer"
-                )
+                IllegalStateException.class,
+                () -> reviewService.submitForReview(
+                LABEL_ID,
+                reviewSubmitter()
+        )
         );
 
         assertStatus("PENDING_REVIEW");
@@ -226,21 +235,21 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     void rejectsApprovalAfterAlreadyPendingReviewWithoutReviewTask() {
         createPassedValidation();
 
-        workflowRepository.submitForReview(
+        reviewService.submitForReview(
                 LABEL_ID,
-                "user_label_officer"
+                reviewSubmitter()
         );
 
         assertStatus("PENDING_REVIEW");
 
         assertThrows(
-                DataAccessException.class,
-                () -> workflowRepository.recordDecision(
-                        LABEL_ID,
-                        "APPROVE",
-                        "user_approver",
-                        "No review task exists"
-                )
+                IllegalStateException.class,
+                () -> reviewService.recordDecision(
+                LABEL_ID,
+                "APPROVE",
+                "No review task exists",
+                reviewApprover("LABEL.APPROVE")
+        )
         );
 
         assertStatus("PENDING_REVIEW");
@@ -251,18 +260,18 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
         createPassedValidation();
         createReviewFixture();
 
-        workflowRepository.submitForReview(
+        reviewService.submitForReview(
                 LABEL_ID,
-                "user_label_officer"
+                reviewSubmitter()
         );
 
         assertStatus("PENDING_REVIEW");
 
-        workflowRepository.recordDecision(
+        reviewService.recordDecision(
                 LABEL_ID,
                 "APPROVE",
-                "user_approver",
-                "SCRUM-37 approval integration test"
+                "SCRUM-37 approval integration test",
+                reviewApprover("LABEL.APPROVE")
         );
 
         assertStatus("APPROVED");
@@ -273,18 +282,18 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
         createPassedValidation();
         createReviewFixture();
 
-        workflowRepository.submitForReview(
+        reviewService.submitForReview(
                 LABEL_ID,
-                "user_label_officer"
+                reviewSubmitter()
         );
 
         assertStatus("PENDING_REVIEW");
 
-        workflowRepository.recordDecision(
+        reviewService.recordDecision(
                 LABEL_ID,
                 "REQUEST_CHANGES",
-                "user_approver",
-                "SCRUM-37 request changes integration test"
+                "SCRUM-37 request changes integration test",
+                reviewApprover("LABEL.REQUEST_CHANGES")
         );
 
         assertStatus("DRAFT");
@@ -295,16 +304,16 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
         createPassedValidation();
         createReviewFixture();
 
-        workflowRepository.submitForReview(
+        reviewService.submitForReview(
                 LABEL_ID,
-                "user_label_officer"
+                reviewSubmitter()
         );
 
-        workflowRepository.recordDecision(
+        reviewService.recordDecision(
                 LABEL_ID,
                 "APPROVE",
-                "user_approver",
-                "SCRUM-37 publication integration test"
+                "SCRUM-37 publication integration test",
+                reviewApprover("LABEL.APPROVE")
         );
 
         assertStatus("APPROVED");
@@ -647,4 +656,25 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
 
         assertEquals(expectedStatus, actualStatus);
     }
-}
+
+    private AuthenticatedActor reviewSubmitter() {
+        return new AuthenticatedActor(
+                "user_label_officer",
+                "user_label_officer",
+                "Label Officer",
+                Set.of(),
+                Set.of("LABEL.SUBMIT_REVIEW")
+        );
+    }
+
+    private AuthenticatedActor reviewApprover(
+            String permission
+    ) {
+        return new AuthenticatedActor(
+                "user_approver",
+                "user_approver",
+                "Approver",
+                Set.of(),
+                Set.of(permission)
+        );
+    }}
