@@ -7,7 +7,8 @@ ALTER TABLE impact_analysis_run
 -- Old run-code keys can coincide with another row's new change-request key.
 -- Guard the business key first, then rebuild this index after the backfill.
 UPDATE impact_analysis_run
-SET idempotency_key = CONCAT('impact-analysis:', change_request_id);
+SET idempotency_key = CONCAT('impact-analysis:', change_request_id)
+WHERE idempotency_key <> CONCAT('impact-analysis:', change_request_id);
 
 ALTER TABLE impact_analysis_run
   ADD CONSTRAINT uq_impact_run_idempotency_key_v6 UNIQUE (idempotency_key);
