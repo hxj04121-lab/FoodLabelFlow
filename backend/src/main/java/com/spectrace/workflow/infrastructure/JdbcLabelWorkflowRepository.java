@@ -1,8 +1,6 @@
 package com.spectrace.workflow.infrastructure;
 
-import com.spectrace.label.application.LabelVersionConflictException;
 import com.spectrace.workflow.application.port.LabelWorkflowRepository;
-import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -94,62 +92,5 @@ public class JdbcLabelWorkflowRepository
                         : Optional.empty(),
                 labelVersionId
         );
-    }
-
-    @Override
-    public void submitForReview(
-            String labelVersionId,
-            String actorUserId
-    ) {
-        try {
-            jdbcTemplate.update(
-                    "CALL sp_submit_label_for_review(?, ?)",
-                    labelVersionId,
-                    actorUserId
-            );
-        } catch (DataAccessException error) {
-            throw mapVersionConflict(error);
-        }
-    }
-
-    @Override
-    public void recordDecision(
-            String labelVersionId,
-            String decision,
-            String actorUserId,
-            String comments
-    ) {
-        try {
-            jdbcTemplate.update(
-                    "CALL sp_record_label_decision(?, ?, ?, ?)",
-                    labelVersionId,
-                    actorUserId,
-                    decision,
-                    comments
-            );
-        } catch (DataAccessException error) {
-            throw mapVersionConflict(error);
-        }
-    }
-
-    private RuntimeException mapVersionConflict(
-            DataAccessException error
-    ) {
-        Throwable cause = error.getMostSpecificCause();
-
-        String message = cause == null
-                ? error.getMessage()
-                : cause.getMessage();
-
-        if (message != null
-                && message.contains(
-                        "LABEL_VERSION_CONFLICT"
-                )) {
-            return new LabelVersionConflictException(
-                    "Label version is stale or historical"
-            );
-        }
-
-        return error;
     }
 }

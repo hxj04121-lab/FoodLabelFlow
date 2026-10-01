@@ -6,6 +6,12 @@ import java.util.Objects;
 
 import static com.spectrace.shared.contract.ContractValues.requiredText;
 
+/**
+ * The classified impact on one relevant product. currentFormulaVersionId is the
+ * formula behind the published label; proposedFormulaVersionId is the adopted N+1,
+ * or null when none exists. missingAllergenCodes is sorted, so equal inputs give
+ * equal findings, and is empty exactly when the classification is NO_ACTION.
+ */
 public record ImpactFinding(
         String impactFindingId,
         String impactAnalysisRunId,

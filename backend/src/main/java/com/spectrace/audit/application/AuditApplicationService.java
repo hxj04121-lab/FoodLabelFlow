@@ -2,6 +2,7 @@ package com.spectrace.audit.application;
 
 import com.spectrace.audit.application.port.AuditEventPort;
 import com.spectrace.audit.application.port.ImpactAuditEventPort;
+import com.spectrace.audit.application.port.ImpactAuditPort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -10,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
 
 @Service
-public class AuditApplicationService implements AuditEventPort, ImpactAuditEventPort {
+public class AuditApplicationService implements AuditEventPort, ImpactAuditPort, ImpactAuditEventPort {
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -67,6 +68,27 @@ public class AuditApplicationService implements AuditEventPort, ImpactAuditEvent
                 validationRunId,
                 provenanceId
         );
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordImpactEvent(
+            String actorId,
+            String eventType,
+            String entityType,
+            String entityId,
+            String correlationId,
+            String provenanceId
+    ) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO audit_event(
+                  audit_event_id, event_type, entity_type, entity_id, event_at,
+                  actor_user_id, event_payload, correlation_id, data_provenance_id
+                ) VALUES (?, ?, ?, ?, UTC_TIMESTAMP(), ?, JSON_OBJECT(), ?, ?)
+                """,
+                UUID.randomUUID().toString(), eventType, entityType, entityId,
+                actorId, correlationId, provenanceId);
     }
 
     @Override

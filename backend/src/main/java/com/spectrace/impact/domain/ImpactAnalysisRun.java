@@ -5,6 +5,7 @@ import java.util.Objects;
 
 import static com.spectrace.shared.contract.ContractValues.requiredText;
 
+/** One execution of impact analysis for a change request against an exact rule-set version. */
 public record ImpactAnalysisRun(
         String impactAnalysisRunId,
         String runCode,

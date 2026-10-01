@@ -1,11 +1,13 @@
 package com.spectrace.impact.domain;
 
+/** V2 impact_analysis_run.status tokens. */
 public enum ImpactRunStatus {
     QUEUED,
     RUNNING,
     COMPLETED,
     FAILED;
 
+    /** A terminal run has a completion time and accepts no further findings. */
     public boolean isTerminal() {
         return this == COMPLETED || this == FAILED;
     }

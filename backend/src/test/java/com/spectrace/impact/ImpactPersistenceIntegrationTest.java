@@ -1,5 +1,6 @@
 package com.spectrace.impact;
 
+import com.spectrace.impact.application.ImpactRunAlreadyExistsException;
 import com.spectrace.impact.application.port.ImpactAnalysisRunRepository;
 import com.spectrace.impact.application.port.ImpactFindingRepository;
 import com.spectrace.impact.application.port.ReviewTaskLinkageRepository;
@@ -79,26 +80,46 @@ class ImpactPersistenceIntegrationTest extends MySqlIntegrationTestSupport {
     }
 
     @Test
-    void sameChangeRequestKeepsHistoryAndRejectsDuplicateRunCode() {
+    void sameChangeRequestRejectsNewRunIdentifiersAndPreservesTheOriginalResult() {
         ImpactAnalysisRun first = run(RUN_X, CHANGE_X, Instant.parse("2026-09-28T00:00:00Z"));
         ImpactAnalysisRun second = run(RUN_Y, CHANGE_X, Instant.parse("2026-09-28T00:00:02Z"));
 
         runs.save(first);
-        runs.save(second);
-        assertThat(runs.findByChangeRequestId(CHANGE_X)).containsExactly(first, second);
+        ImpactFinding finding = finding(FINDING_X, first.impactAnalysisRunId(), "prod_usda_1106285",
+                "formula_1106285_v1", "label_1106285_v1", ImpactClassification.REVIEW_REQUIRED, List.of("SOY"));
+        findings.saveAll(first.impactAnalysisRunId(), List.of(finding));
+        ReviewTaskLinkage link = linkage(finding.impactFindingId(), REVIEW_X);
+        reviewTasks.saveOrGetExisting(link);
 
-        ImpactAnalysisRun retry = run(
-                "scrum62-run-x-retry",
-                "code-" + RUN_X,
-                CHANGE_X,
-                Instant.parse("2026-09-28T00:00:03Z")
-        );
-        assertThatThrownBy(() -> runs.save(retry)).isInstanceOf(DuplicateKeyException.class);
+        assertThatThrownBy(() -> runs.save(second)).isInstanceOfSatisfying(
+                ImpactRunAlreadyExistsException.class,
+                replay -> assertThat(replay.existingRun()).isEqualTo(first));
+        assertThat(runs.findByChangeRequestId(CHANGE_X)).containsExactly(first);
+        assertThat(runs.findById(RUN_Y)).isEmpty();
+        assertThat(findings.findByRunId(RUN_X)).containsExactly(finding);
+        assertThat(reviewTasks.findByFindingId(FINDING_X)).contains(link);
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM impact_analysis_run WHERE change_request_id = ?",
                 Integer.class,
                 CHANGE_X
-        )).isEqualTo(2);
+        )).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT idempotency_key FROM impact_analysis_run WHERE change_request_id = ?",
+                String.class, CHANGE_X)).isEqualTo("impact-analysis:" + CHANGE_X);
+    }
+
+    @Test
+    void databaseBusinessKeyGuardCannotBeBypassedWithANewIdempotencyKey() {
+        runs.save(run(RUN_X, CHANGE_X));
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO impact_analysis_run(
+                    impact_analysis_run_id, run_code, change_request_id, idempotency_key,
+                    rule_set_version_id, status, started_at, completed_at, executed_by_user_id, data_provenance_id)
+                SELECT ?, ?, change_request_id, ?, rule_set_version_id, status,
+                       started_at, completed_at, executed_by_user_id, data_provenance_id
+                FROM impact_analysis_run WHERE impact_analysis_run_id = ?
+                """, RUN_Y, "code-" + RUN_Y, "another-key", RUN_X))
+                .isInstanceOf(DuplicateKeyException.class);
+        assertThat(runs.findByChangeRequestId(CHANGE_X)).hasSize(1);
     }
 
     @Test
