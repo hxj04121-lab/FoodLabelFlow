@@ -62,12 +62,26 @@ Maven 3.9.16. The system Java selection was not changed.
 | CatalogSpecificationAdoptionHttpTest | PASS: 21 HTTP/ApiError/regression cases. |
 | Existing CatalogRulesTest, ArchitectureTest, ValidationArchitectureTest, SharedApiErrorContractTest, OpenApiContractTest, S3ImpactApiContractTest | PASS. Focused run total: 62 tests, zero failures/errors/skips. |
 | FormulaSpecificationAdoptionMySqlTest | ENVIRONMENT_BLOCKED: attempted 4 tests, 4 initialization errors, zero assertion failures. Testcontainers could not find a valid Docker environment; test bodies did not run. |
+| Frontend locked dependency restore and production build | PASS: npm ci, TypeScript and Vite. Local Node 24.14.0 differs from CI Node 22. Existing 575.62 kB chunk warning remains. |
+| Existing mock API browser regressions, installed Edge | PASS: 66 cases plus 1 catalog backend-failure fixture, zero failures/skips. These do not exercise a real backend or today's adoption transaction. |
 | git diff --check | PASS. |
-| Full backend verify, browser/Compose E2E, security/Sonar, new-head CI | NOT RUN for this change. |
+| Full backend verify, real-backend/browser/Compose E2E, security/Sonar, new-head CI | NOT RUN for this change. |
 
 Docker Desktop failed during startup while creating its `dockerInference` IPC
-listener: "The file cannot be accessed by the system." The Linux engine pipe was
-unavailable. No fallback database or skipped-as-pass result was used. The four
+listener: "The file cannot be accessed by the system." A controlled launch of the
+existing application in the owner's Windows session at 03:08 UTC reproduced the
+same fatal error while removing
+`C:\Users\rcncai\AppData\Local\Docker\run\dockerInference`. A bounded
+`docker info --format {{.ServerVersion}}` probe timed out after 10 seconds. Native
+WSL enumeration worked, with the docker-desktop distribution stopped. An attempt
+to start the existing helper service lacked OS permission; that service is not
+established as the cause and is not required for the WSL2 Linux engine.
+
+Start-only recovery did not restore the engine. No settings, permissions, IPC
+files, images, volumes or credentials were changed. Database-dependent checks
+were not blindly repeated. Further recovery requires a separately approved,
+narrowly scoped IPC repair decision; no reset or broad cleanup is proposed.
+No fallback database or skipped-as-pass result was used. The four
 MySQL tests use the existing harness and isolated fixtures to assert exact old
 formula/items/label preservation, all copied fields, current pointer and audit
 payload, rejected unauthorized/invalid requests, and rollback after a real audit
@@ -86,6 +100,27 @@ With a working Docker engine, run:
 ```powershell
 mvn -B -ntp -f backend/pom.xml '-Dtest=FormulaSpecificationAdoptionMySqlTest' test
 ```
+
+Frontend commands ran from `frontend`, with a dedicated Vite server on port
+55173. The server was stopped and the port released after verification. Existing
+Edge was used; no browser or global software installation was needed.
+
+```powershell
+npm ci --no-audit --no-fund
+npm run build
+npm run dev -- --host 127.0.0.1 --port 55173 --strictPort
+$env:PLAYWRIGHT_CHANNEL = 'msedge'
+$env:PLAYWRIGHT_BASE_URL = 'http://127.0.0.1:55173'
+npm run test:e2e -- tests/dashboard.spec.ts tests/declarations.spec.ts tests/derived-allergens.spec.ts tests/english-ui.spec.ts tests/formula-creator.spec.ts tests/formula-write-errors.spec.ts tests/impact-foundation.spec.ts tests/independent-readiness.spec.ts tests/labels.spec.ts tests/unsaved.spec.ts tests/validation-ui.spec.ts
+npm run test:e2e -- tests/catalog-live.spec.ts --grep 'backend failure never falls back to seed data'
+```
+
+The offline npm restore first failed on an uncached yargs-parser package; normal
+locked dependency restore succeeded without a source or lockfile change. The
+delivery includes both logs, the build/test logs and 15 mock UI screenshots.
+Live catalog, formula-lifecycle and validation cases remain unexecuted. The
+human-acceptance audit subprocess also assumes a Unix Docker socket and requires
+a Windows-compatible execution decision before it can run here.
 
 ## Dependencies and remaining acceptance
 
