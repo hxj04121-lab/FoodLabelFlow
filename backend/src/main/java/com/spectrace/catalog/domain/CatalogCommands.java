@@ -75,4 +75,10 @@ public final class CatalogCommands {
     public record Release(String expectedCurrentFormulaId) {
         public Release { expectedCurrentFormulaId = optional(expectedCurrentFormulaId, 120, "expectedCurrentFormulaId"); }
     }
+    public record AdoptSpecification(String sourceFormulaVersionId, String targetSpecificationVersionId) {
+        public AdoptSpecification {
+            sourceFormulaVersionId = required(sourceFormulaVersionId, 120, "sourceFormulaVersionId");
+            targetSpecificationVersionId = required(targetSpecificationVersionId, 100, "targetSpecificationVersionId");
+        }
+    }
 }
