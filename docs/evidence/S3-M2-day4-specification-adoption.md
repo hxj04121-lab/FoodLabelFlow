@@ -61,11 +61,13 @@ Maven 3.9.16. The system Java selection was not changed.
 | CatalogSpecificationAdoptionTest | PASS: 16 business-rule tests. |
 | CatalogSpecificationAdoptionHttpTest | PASS: 21 HTTP/ApiError/regression cases. |
 | Existing CatalogRulesTest, ArchitectureTest, ValidationArchitectureTest, SharedApiErrorContractTest, OpenApiContractTest, S3ImpactApiContractTest | PASS. Focused run total: 62 tests, zero failures/errors/skips. |
-| FormulaSpecificationAdoptionMySqlTest | ENVIRONMENT_BLOCKED: attempted 4 tests, 4 initialization errors, zero assertion failures. Testcontainers could not find a valid Docker environment; test bodies did not run. |
+| FormulaSpecificationAdoptionMySqlTest | PASS: 4 real MySQL/HTTP tests, zero failures/errors/skips, on unchanged mysql:8.4.11 using existing rootless Podman. The initial Desktop attempt had 4 initialization errors; those historical logs are retained. |
+| Full backend verify | PASS: 437 tests across 67 suites, zero failures/errors/skips; jar, Spring Boot repackage and JaCoCo report completed. |
 | Frontend locked dependency restore and production build | PASS: npm ci, TypeScript and Vite. Local Node 24.14.0 differs from CI Node 22. Existing 575.62 kB chunk warning remains. |
 | Existing mock API browser regressions, installed Edge | PASS: 66 cases plus 1 catalog backend-failure fixture, zero failures/skips. These do not exercise a real backend or today's adoption transaction. |
+| Applicable live backend browser/API regressions | PASS: 4 cases (catalog, validation, formula lifecycle and selected RBAC); independent MySQL container, local backend and installed Edge. They do not add a new adoption UI flow. |
 | git diff --check | PASS. |
-| Full backend verify, real-backend/browser/Compose E2E, security/Sonar, new-head CI | NOT RUN for this change. |
+| Full three-service Compose build, Unix-socket audit browser case, security/Sonar, new-head CI | NOT RUN for this change. |
 
 Docker Desktop failed during startup while creating its `dockerInference` IPC
 listener: "The file cannot be accessed by the system." A controlled launch of the
@@ -77,16 +79,33 @@ WSL enumeration worked, with the docker-desktop distribution stopped. An attempt
 to start the existing helper service lacked OS permission; that service is not
 established as the cause and is not required for the WSL2 Linux engine.
 
-Start-only recovery did not restore the engine. No settings, permissions, IPC
-files, images, volumes or credentials were changed. Database-dependent checks
-were not blindly repeated. Further recovery requires a separately approved,
-narrowly scoped IPC repair decision; no reset or broad cleanup is proposed.
-No fallback database or skipped-as-pass result was used. The four
-MySQL tests use the existing harness and isolated fixtures to assert exact old
-formula/items/label preservation, all copied fields, current pointer and audit
-payload, rejected unauthorized/invalid requests, and rollback after a real audit
-insert throws. Those assertions remain unverified until a working Docker runtime
-executes them.
+New read-only Win32 inspection confirmed the three runtime objects are AF_UNIX
+socket reparse points (tag 0x80000023). No socket, ACL, Docker settings, credentials
+or existing database data was changed. Normal quit cannot clean an already
+stopped application; Desktop startup was not blindly repeated.
+
+The existing Podman WSL2 machine started normally without user interaction. It
+retained its rootless mode and network configuration. Its Docker-compatible API
+1.44 served the unchanged Testcontainers mysql:8.4.11 harness through a local
+named pipe. Only each Maven process used DOCKER_HOST and the official rootless
+TESTCONTAINERS_RYUK_DISABLED setting; no global context or privileged-container
+setting changed. This restored real database verification. The four tests now
+executed exact old formula/items/label preservation, copied fields, pointer/audit
+payload, rejected requests and rollback after a real audit insert throws.
+
+The first full verify passed all 437 tests, then failed in jar dependency
+resolution after a transient HTTPS handshake error. A diagnostic package retry
+succeeded without source, dependency, proxy or TLS changes. The final full verify
+then passed all phases without skipping tests.
+
+Live browser checks used a separate new --rm MySQL container and copied executable
+JAR, with an in-memory Vite proxy on port 55174. Validation ran before the formula
+lifecycle changes its seed preconditions. Four live cases and nine live screenshots
+are recorded. The app, Vite and own MySQL container were stopped afterward. Exact
+before/after inventories remain seven pre-existing stopped containers and four
+pre-existing volumes; all three test ports are free. Podman remains running for
+subsequent work. Newly cached public test images remain; existing images/data were
+not edited. No fallback database or skipped-as-pass result was used.
 
 Reproduce the passing focused checks from the repository root:
 
@@ -95,10 +114,13 @@ $env:JAVA_HOME = 'C:\Program Files\Java\jdk-25.0.4'
 mvn -B -ntp -f backend/pom.xml '-Dtest=CatalogSpecificationAdoptionTest,CatalogSpecificationAdoptionHttpTest,CatalogRulesTest,ArchitectureTest,ValidationArchitectureTest,SharedApiErrorContractTest,OpenApiContractTest,S3ImpactApiContractTest' test
 ```
 
-With a working Docker engine, run:
+Reproduce the true MySQL and complete verification with the existing Podman:
 
 ```powershell
+$env:DOCKER_HOST = 'npipe:////./pipe/podman-machine-default'
+$env:TESTCONTAINERS_RYUK_DISABLED = 'true'
 mvn -B -ntp -f backend/pom.xml '-Dtest=FormulaSpecificationAdoptionMySqlTest' test
+mvn -B -ntp -f backend/pom.xml verify
 ```
 
 Frontend commands ran from `frontend`, with a dedicated Vite server on port
@@ -118,18 +140,28 @@ npm run test:e2e -- tests/catalog-live.spec.ts --grep 'backend failure never fal
 The offline npm restore first failed on an uncached yargs-parser package; normal
 locked dependency restore succeeded without a source or lockfile change. The
 delivery includes both logs, the build/test logs and 15 mock UI screenshots.
-Live catalog, formula-lifecycle and validation cases remain unexecuted. The
-human-acceptance audit subprocess also assumes a Unix Docker socket and requires
-a Windows-compatible execution decision before it can run here.
+The live catalog, validation, formula-lifecycle and selected human RBAC cases
+passed in separate runner invocations. The human-acceptance audit subprocess
+assumes a Unix Docker socket/default Compose project and remains unexecuted here.
+The full three-service Compose build was not used; runtime verification used the
+local packaged backend and separate MySQL. Exact commands, reports and resource
+inventories are included in the local delivery.
 
 ## Dependencies and remaining acceptance
 
 SCRUM-77 and SCRUM-78 belong to Huang Xiangjia and were In Progress at the live
 read. Their discovery/classification services were not implemented here.
-RelevantProductLookupPort exists, but neither current main nor PR #56 has a
-production lookup adapter. Runtime discovery requires that additional M2-owned
-adapter delivery. Adoption preserves supplier-material membership, so the lookup
-semantics and relevance set stay compatible.
+RelevantProductLookupPort exists; current main and PR #56 have no production
+lookup adapter. [PR #57](https://github.com/hxj04121-lab/FoodLabelFlow/pull/57) at
+69d3aac1508fa888a3aa1d8a17aac7b5ad67c648 now adds a candidate adapter. The local M2
+read-only review found lookup/discovery compatible with the unchanged port and
+PR #56 contract. Missing published labels remain in the result and cause complete
+discovery rejection with 422 PUBLISHED_LABEL_MISSING. Full analysis preconditions
+before every write and transaction/concurrency behavior remain orchestration
+acceptance; this PR's discovery tests do not prove that whole-run behavior.
+Its independent CI run 37091021378 passed 408 backend tests and other checks, but
+does not validate this separate adoption branch. PR #57 remains unmerged.
+Adoption preserves supplier-material membership, keeping lookup semantics valid.
 
 For SCRUM-78, use the published label's pinned formula N as the finding's current
 formula, and the adopted product formula N+1 as its proposed formula. The old
@@ -139,5 +171,6 @@ flag and must not be used as a published-label existence check.
 This local change has not been pushed, opened as a PR, reviewed by M1, merged or
 deployed. Jira has not been changed and no Day-4 Done marker is claimed. Next
 acceptance requires publication authorization, a draft PR to main, real M1
-review, executable MySQL evidence and the appropriate CI evidence. Full duplicate
+review and the appropriate new-head CI evidence. Real local MySQL and full backend
+verify now pass. Full duplicate
 and concurrency acceptance remains SCRUM-56 / Day 5; SCRUM-48 stays In Progress.
