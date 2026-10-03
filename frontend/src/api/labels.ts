@@ -275,6 +275,13 @@ export async function getLabelDraft(
       200,
     )
   }
+  if (result.labelVersionId !== labelVersionId) {
+    throw new LabelApiError(
+      'LABEL_VERSION_MISMATCH',
+      'The label API returned a different version from the requested ID.',
+      200,
+    )
+  }
   return result
 }
 
@@ -384,6 +391,13 @@ export async function getValidationRun(
     throw new LabelApiError(
       'INVALID_RESPONSE',
       'The label API returned an invalid validation run.',
+      200,
+    )
+  }
+  if (result.validationRunId !== validationRunId) {
+    throw new LabelApiError(
+      'VALIDATION_RUN_MISMATCH',
+      'The validation API returned a different run from the requested ID.',
       200,
     )
   }
