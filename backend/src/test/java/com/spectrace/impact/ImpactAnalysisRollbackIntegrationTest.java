@@ -126,7 +126,7 @@ class ImpactAnalysisRollbackIntegrationTest extends MySqlIntegrationTestSupport 
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM impact_analysis_run WHERE impact_analysis_run_id = ? OR change_request_id = ? "
                         + "OR idempotency_key = ?",
-                Integer.class, RUN, CHANGE, "impact-analysis:code-" + RUN)).isZero();
+                Integer.class, RUN, CHANGE, "impact-analysis:" + CHANGE)).isZero();
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM impact_finding WHERE impact_analysis_run_id = ? OR impact_finding_id IN (?, ?, ?)",
                 Integer.class, RUN, FINDING_ONE, FINDING_MIDDLE, FINDING_LAST)).isZero();
@@ -144,7 +144,7 @@ class ImpactAnalysisRollbackIntegrationTest extends MySqlIntegrationTestSupport 
                 Integer.class, CHANGE)).isEqualTo(1);
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM impact_analysis_run WHERE idempotency_key = ?",
-                Integer.class, "impact-analysis:code-" + RUN)).isEqualTo(1);
+                Integer.class, "impact-analysis:" + CHANGE)).isEqualTo(1);
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM impact_finding WHERE impact_analysis_run_id = ?",
                 Integer.class, RUN)).isEqualTo(FINDING_IDS.size());
