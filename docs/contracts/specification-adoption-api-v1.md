@@ -83,7 +83,4 @@ its formula is no longer current. That flag is a validation-eligibility guard; i
 does not mean the published label is absent. SCRUM-78 must retain its declarations
 for the before/after comparison. Classification and publication remain with M1/M4.
 
-At baseline `e53f7b0`, `RelevantProductLookupPort` has no production adapter. PR #56
-provides the SOY golden oracle and lookup semantics, not that adapter. This runtime
-dependency requires its owner to supply the adapter before discovery runs end to
-end; SCRUM-55 does not implement the discovery or classification service.
+Main e7512c6 includes the production lookup adapter (PR #57) and ingredient-specification strategy (PR #59). Day 5 integration acceptance will exercise them with this real adoption action and the PR #56 golden oracle. SCRUM-55 does not implement discovery or classification.
