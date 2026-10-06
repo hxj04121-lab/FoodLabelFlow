@@ -16,6 +16,12 @@ public interface ChangeRequestRepository {
 
     Optional<ChangeRequest> findById(String changeRequestId);
 
+    /** The same read, locking the row until commit so runs of one request are serialised. */
+    Optional<ChangeRequest> lockById(String changeRequestId);
+
+    /** Compare-and-set the status; throws IllegalStateException when the row is not in {@code from}. */
+    void updateStatus(String changeRequestId, ChangeRequestStatus from, ChangeRequestStatus to);
+
     /**
      * A non-CANCELLED request for exactly this typed version pair, if one exists. Must be a
      * locking (current) read so it sees requests committed while the caller waited on a lock.

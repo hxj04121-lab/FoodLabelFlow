@@ -15,6 +15,8 @@ public class RequestImpactIntegration implements ImpactIntegration {
 
     private static final String AUTH_PROVIDER_HEADER = "X-Auth-Provider";
     private static final String AUTH_SUBJECT_HEADER = "X-External-Subject";
+    /** Proposed with M4 in SCRUM-79: the maker who drafts the replacement label owns the task. */
+    static final String REVIEW_TASK_ASSIGNEE_PERMISSION = "LABEL.CREATE";
 
     private final HttpServletRequest request;
     private final IdentityService identityService;
@@ -56,6 +58,14 @@ public class RequestImpactIntegration implements ImpactIntegration {
             String actorId, String changeRequestId, String impactAnalysisRunId, String dataProvenanceId) {
         auditEvents.recordImpactEvent(actorId, "IMPACT_ANALYSIS_RUN", "IMPACT_ANALYSIS_RUN",
                 impactAnalysisRunId, changeRequestId, dataProvenanceId);
+    }
+
+    @Override
+    public String reviewTaskAssignee() {
+        return identityService.activeUserIdsWithPermission(REVIEW_TASK_ASSIGNEE_PERMISSION).stream()
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "No active user holds " + REVIEW_TASK_ASSIGNEE_PERMISSION + " to receive review tasks"));
     }
 
     private AuthenticatedActor actor() {
