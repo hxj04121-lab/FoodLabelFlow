@@ -20,6 +20,6 @@ This is an M2 data oracle. It does not implement impact classification or Review
 
 ## Executable verification
 
-`S3SoyGoldenRelationshipMySqlTest` reads the same versioned JSON as the consumer and checks the current product/formula/formula-item/specification/material/label/allergen relationships against the MySQL schema loaded by Flyway. It compares product-ID sets, verifies current released and published pointers, checks the SOY source and declaration for each outcome, and confirms that negative controls lack the changed supplier material.
+`S3SoyGoldenRelationshipMySqlTest` reads the versioned CSV linked above and checks the current product/formula/formula-item/specification/material/label/allergen relationships against the MySQL schema loaded by Flyway. It compares product-ID sets, verifies current released and published pointers, checks the SOY source and declaration for each outcome, and confirms that negative controls lack the changed supplier material. `IngredientSpecImpactStrategyMySqlTest` consumes that same CSV after real adoption requests; no second JSON oracle is required.
 
-Preflight on 2026-10-02: `origin/main` was `e53f7b0f0fb7c9e0038dbbbe4193f953edab8e35`, its CI run `36822786343` was green, and no pull requests were open. The Day 3 scheduled attempt at 09:25 exited before Jira access because the Windows task has no `JIRA_*` environment credentials; the authenticated Jira connector transitioned SCRUM-54 to In Progress before this implementation work.
+Historical preflight on 2026-10-02: `origin/main` was `e53f7b0f0fb7c9e0038dbbbe4193f953edab8e35`, its CI run `36822786343` was green, and no pull requests were open. This is the Day 3 baseline, not a Day 6 verification result.

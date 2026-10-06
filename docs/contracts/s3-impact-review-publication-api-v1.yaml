@@ -519,7 +519,7 @@ components:
           $ref: '#/components/schemas/Identifier'
         missingAllergenCodes:
           type: array
-          description: Sorted unique allergen codes absent from the proposed formula; empty for NO_ACTION.
+          description: Sorted unique allergen codes derived from the proposed formula but absent from the current published label's CONTAINS declarations; empty for NO_ACTION.
           minItems: 0
           maxItems: 0
           uniqueItems: true
@@ -558,7 +558,7 @@ components:
           $ref: '#/components/schemas/Identifier'
         missingAllergenCodes:
           type: array
-          description: Sorted unique allergen codes absent from the proposed formula; non-empty for REVIEW_REQUIRED.
+          description: Sorted unique allergen codes derived from the proposed formula but absent from the current published label's CONTAINS declarations; non-empty for REVIEW_REQUIRED.
           minItems: 1
           uniqueItems: true
           items:

@@ -1,0 +1,100 @@
+%% SCRUM-57 / A07 design model; only existing runtime classes and framework infrastructure.
+%% Source baseline: 20a41e48c71e0851bf9c71de9ba580cf1623323a.
+classDiagram
+    direction TB
+    class CatalogController {
+        <<RestController>>
+        +adoptSpecification(String id, AdoptSpecification body) Map
+    }
+    class AdoptSpecification {
+        <<record>>
+        String sourceFormulaVersionId
+        String targetSpecificationVersionId
+    }
+    class CatalogService {
+        <<Service>>
+        +adoptSpecification(String productId, AdoptSpecification request) Map
+        +create(Formula value) Map
+        +get(Kind kind, String id) Map
+        -lockMaterials(List materialIds) void
+        -adoptionReference(Kind kind, String id, boolean lock) Map
+        -releasedAndEffective(Map specification) void
+    }
+    class CatalogStore {
+        <<Repository>>
+        +get(Kind kind, String id, boolean lock) Map
+        +formulaItems(String id) List
+        +adoptFormula(String productId, String sourceId, String materialId, String targetId, String provenanceId, String actor) String
+        +releaseFormula(String id, String productId, String actor) void
+        -formulaVersion(String productId, String provenanceId, String actor) String
+    }
+    class CatalogIntegration {
+        <<interface>>
+        +requireActor(String permission) String
+        +audit(String actorId, String action, String entityId, String provenanceId) void
+        +auditSpecificationAdoption(String actorId, String newId, String sourceId, String targetId, String provenanceId) void
+    }
+    class RequestCatalogIntegration {
+        <<Component>>
+        +requireActor(String permission) String
+        +audit(String actorId, String action, String entityId, String provenanceId) void
+        +auditSpecificationAdoption(String actorId, String newId, String sourceId, String targetId, String provenanceId) void
+    }
+    class IdentityService {
+        +authenticate(String provider, String subject) AuthenticatedActor
+    }
+    class AuthorizationService {
+        +requirePermission(AuthenticatedActor actor, String permission) void
+    }
+    class AuditApplicationService {
+        <<Service>>
+        +recordCatalogEvent(String actorId, String action, String entityId, String provenanceId) void
+        +recordSpecificationAdoptionEvent(String actorId, String newId, String sourceId, String targetId, String provenanceId) void
+    }
+    class JdbcTemplate {
+        <<Spring infrastructure>>
+        +queryForList() List
+        +update() int
+    }
+    class CatalogErrors {
+        <<RestControllerAdvice>>
+        +business(CatalogFailure error) ResponseEntity
+        +conflict(DataIntegrityViolationException error) ResponseEntity
+        +invalid(Exception error) ResponseEntity
+        +internal(RuntimeException error) ResponseEntity
+    }
+    class CatalogFailure {
+        <<RuntimeException>>
+        +status() int
+        +code() String
+    }
+    class ApiError {
+        <<record>>
+        String code
+        String message
+        String traceId
+        String evidenceId
+    }
+
+    CatalogController --> CatalogService : delegates
+    CatalogController ..> AdoptSpecification : binds request
+    CatalogService ..> AdoptSpecification : validates explicit references
+    CatalogService --> CatalogStore : catalog persistence
+    CatalogService ..> CatalogIntegration : ObjectProvider resolves adapter
+    RequestCatalogIntegration ..|> CatalogIntegration : implements
+    RequestCatalogIntegration --> IdentityService : authenticates request identity
+    RequestCatalogIntegration --> AuthorizationService : checks each permission
+    RequestCatalogIntegration --> AuditApplicationService : joins caller transaction
+    CatalogStore --> JdbcTemplate : catalog SQL
+    AuditApplicationService --> JdbcTemplate : audit SQL
+    CatalogService ..> CatalogFailure : business rejection
+    CatalogErrors ..> CatalogFailure : maps status and code
+    CatalogErrors ..> ApiError : returns canonical error
+    CatalogErrors ..> CatalogController : scoped advice
+
+    note for AdoptSpecification "Nested CatalogCommands record.<br/>Constructor validates both IDs.<br/>No actor or new provenance field."
+    note for CatalogService "Write @Transactional.<br/>Product, source, sorted materials,<br/>then sorted specifications."
+    note for CatalogStore "Existing JDBC maps and tables.<br/>Copy item values.<br/>Replace matching specification IDs."
+    note for RequestCatalogIntegration "Existing property-gated adapter.<br/>Missing identity: 401.<br/>Missing permission: 403."
+    note for AuditApplicationService "Both methods: MANDATORY.<br/>Adoption payload references:<br/>sourceFormulaVersionId,<br/>targetSpecificationVersionId,<br/>newFormulaVersionId."
+    note for ApiError "traceId and evidenceId are null<br/>when no real IDs exist."
