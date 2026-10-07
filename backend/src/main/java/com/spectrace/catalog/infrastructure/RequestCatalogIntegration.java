@@ -60,4 +60,11 @@ public class RequestCatalogIntegration implements CatalogIntegration {    public
     public void audit(String actorId, String action, String entityId, String provenanceId) {
         auditService.recordCatalogEvent(actorId, action, entityId, provenanceId);
     }
+    @Override
+    public void auditSpecificationAdoption(String actorId, String newFormulaVersionId,
+                                          String sourceFormulaVersionId, String targetSpecificationVersionId,
+                                          String provenanceId) {
+        auditService.recordSpecificationAdoptionEvent(actorId, newFormulaVersionId, sourceFormulaVersionId,
+                targetSpecificationVersionId, provenanceId);
+    }
 }

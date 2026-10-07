@@ -13,7 +13,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.TreeSet;
 
+import static com.spectrace.catalog.domain.CatalogCommands.required;
 import static com.spectrace.catalog.infrastructure.CatalogStore.Kind.*;
 
 @Service
@@ -112,11 +114,85 @@ public class CatalogService {
         adapter.audit(actor, "FORMULA_RELEASED", id, (String) formula.get("data_provenance_id"));
         return get(FORMULA, id);
     }
+    /** Adopt a newer released specification explicitly; never edit the released source snapshot. */
+    @Transactional
+    public Map<String, Object> adoptSpecification(String productId, AdoptSpecification request) {
+        if (request == null) throw CatalogFailure.invalid("adoption request is required");
+        productId = required(productId, 100, "productId");
+        var adapter = integration();
+        String actor = adapter.requireActor("DATA.MAINTAIN");
+        adapter.requireActor("FORMULA.RELEASE");
+        // Serialize both the source check and version allocation with every other catalog formula write.
+        var product = store.get(PRODUCT, productId, true);
+        var source = adoptionReference(FORMULA, request.sourceFormulaVersionId(), true);
+        if (!productId.equals(source.get("product_id")))
+            throw new CatalogFailure(422, "SOURCE_FORMULA_PRODUCT_MISMATCH", "Source formula belongs to a different product");
+        if (!"RELEASED".equals(source.get("lifecycle_status")))
+            throw new CatalogFailure(422, "SOURCE_FORMULA_NOT_RELEASED", "Adoption requires a released source formula");
+        if (!Objects.equals(request.sourceFormulaVersionId(), product.get("current_formula_version_id"))
+                || !"Y".equals(source.get("is_current_released")))
+            throw new CatalogFailure(409, "CURRENT_FORMULA_CHANGED", "Refresh the product before adopting a specification");
+        var items = store.formulaItems(request.sourceFormulaVersionId());
+        if (items.isEmpty()) throw CatalogFailure.invalid("source formula must have items");
+
+        // Lock specifications in the same ID order as ordinary create/release flows.
+        var specificationIds = new TreeSet<String>();
+        specificationIds.add(request.targetSpecificationVersionId());
+        for (var item : items) specificationIds.add((String) item.get("specification_version_id"));
+        var specifications = new LinkedHashMap<String, Map<String, Object>>();
+        for (String specificationId : specificationIds) {
+            var specification = adoptionReference(SPECIFICATION, specificationId, true);
+            specifications.put(specificationId, specification);
+        }
+        var target = specifications.get(request.targetSpecificationVersionId());
+        releasedAndEffective(target);
+        String targetMaterialId = (String) target.get("supplier_material_id");
+        var replacements = items.stream()
+                .filter(item -> targetMaterialId.equals(item.get("supplier_material_id"))).toList();
+        if (replacements.isEmpty())
+            throw new CatalogFailure(422, "SPECIFICATION_MATERIAL_MISMATCH", "Target specification material is absent from the source formula");
+        if (replacements.stream().anyMatch(item -> request.targetSpecificationVersionId().equals(item.get("specification_version_id"))))
+            throw new CatalogFailure(409, "SPECIFICATION_ALREADY_ADOPTED", "Source formula already references the target specification");
+        for (var item : items) {
+            var specification = specifications.get((String) item.get("specification_version_id"));
+            if (!Objects.equals(item.get("supplier_material_id"), specification.get("supplier_material_id")))
+                throw new CatalogFailure(422, "SPECIFICATION_MATERIAL_MISMATCH", "Source item specification belongs to a different material");
+            // A retired historical specification may be replaced; only the new snapshot must be eligible.
+            if (!targetMaterialId.equals(item.get("supplier_material_id"))) releasedAndEffective(specification);
+        }
+        int targetVersion = ((Number) target.get("version_number")).intValue();
+        for (var item : replacements) {
+            var previous = specifications.get((String) item.get("specification_version_id"));
+            if (targetVersion <= ((Number) previous.get("version_number")).intValue())
+                throw new CatalogFailure(422, "SPECIFICATION_VERSION_NOT_NEWER", "Target specification must be newer than the source item specification");
+        }
+
+        String provenanceId = (String) target.get("data_provenance_id");
+        String id = store.adoptFormula(productId, request.sourceFormulaVersionId(), targetMaterialId,
+                request.targetSpecificationVersionId(), provenanceId, actor);
+        adapter.audit(actor, "FORMULA_CREATED", id, provenanceId);
+        store.releaseFormula(id, productId, actor);
+        adapter.audit(actor, "FORMULA_RELEASED", id, provenanceId);
+        adapter.auditSpecificationAdoption(actor, id, request.sourceFormulaVersionId(),
+                request.targetSpecificationVersionId(), provenanceId);
+        return get(FORMULA, id);
+    }
+    private Map<String, Object> adoptionReference(CatalogStore.Kind kind, String id, boolean lock) {
+        try {
+            return store.get(kind, id, lock);
+        } catch (CatalogFailure failure) {
+            if (failure.status() != 404) throw failure;
+            throw new CatalogFailure(422, "INVALID_REFERENCE", "Adoption references an unavailable " + kind.name().toLowerCase(java.util.Locale.ROOT));
+        }
+    }
     private void eligible(String materialId, String specificationId) {
         store.get(MATERIAL, materialId, false);
         var spec = store.get(SPECIFICATION, specificationId, true);
         if (!materialId.equals(spec.get("supplier_material_id")))
             throw new CatalogFailure(422, "SPECIFICATION_MATERIAL_MISMATCH", "Specification belongs to a different material");
+        releasedAndEffective(spec);
+    }
+    private static void releasedAndEffective(Map<String, Object> spec) {
         if (!"RELEASED".equals(spec.get("lifecycle_status")))
             throw new CatalogFailure(422, "SPECIFICATION_NOT_RELEASED", "Formula items require released specifications");
         if (((java.sql.Date) spec.get("effective_date")).toLocalDate().isAfter(LocalDate.now(ZoneOffset.UTC)))

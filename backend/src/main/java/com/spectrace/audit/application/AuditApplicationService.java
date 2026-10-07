@@ -41,6 +41,27 @@ public class AuditApplicationService implements AuditEventPort, ImpactAuditPort,
         );
     }
 
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordSpecificationAdoptionEvent(
+            String actorId,
+            String newFormulaVersionId,
+            String sourceFormulaVersionId,
+            String targetSpecificationVersionId,
+            String provenanceId
+    ) {
+        jdbcTemplate.update(
+                """
+                INSERT INTO audit_event(
+                  audit_event_id, event_type, entity_type, entity_id, event_at,
+                  actor_user_id, event_payload, data_provenance_id
+                ) VALUES (?, 'FORMULA_SPECIFICATION_ADOPTED', 'CATALOG', ?, UTC_TIMESTAMP(), ?,
+                          JSON_OBJECT('sourceFormulaVersionId', ?, 'targetSpecificationVersionId', ?,
+                                      'newFormulaVersionId', ?), ?)
+                """,
+                UUID.randomUUID().toString(), newFormulaVersionId, actorId,
+                sourceFormulaVersionId, targetSpecificationVersionId, newFormulaVersionId, provenanceId);
+    }
+
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void recordValidationEvent(

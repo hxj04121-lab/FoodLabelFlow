@@ -49,6 +49,10 @@ public class CatalogController {
     @GetMapping("/products/{id}") public Map<String, Object> product(@PathVariable String id) { return service.get(PRODUCT, id); }
     @GetMapping("/products/{id}/formulas")
     public List<Map<String, Object>> versions(@PathVariable String id) { return service.versions(id); }
+    @PostMapping("/products/{id}/formula-adoptions") @ResponseStatus(HttpStatus.CREATED)
+    public Map<String, Object> adoptSpecification(@PathVariable String id, @RequestBody AdoptSpecification body) {
+        return service.adoptSpecification(id, body);
+    }
     @GetMapping("/formulas/{id}") public Map<String, Object> formula(@PathVariable String id) { return service.get(FORMULA, id); }
     @GetMapping("/formulas/{id}/trace") public Map<String, Object> trace(@PathVariable String id) { return service.trace(id); }
     @PostMapping("/formulas") @ResponseStatus(HttpStatus.CREATED)
