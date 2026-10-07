@@ -4,6 +4,8 @@ import com.spectrace.identity.application.port.IdentityRepository;
 import com.spectrace.identity.domain.AuthenticatedActor;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class IdentityService {
 
@@ -31,5 +33,13 @@ public class IdentityService {
                                 "Authenticated identity is not mapped to an active SpecTrace user"
                         )
                 );
+    }
+
+    /** Active users holding the permission, ordered by userId; empty when nobody holds it. */
+    public List<String> activeUserIdsWithPermission(String permissionCode) {
+        if (permissionCode == null || permissionCode.isBlank()) {
+            throw new IllegalArgumentException("Permission is required");
+        }
+        return identityRepository.findActiveUserIdsWithPermission(permissionCode);
     }
 }

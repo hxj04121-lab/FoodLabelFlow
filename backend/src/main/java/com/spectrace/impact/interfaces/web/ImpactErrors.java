@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /** One error envelope for the impact API; identity failures are mapped by IdentityErrors first. */
-@RestControllerAdvice(assignableTypes = ChangeRequestController.class)
+@RestControllerAdvice(assignableTypes = {ChangeRequestController.class, ImpactAnalysisController.class})
 public class ImpactErrors {
     private static final Logger LOG = LoggerFactory.getLogger(ImpactErrors.class);
 
@@ -28,6 +28,6 @@ public class ImpactErrors {
     public ResponseEntity<ApiError> internal(Exception error) {
         LOG.error("Impact API request failed", error);
         return ResponseEntity.internalServerError()
-                .body(ApiError.of("INTERNAL_ERROR", "The change request could not be completed"));
+                .body(ApiError.of("INTERNAL_ERROR", "The impact request could not be completed"));
     }
 }
