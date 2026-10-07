@@ -15,7 +15,7 @@ class FlywayIntegrationTest extends MySqlIntegrationTestSupport {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void flywayLoadsTheV6ImpactIdempotencySchemaAndDatabaseHealthWorks() {
+    void flywayLoadsTheV7ReviewTaskLifecycleSchemaAndDatabaseHealthWorks() {
         Integer productCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM product", Integer.class);
         Integer impactCount = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM impact_finding", Integer.class);
         Integer migrationCount = jdbcTemplate.queryForObject(
@@ -25,7 +25,19 @@ class FlywayIntegrationTest extends MySqlIntegrationTestSupport {
 
         assertThat(productCount).isEqualTo(60);
         assertThat(impactCount).isZero();
-        assertThat(migrationCount).isEqualTo(6);
+        assertThat(migrationCount).isEqualTo(7);
+        assertThat(jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name = 'review_task'
+                  AND column_name IN (
+                    'target_label_version_id', 'decision',
+                    'resolved_by_user_id', 'resolved_at'
+                  )
+                """,
+                Integer.class
+        )).isEqualTo(4);
         assertThat(jdbcTemplate.queryForObject("SELECT 1", Integer.class)).isEqualTo(1);
     }
 }

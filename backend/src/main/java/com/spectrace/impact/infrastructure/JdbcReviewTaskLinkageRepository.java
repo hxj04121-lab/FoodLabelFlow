@@ -17,9 +17,9 @@ public class JdbcReviewTaskLinkageRepository implements ReviewTaskLinkageReposit
     private static final String INSERT = """
             INSERT INTO review_task(
               review_task_id, impact_finding_id, product_id, current_label_version_id,
-              draft_label_version_id, status, assigned_to_user_id, created_by_user_id,
+              draft_label_version_id, target_label_version_id, status, assigned_to_user_id, created_by_user_id,
               created_at, data_provenance_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
 
     private static final String SELECT = """
@@ -50,6 +50,7 @@ public class JdbcReviewTaskLinkageRepository implements ReviewTaskLinkageReposit
                     linkage.impactFindingId(),
                     linkage.productId(),
                     linkage.currentLabelVersionId(),
+                    linkage.draftLabelVersionId(),
                     linkage.draftLabelVersionId(),
                     linkage.status().name(),
                     linkage.assignedToUserId(),

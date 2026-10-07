@@ -294,7 +294,7 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
         );
 
         assertStatus("APPROVED");
-        assertReviewTaskStatus("CLOSED");
+        assertReviewTaskStatus("IN_REVIEW");
     }
 
     @Test
@@ -553,10 +553,10 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
                 LABEL_ID
         );
 
-        jdbcTemplate.update(
-                "CALL sp_publish_label(?, ?)",
+        reviewService.publishReviewTask(
+                REVIEW_TASK_ID,
                 LABEL_ID,
-                "user_publisher"
+                reviewApprover("LABEL.PUBLISH")
         );
 
         assertStatus("PUBLISHED");
@@ -583,6 +583,175 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
 
         assertEquals("SUPERSEDED", oldStatus);
         assertEquals("N", oldCurrentFlag);
+        assertEquals(
+                LABEL_ID,
+                jdbcTemplate.queryForObject(
+                        "SELECT current_published_label_version_id FROM product WHERE product_id = (SELECT product_id FROM label_version WHERE label_version_id = ?)",
+                        String.class,
+                        LABEL_ID
+                )
+        );
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM publication_record WHERE label_version_id = ?",
+                Integer.class,
+                LABEL_ID
+        ));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM audit_event WHERE event_type = 'LABEL_PUBLISHED' AND entity_id = ?",
+                Integer.class,
+                LABEL_ID
+        ));
+        assertReviewTaskStatus("CLOSED");
+        assertEquals("user_approver", jdbcTemplate.queryForObject(
+                "SELECT resolved_by_user_id FROM review_task WHERE review_task_id = ?",
+                String.class,
+                REVIEW_TASK_ID
+        ));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM review_task WHERE review_task_id = ? AND resolved_at IS NOT NULL",
+                Integer.class,
+                REVIEW_TASK_ID
+        ));
+        assertThrows(
+                IllegalStateException.class,
+                () -> reviewService.publishReviewTask(
+                        REVIEW_TASK_ID, LABEL_ID,
+                        reviewApprover("LABEL.PUBLISH")
+                )
+        );
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM publication_record WHERE label_version_id = ?",
+                Integer.class,
+                LABEL_ID
+        ));
+    }
+
+    @Test
+    void rejectsPublicationWhenTargetIsNotApproved() {
+        createReviewFixture();
+        assertThrows(IllegalStateException.class, () ->
+                reviewService.publishReviewTask(
+                        REVIEW_TASK_ID, LABEL_ID,
+                        reviewApprover("LABEL.PUBLISH")
+                ));
+        assertEquals(0, publicationCount());
+    }
+
+    @Test
+    void rejectsPublicationWhenDecisionIsNotApprove() {
+        createReviewFixture();
+        jdbcTemplate.update(
+                "UPDATE review_task SET status='IN_REVIEW', decision='REJECT' WHERE review_task_id = ?",
+                REVIEW_TASK_ID
+        );
+        jdbcTemplate.update(
+                "UPDATE label_version SET lifecycle_status='APPROVED' WHERE label_version_id = ?",
+                LABEL_ID
+        );
+        assertThrows(IllegalStateException.class, () ->
+                reviewService.publishReviewTask(
+                        REVIEW_TASK_ID, LABEL_ID,
+                        reviewApprover("LABEL.PUBLISH")
+                ));
+        assertEquals(0, publicationCount());
+        assertStatus("APPROVED");
+    }
+
+    @Test
+    void rejectsPublicationForMismatchedTargetVersion() {
+        createReviewFixture();
+        assertThrows(LabelVersionConflictException.class, () ->
+                reviewService.publishReviewTask(
+                        REVIEW_TASK_ID, "another_label_version",
+                        reviewApprover("LABEL.PUBLISH")
+                ));
+        assertEquals(0, publicationCount());
+    }
+
+    @Test
+    void firstPublicationWorksWithoutPreviousPublishedVersion() {
+        createPassedValidation();
+        createReviewFixture();
+        jdbcTemplate.update("""
+                UPDATE label_version
+                SET lifecycle_status='SUPERSEDED', is_current_published='N'
+                WHERE product_id = (SELECT product_id FROM
+                    (SELECT product_id FROM label_version WHERE label_version_id = ?) chosen)
+                  AND jurisdiction_code = (SELECT jurisdiction_code FROM
+                    (SELECT jurisdiction_code FROM label_version WHERE label_version_id = ?) chosen)
+                  AND label_version_id <> ? AND lifecycle_status='PUBLISHED'
+                """, LABEL_ID, LABEL_ID, LABEL_ID);
+        jdbcTemplate.update("""
+                UPDATE product
+                SET current_published_label_version_id = NULL
+                WHERE product_id = (SELECT product_id FROM label_version WHERE label_version_id = ?)
+                """, LABEL_ID);
+        approveTarget();
+
+        reviewService.publishReviewTask(
+                REVIEW_TASK_ID, LABEL_ID, reviewApprover("LABEL.PUBLISH")
+        );
+
+        assertStatus("PUBLISHED");
+        assertEquals(LABEL_ID, jdbcTemplate.queryForObject(
+                "SELECT current_published_label_version_id FROM product WHERE product_id = (SELECT product_id FROM label_version WHERE label_version_id = ?)",
+                String.class, LABEL_ID));
+    }
+
+    @Test
+    void publicationFailureRollsBackLifecyclePointerRecordsAndResolution() {
+        createPassedValidation();
+        createReviewFixture();
+        approveTarget();
+        String oldPublishedLabelId = jdbcTemplate.queryForObject(
+                "SELECT label_version_id FROM label_version WHERE product_id = (SELECT product_id FROM label_version WHERE label_version_id = ?) AND jurisdiction_code = (SELECT jurisdiction_code FROM label_version WHERE label_version_id = ?) AND lifecycle_status='PUBLISHED' AND is_current_published='Y' AND label_version_id <> ? LIMIT 1",
+                String.class, LABEL_ID, LABEL_ID, LABEL_ID);
+        String oldPointer = jdbcTemplate.queryForObject(
+                "SELECT current_published_label_version_id FROM product WHERE product_id = (SELECT product_id FROM label_version WHERE label_version_id = ?)",
+                String.class, LABEL_ID);
+        doThrow(new IllegalStateException("forced publication audit failure"))
+                .when(commandRepository).createPublicationAudit(
+                        eq(LABEL_ID), eq(REVIEW_TASK_ID), anyString(), anyString());
+
+        assertThrows(IllegalStateException.class, () ->
+                reviewService.publishReviewTask(
+                        REVIEW_TASK_ID, LABEL_ID,
+                        reviewApprover("LABEL.PUBLISH")
+                ));
+
+        assertStatus("APPROVED");
+        assertReviewTaskStatus("IN_REVIEW");
+        assertEquals(oldPointer, jdbcTemplate.queryForObject(
+                "SELECT current_published_label_version_id FROM product WHERE product_id = (SELECT product_id FROM label_version WHERE label_version_id = ?)",
+                String.class, LABEL_ID));
+        assertEquals("PUBLISHED", jdbcTemplate.queryForObject(
+                "SELECT lifecycle_status FROM label_version WHERE label_version_id = ?",
+                String.class, oldPublishedLabelId));
+        assertEquals("N", jdbcTemplate.queryForObject(
+                "SELECT is_current_published FROM label_version WHERE label_version_id = ?",
+                String.class, LABEL_ID));
+        assertEquals(0, publicationCount());
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM audit_event WHERE event_type='LABEL_PUBLISHED' AND entity_id = ?",
+                Integer.class, LABEL_ID));
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM review_task WHERE review_task_id = ? AND resolved_at IS NOT NULL",
+                Integer.class, REVIEW_TASK_ID));
+    }
+
+    private void approveTarget() {
+        reviewService.submitForReview(LABEL_ID, reviewSubmitter());
+        reviewService.recordDecision(
+                LABEL_ID, "APPROVE", "approved", reviewApprover("LABEL.APPROVE")
+        );
+    }
+
+    private int publicationCount() {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM publication_record WHERE label_version_id = ?",
+                Integer.class,
+                LABEL_ID
+        );
     }
 
     private void createReviewFixture() {
@@ -699,6 +868,7 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
                     product_id,
                     current_label_version_id,
                     draft_label_version_id,
+                    target_label_version_id,
                     status,
                     assigned_to_user_id,
                     created_by_user_id,
@@ -711,6 +881,7 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
                     product_id,
                     current_label_version_id,
                     ?,
+                    ?,
                     'OPEN',
                     'user_approver',
                     'user_label_officer',
@@ -720,6 +891,7 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
                 WHERE impact_finding_id = ?
                 """,
                 REVIEW_TASK_ID,
+                LABEL_ID,
                 LABEL_ID,
                 IMPACT_FINDING_ID
         );

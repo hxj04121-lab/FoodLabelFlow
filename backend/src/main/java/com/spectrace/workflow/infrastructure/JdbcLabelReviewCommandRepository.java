@@ -146,10 +146,12 @@ public class JdbcLabelReviewCommandRepository
         jdbc.update(
                 """
                 UPDATE review_task
-                SET status = 'IN_REVIEW'
-                WHERE draft_label_version_id = ?
+                SET status = 'IN_REVIEW',
+                    target_label_version_id = ?
+                WHERE target_label_version_id = ?
                   AND status = 'OPEN'
                 """,
+                labelVersionId,
                 labelVersionId
         );
     }
@@ -258,9 +260,10 @@ public class JdbcLabelReviewCommandRepository
             JOIN product p
               ON p.product_id = lv.product_id
             LEFT JOIN review_task rt
-              ON rt.draft_label_version_id =
+              ON rt.target_label_version_id =
                  lv.label_version_id
              AND rt.status = 'IN_REVIEW'
+             AND rt.resolved_at IS NULL
             WHERE lv.label_version_id = ?
             FOR UPDATE
             """,
@@ -314,17 +317,215 @@ public class JdbcLabelReviewCommandRepository
     @Override
     public int updateReviewTaskStatus(
             String reviewTaskId,
-            String newStatus
+            String labelVersionId,
+            String newStatus,
+            String decision,
+            String resolverUserId,
+            boolean resolved
     ) {
         return jdbc.update(
                 """
                 UPDATE review_task
-                SET status = ?
+                SET status = ?,
+                    target_label_version_id = ?,
+                    decision = ?,
+                    resolved_by_user_id = ?,
+                    resolved_at = CASE WHEN ? THEN NOW() ELSE NULL END
                 WHERE review_task_id = ?
                   AND status = 'IN_REVIEW'
+                  AND target_label_version_id = ?
+                  AND resolved_at IS NULL
                 """,
                 newStatus,
+                labelVersionId,
+                decision,
+                resolved ? resolverUserId : null,
+                resolved,
+                reviewTaskId,
+                labelVersionId
+        );
+    }
+
+    @Override
+    public Optional<PublicationTarget> lockForPublication(
+            String reviewTaskId
+    ) {
+        return jdbc.query(
+                """
+                SELECT
+                    rt.review_task_id,
+                    rt.target_label_version_id,
+                    rt.decision,
+                    rt.status AS task_status,
+                    rt.resolved_at,
+                    lv.lifecycle_status,
+                    lv.product_id,
+                    lv.data_provenance_id
+                FROM review_task rt
+                JOIN label_version lv
+                  ON lv.label_version_id = rt.target_label_version_id
+                JOIN product p
+                  ON p.product_id = lv.product_id
+                WHERE rt.review_task_id = ?
+                FOR UPDATE
+                """,
+                rs -> rs.next()
+                        ? Optional.of(new PublicationTarget(
+                                rs.getString("review_task_id"),
+                                rs.getString("target_label_version_id"),
+                                rs.getString("decision"),
+                                rs.getString("task_status"),
+                                rs.getTimestamp("resolved_at") == null
+                                        ? null
+                                        : rs.getTimestamp("resolved_at").toLocalDateTime(),
+                                rs.getString("lifecycle_status"),
+                                rs.getString("product_id"),
+                                rs.getString("data_provenance_id")
+                        ))
+                        : Optional.empty(),
                 reviewTaskId
+        );
+    }
+
+    @Override
+    public int supersedePublishedVersion(String labelVersionId) {
+        return jdbc.update(
+                """
+                UPDATE label_version
+                SET lifecycle_status = 'SUPERSEDED',
+                    is_current_published = 'N'
+                WHERE product_id = (
+                    SELECT target.product_id
+                    FROM (SELECT product_id
+                          FROM label_version
+                          WHERE label_version_id = ?) target
+                )
+                  AND jurisdiction_code = (
+                    SELECT target.jurisdiction_code
+                    FROM (SELECT jurisdiction_code
+                          FROM label_version
+                          WHERE label_version_id = ?) target
+                )
+                  AND label_version_id <> ?
+                  AND lifecycle_status = 'PUBLISHED'
+                  AND is_current_published = 'Y'
+                """,
+                labelVersionId,
+                labelVersionId,
+                labelVersionId
+        );
+    }
+
+    @Override
+    public int publishApprovedVersion(String labelVersionId) {
+        return jdbc.update(
+                """
+                UPDATE label_version
+                SET lifecycle_status = 'PUBLISHED',
+                    is_current_published = 'Y'
+                WHERE label_version_id = ?
+                  AND lifecycle_status = 'APPROVED'
+                  AND is_current_published = 'N'
+                """,
+                labelVersionId
+        );
+    }
+
+    @Override
+    public int updateCurrentPublishedVersion(
+            String productId,
+            String labelVersionId
+    ) {
+        return jdbc.update(
+                """
+                UPDATE product
+                SET current_published_label_version_id = ?
+                WHERE product_id = ?
+                """,
+                labelVersionId,
+                productId
+        );
+    }
+
+    @Override
+    public void createPublicationRecord(
+            String labelVersionId,
+            String actorUserId,
+            String dataProvenanceId
+    ) {
+        jdbc.update(
+                """
+                INSERT INTO publication_record (
+                    publication_record_id,
+                    label_version_id,
+                    published_by_user_id,
+                    published_at,
+                    publication_channel,
+                    data_provenance_id
+                ) VALUES (?, ?, ?, NOW(), 'DEMO_RELEASE', ?)
+                """,
+                "publication_" + labelVersionId,
+                labelVersionId,
+                actorUserId,
+                dataProvenanceId
+        );
+    }
+
+    @Override
+    public void createPublicationAudit(
+            String labelVersionId,
+            String reviewTaskId,
+            String actorUserId,
+            String dataProvenanceId
+    ) {
+        jdbc.update(
+                """
+                INSERT INTO audit_event (
+                    audit_event_id, event_type, entity_type, entity_id,
+                    event_at, actor_user_id, before_value, after_value,
+                    event_payload, correlation_id, data_provenance_id
+                ) VALUES (
+                    ?, 'LABEL_PUBLISHED', 'LABEL_VERSION', ?, NOW(), ?,
+                    JSON_OBJECT('lifecycle_status', 'APPROVED',
+                                'is_current_published', 'N'),
+                    JSON_OBJECT('lifecycle_status', 'PUBLISHED',
+                                'is_current_published', 'Y'),
+                    JSON_OBJECT('review_task_id', ?,
+                                'helper', 'LabelReviewService'),
+                    ?, ?
+                )
+                """,
+                "audit_label_publish_" + UUID.randomUUID()
+                        .toString().replace("-", ""),
+                labelVersionId,
+                actorUserId,
+                reviewTaskId,
+                labelVersionId,
+                dataProvenanceId
+        );
+    }
+
+    @Override
+    public int resolvePublishedReviewTask(
+            String reviewTaskId,
+            String labelVersionId,
+            String resolverUserId
+    ) {
+        return jdbc.update(
+                """
+                UPDATE review_task
+                SET status = 'CLOSED',
+                    resolved_by_user_id = ?,
+                    resolved_at = NOW()
+                WHERE review_task_id = ?
+                  AND target_label_version_id = ?
+                  AND decision = 'APPROVE'
+                  AND status = 'IN_REVIEW'
+                  AND resolved_at IS NULL
+                """,
+                resolverUserId,
+                reviewTaskId,
+                labelVersionId
         );
     }
 
