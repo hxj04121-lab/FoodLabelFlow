@@ -19,6 +19,7 @@ until that bridge is installed. No request accepts a trusted actor ID.
 | GET | /products | paginated list |
 | GET | /products/{id} | product and current formula pointer |
 | GET | /products/{id}/formulas | ordered version history |
+| POST | /products/{id}/formula-adoptions | explicitly create and release a new formula using a newer specification |
 | POST | /formulas | create immutable draft snapshot |
 | GET | /formulas/{id} | formula plus items |
 | POST | /formulas/{id}/release | atomic release |
@@ -26,6 +27,11 @@ until that bridge is installed. No request accepts a trusted actor ID.
 
 List query: `limit=50&offset=0`; limit 1..100, offset >=0. Default list is an array.
 No update/delete API is supplied; corrections create a new version.
+
+The additive M2 adoption candidate is documented in
+[specification-adoption-api-v1.md](../contracts/specification-adoption-api-v1.md).
+It requires both DATA.MAINTAIN and FORMULA.RELEASE, retains historical snapshots,
+and updates the formula pointer independently of label publication.
 
 Supplier:
 ```json

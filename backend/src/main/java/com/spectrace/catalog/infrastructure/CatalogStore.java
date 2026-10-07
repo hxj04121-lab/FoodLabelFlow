@@ -82,14 +82,7 @@ public class CatalogStore {
     }
     /** Caller holds the product row lock; all versions and items are append-only after creation. */
     public String formula(Formula value, String actor) {
-        var previous = jdbc.queryForList("SELECT version_number FROM formula_version WHERE product_id=? ORDER BY version_number DESC LIMIT 1 FOR UPDATE",
-                Integer.class, value.productId());
-        int version = previous.isEmpty() ? 1 : previous.getFirst() + 1;
-        String id = id();
-        jdbc.update("""
-                INSERT INTO formula_version(formula_version_id,product_id,version_number,lifecycle_status,
-                  is_current_released,created_by_user_id,data_provenance_id) VALUES (?,?,?,'DRAFT','N',?,?)
-                """, id, value.productId(), version, actor, value.provenanceId());
+        String id = formulaVersion(value.productId(), value.provenanceId(), actor);
         for (int i = 0; i < value.items().size(); i++) {
             var item = value.items().get(i);
             jdbc.update("""
@@ -97,6 +90,32 @@ public class CatalogStore {
                       specification_version_id,sequence_no,quantity_value,quantity_unit) VALUES (?,?,?,?,?,?,?)
                     """, id(), id, item.materialId(), item.specificationId(), i + 1, item.quantity(), item.unit());
         }
+        return id;
+    }
+    /** Caller holds the product and source-version locks; copy the snapshot without renumbering items. */
+    public String adoptFormula(String productId, String sourceFormulaVersionId, String targetMaterialId,
+                               String targetSpecificationVersionId, String provenanceId, String actor) {
+        String id = formulaVersion(productId, provenanceId, actor);
+        for (var item : formulaItems(sourceFormulaVersionId)) {
+            String specificationId = targetMaterialId.equals(item.get("supplier_material_id"))
+                    ? targetSpecificationVersionId : (String) item.get("specification_version_id");
+            jdbc.update("""
+                    INSERT INTO formula_item(formula_item_id,formula_version_id,supplier_material_id,
+                      specification_version_id,sequence_no,quantity_value,quantity_unit) VALUES (?,?,?,?,?,?,?)
+                    """, id(), id, item.get("supplier_material_id"), specificationId,
+                    item.get("sequence_no"), item.get("quantity_value"), item.get("quantity_unit"));
+        }
+        return id;
+    }
+    private String formulaVersion(String productId, String provenanceId, String actor) {
+        var previous = jdbc.queryForList("SELECT version_number FROM formula_version WHERE product_id=? ORDER BY version_number DESC LIMIT 1 FOR UPDATE",
+                Integer.class, productId);
+        int version = previous.isEmpty() ? 1 : previous.getFirst() + 1;
+        String id = id();
+        jdbc.update("""
+                INSERT INTO formula_version(formula_version_id,product_id,version_number,lifecycle_status,
+                  is_current_released,created_by_user_id,data_provenance_id) VALUES (?,?,?,'DRAFT','N',?,?)
+                """, id, productId, version, actor, provenanceId);
         return id;
     }
     public void releaseFormula(String id, String productId, String actor) {
