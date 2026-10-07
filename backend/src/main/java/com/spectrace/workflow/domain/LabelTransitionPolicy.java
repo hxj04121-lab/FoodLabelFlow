@@ -1,8 +1,5 @@
 package com.spectrace.workflow.domain;
 
-import org.springframework.stereotype.Component;
-
-@Component
 public class LabelTransitionPolicy {
 
     public void requireTransition(

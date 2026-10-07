@@ -1,9 +1,7 @@
 package com.spectrace.workflow.domain;
 
 import com.spectrace.identity.application.AuthorizationDeniedException;
-import org.springframework.stereotype.Component;
 
-@Component
 public class MakerCheckerPolicy {
 
     public void requireIndependentChecker(
