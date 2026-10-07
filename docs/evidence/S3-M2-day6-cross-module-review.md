@@ -7,17 +7,17 @@ This ledger reconciles recorded review with the current candidate. It distinguis
 an implemented/documented response, a GitHub thread's resolution state and an owner's
 acceptance. Only an attributable owner decision can satisfy the last condition.
 
-## Reviewed baseline and prerequisite state
+## Original Day 6 baseline and prerequisite state (2026-10-06 snapshot)
 
-Main remains `e7512c638dd8661cff7e6c64aaf978a8acba3bf0`, containing the merged golden
+At the original Day 6 preflight, main was `e7512c638dd8661cff7e6c64aaf978a8acba3bf0`, containing the merged golden
 [PR56](https://github.com/hxj04121-lab/FoodLabelFlow/pull/56), catalog lookup
 [PR57](https://github.com/hxj04121-lab/FoodLabelFlow/pull/57) and M1 strategy
 [PR59](https://github.com/hxj04121-lab/FoodLabelFlow/pull/59).
-[PR61](https://github.com/hxj04121-lab/FoodLabelFlow/pull/61) remains an unmerged draft
+[PR61](https://github.com/hxj04121-lab/FoodLabelFlow/pull/61) was an unmerged draft
 at `d6ca803`, based on main. [PR62](https://github.com/hxj04121-lab/FoodLabelFlow/pull/62)
-remains an unmerged draft at `20a41e4`, based on PR61's branch. Both have zero recorded
-reviews and review threads. The Day 6 design is traceable to that Day 5 implementation
-baseline; it is not represented as already integrated on main.
+was an unmerged draft at `20a41e4`, based on PR61's branch. Both had zero recorded
+reviews and review threads in that snapshot. The Day 6 design is traceable to that
+Day 5 implementation baseline; later review and integration do not rewrite it.
 
 Jira assigns SCRUM-57's A07 diagrams, pattern decision and cross-module review work
 to M2. Its code/test prerequisites are available on the dependent branches, so the
@@ -26,7 +26,7 @@ be satisfied by assuming a calendar date, an earlier ticket status or a merge.
 Day 7 SCRUM-58 and parent SCRUM-48 closure remain gated on accepted, merged current-main
 evidence.
 
-## Actual review records
+## Day 6 review records (2026-10-06 snapshot)
 
 | Artifact | Observed record | What it establishes |
 | --- | --- | --- |
@@ -49,9 +49,32 @@ This is a bounded audit of those PR records, Jira records and repository evidenc
 It does not claim that no conversation could exist elsewhere. An external decision
 must be linked and its accepted version/scope recorded before it changes this ledger.
 
-## PR48 findings and current disposition
+## Attributable M1 follow-up on 2026-10-07
 
-All ten GitHub threads below are still **unresolved** in the observed records.
+These are actual owner decisions after the original Day 6 snapshot above.
+
+| PR / exact reviewed head | Attributable M1 record | Scope established and remaining boundary |
+| --- | --- | --- |
+| PR61 / `3a2ebd9739866d1061986c51fe4cfae7cde061bf` | [APPROVED by `hxj04121-lab`](https://github.com/hxj04121-lab/FoodLabelFlow/pull/61#pullrequestreview-5443081482), 13:33:30 UTC; merged at 13:33:34 UTC as `f16ca3e0d3fcb79a421161a283085e312db6d39c`. | Real exact-head M1 acceptance of the adoption implementation, immutable history, pointer/audit transaction and consumption notes; not complete contract/golden freeze acceptance. |
+| PR62 / `2a28088bff4c0b79597da4a3bc3369aa11c94d61` | [COMMENTED by M1](https://github.com/hxj04121-lab/FoodLabelFlow/pull/62#pullrequestreview-5443091866), 13:34:17 UTC: code fix correct; retarget main and mark ready before the promised approval. | Actual scoped review of material-before-specification locking and real adoption/golden tests. The own-container suggestion is explicitly non-blocking. COMMENTED is not APPROVED and is bound to this reviewed head. |
+| PR63 / `b7777cd4df409f651cc3393d96f87df23e2bad75` | [COMMENTED by M1](https://github.com/hxj04121-lab/FoodLabelFlow/pull/63#pullrequestreview-5443092233), 13:34:19 UTC: docs good; after PR62 merges, retarget main and mark ready before approval. | Actual scoped review of the corrected missing-allergen wording, adoption SAD/diagrams and evidence privacy. It is not the promised formal approval of a later integration head. |
+
+Subsequent heads, base changes, qualifying main-bound CI/Sonar, formal approvals and
+merges must be checked against the actual PR receipts. A previous COMMENTED review
+or a review request does not approve a later head. Metadata retarget/ready alone does
+not establish that the required workflow ran. The original Day 6 test/render records
+remain historical; no new execution is attributed to this review-ledger update.
+
+These records add real M1 acceptance evidence without claiming M3/M4/M5 acceptance,
+resolving PR48 threads, releasing the business Specification V2, or accepting the
+full impact/review/publication workflow. Exact-version cross-module freeze remains
+a separate decision.
+
+## PR48 findings and Day 6 disposition
+
+All ten GitHub threads below were **unresolved** in the Day 6 observed records.
+This table preserves that dated disposition; the scoped M1 follow-up above does not
+assert a later thread resolution or complete freeze approval.
 M1 has subsequently acknowledged incorporation of the contract corrections in Jira;
 the table separates that acknowledgement from exact-version freeze signoff.
 The implementation column describes the candidate response; it does not close a
@@ -84,7 +107,7 @@ the repository's [earlier explicit role evidence](S2-M2-contract-diff.md).
 
 | Owner | Required decision | Recorded acceptance |
 | --- | --- | --- |
-| M1 / Huang Xiangjia | Confirm the current candidate and adoption/golden references after the recorded remediation; consume lookup/golden/adoption without transferring classification ownership. | Human acknowledgement of incorporated corrections is recorded in Jira10096. Exact-current-version/adoption acceptance and freeze signoff are not recorded; PR48's formal review remains COMMENTED. |
+| M1 / Huang Xiangjia | Confirm the current candidate and adoption/golden references after the recorded remediation; consume lookup/golden/adoption without transferring classification ownership. | Jira10096 acknowledges incorporated corrections. The exact-head PR61 APPROVED and PR62/PR63 COMMENTED decisions above add adoption/design review evidence. Complete exact-version contract/golden freeze signoff is not recorded here; PR48's Day 6 formal review record is COMMENTED. |
 | M3 / Xu Feiyang | Accept direct payloads, selector pagination/loading/error states and any run-query pagination decision. | Missing in the collected records. |
 | M4 / Zhu Wenyu | Confirm 401/403, POST permissions, the shared GET read policy, required ReviewTask assignee selection, and review/publication references. | Missing in the collected records; GET/assignee choices remain explicit blockers. |
 | M5 / Sun Huajian | Confirm 409/replay behavior and one transaction for analysis/findings/tasks/audit, including rollback and provenance. | Missing in the collected records. |

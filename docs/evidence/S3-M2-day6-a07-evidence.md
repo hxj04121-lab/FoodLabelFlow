@@ -11,12 +11,14 @@ problem, and reconciliation of actual cross-module review. This scope comes from
 the live Jira task and available Day 4/Day 5 implementation, not from assuming that
 the calendar date grants ownership of another module or the Day 7 merge gate.
 
-Main at preflight is `e7512c638dd8661cff7e6c64aaf978a8acba3bf0`.
+At the original Day 6 preflight, main was `e7512c638dd8661cff7e6c64aaf978a8acba3bf0`.
 Day 4 [PR61](https://github.com/hxj04121-lab/FoodLabelFlow/pull/61), head `d6ca803`, and
 Day 5 [PR62](https://github.com/hxj04121-lab/FoodLabelFlow/pull/62), head `20a41e4`,
-remain unmerged drafts with no new review threads. This evidence is based on exact
-Day 5 commit `20a41e48c71e0851bf9c71de9ba580cf1623323a`. The Day 6 branch is dependent
-on PR62; Day 5 is not prematurely retargeted to main.
+were unmerged drafts in that snapshot. This evidence is based on exact Day 5 commit
+`20a41e48c71e0851bf9c71de9ba580cf1623323a`; the Day 6 branch then depended on PR62.
+Later attributable M1 decisions are recorded in the
+[2026-10-07 follow-up](S3-M2-day6-cross-module-review.md#attributable-m1-follow-up-on-2026-10-07).
+They do not change the inspected baseline or turn these Day 6 checks into new runs.
 
 The earlier 473/480-test runs establish the implementation baseline and are not
 counted as today's new implementation or today's local test executions. Day 6
@@ -32,7 +34,7 @@ adds the artifacts and verification below.
 | Design class diagram | [Editable Mermaid](../architecture/diagrams/s3-m2-adoption-design-class.mmd) / [rendered SVG](../architecture/diagrams/s3-m2-adoption-design-class.svg) |
 | Design sequence diagram | [Editable Mermaid](../architecture/diagrams/s3-m2-adoption-design-sequence.mmd) / [rendered SVG](../architecture/diagrams/s3-m2-adoption-design-sequence.svg) |
 | Problem, candidates, selected approach, rationale, actual before/after changes and implementation/test decisions | [Pattern decision](../architecture/S3-M2-adoption-pattern-decision.md) |
-| Original findings, current response, human acknowledgement and absent acceptance | [Cross-module review ledger](S3-M2-day6-cross-module-review.md) |
+| Dated findings, attributable M1 follow-up and remaining freeze acceptance | [Cross-module review ledger](S3-M2-day6-cross-module-review.md) |
 
 Analysis participants represent boundary/control/entity responsibilities. Design
 participants are the real controller, transactional service, JDBC store,
@@ -77,11 +79,14 @@ the earlier PR61/PR62 results into a new-current-head claim.
 
 ## Acceptance still required
 
-M1's Jira acknowledgement that the PR48 corrections were incorporated is real and
-is recorded in the review ledger. Ten PR48 GitHub threads remain unresolved; there
-is no explicit full current-version freeze approval from M1/M3/M4/M5 in the collected
-records. M4's shared GET policy and required ReviewTask-assignee rule, M3 consumer
-decisions and M5 run transaction/idempotency acceptance remain pending.
+M1's Jira acknowledgement of incorporated PR48 corrections remains real. The review
+ledger also records the later exact-head PR61 APPROVED and PR62/PR63 COMMENTED
+reviews on 2026-10-07; those scoped decisions must not be omitted or promoted into
+complete freeze acceptance. The ten unresolved PR48 threads are a Day 6 snapshot,
+not a claim that they were resolved by later merges. No explicit complete exact-version
+M1/M3/M4/M5 freeze approval is recorded here. The shared GET/ReviewTask-assignee policy,
+M3 consumer decisions and M5 transaction/idempotency acceptance still need attributable
+owner decisions before freeze.
 
 The OpenAPI remains `CANDIDATE_PENDING_CROSS_MODULE_ACCEPTANCE`; the SOY oracle remains
 a proposed scenario, not a real business V2 release. Full impact-run/review/approval/
