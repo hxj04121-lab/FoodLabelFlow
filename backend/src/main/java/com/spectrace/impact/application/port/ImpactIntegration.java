@@ -19,6 +19,13 @@ public interface ImpactIntegration {
     void auditImpactRun(
             String actorId, String changeRequestId, String impactAnalysisRunId, String dataProvenanceId);
 
+    /**
+     * The user a new ReviewTask is assigned to: the active holder of LABEL.CREATE (the maker
+     * who drafts the replacement label) with the lowest userId, so the choice is deterministic.
+     * Throws when nobody holds it; a task is never assigned to a guessed user.
+     */
+    String reviewTaskAssignee();
+
     /** Canonical V3 permission codes. */
     enum Permission {
         CREATE_CHANGE_REQUEST("CHANGE_REQUEST.CREATE"),
