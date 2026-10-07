@@ -272,6 +272,23 @@ public class LabelReviewService {
                     "Target LabelVersion must be APPROVED before publication"
             );
         }
+        if (!task.currentFormula()) {
+            throw new LabelVersionConflictException(
+                    "Label formula version is no longer current: "
+                            + labelVersionId
+            );
+        }
+        if (!task.latestLabelVersion()) {
+            throw new LabelVersionConflictException(
+                    "Label version is stale or historical: "
+                            + labelVersionId
+            );
+        }
+        if (!task.hasApproveRecord()) {
+            throw new IllegalStateException(
+                    "ReviewTask requires a matching APPROVE record before publication"
+            );
+        }
 
         repository.supersedePublishedVersion(labelVersionId);
 

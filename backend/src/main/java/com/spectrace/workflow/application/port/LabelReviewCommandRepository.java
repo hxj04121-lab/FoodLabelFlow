@@ -119,7 +119,10 @@ public interface LabelReviewCommandRepository {
             java.time.LocalDateTime resolvedAt,
             String lifecycleStatus,
             String productId,
-            String dataProvenanceId
+            String dataProvenanceId,
+            boolean currentFormula,
+            boolean latestLabelVersion,
+            boolean hasApproveRecord
     ) {
     }
 }

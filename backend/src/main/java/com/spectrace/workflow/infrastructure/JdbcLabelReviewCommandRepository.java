@@ -148,9 +148,15 @@ public class JdbcLabelReviewCommandRepository
                 UPDATE review_task
                 SET status = 'IN_REVIEW',
                     target_label_version_id = ?
-                WHERE target_label_version_id = ?
+                WHERE (draft_label_version_id = ?
+                       OR target_label_version_id = ?)
                   AND status = 'OPEN'
+                  AND resolved_at IS NULL
+                  AND (target_label_version_id IS NULL
+                       OR target_label_version_id = ?)
                 """,
+                labelVersionId,
+                labelVersionId,
                 labelVersionId,
                 labelVersionId
         );
@@ -350,6 +356,28 @@ public class JdbcLabelReviewCommandRepository
     public Optional<PublicationTarget> lockForPublication(
             String reviewTaskId
     ) {
+        String productId = jdbc.query(
+                """
+                SELECT lv.product_id
+                FROM review_task rt
+                JOIN label_version lv
+                  ON lv.label_version_id = rt.target_label_version_id
+                WHERE rt.review_task_id = ?
+                """,
+                rs -> rs.next() ? rs.getString("product_id") : null,
+                reviewTaskId
+        );
+        if (productId == null) {
+            return Optional.empty();
+        }
+
+        // Serialize publication with draft creation and formula-pointer changes.
+        jdbc.query(
+                "SELECT product_id FROM product WHERE product_id = ? FOR UPDATE",
+                rs -> rs.next() ? rs.getString("product_id") : null,
+                productId
+        );
+
         return jdbc.query(
                 """
                 SELECT
@@ -360,12 +388,33 @@ public class JdbcLabelReviewCommandRepository
                     rt.resolved_at,
                     lv.lifecycle_status,
                     lv.product_id,
-                    lv.data_provenance_id
+                    lv.data_provenance_id,
+                    CASE
+                        WHEN lv.formula_version_id = p.current_formula_version_id
+                         AND fv.lifecycle_status = 'RELEASED'
+                         AND fv.is_current_released = 'Y'
+                        THEN 1 ELSE 0
+                    END AS is_current_formula,
+                    CASE WHEN lv.version_number = (
+                        SELECT MAX(latest.version_number)
+                        FROM label_version latest
+                        WHERE latest.product_id = lv.product_id
+                          AND latest.jurisdiction_code = lv.jurisdiction_code
+                    ) THEN 1 ELSE 0 END AS is_latest_label_version,
+                    EXISTS (
+                        SELECT 1
+                        FROM approval_record ar
+                        WHERE ar.review_task_id = rt.review_task_id
+                          AND ar.label_version_id = rt.target_label_version_id
+                          AND ar.decision = 'APPROVE'
+                    ) AS has_approve_record
                 FROM review_task rt
                 JOIN label_version lv
                   ON lv.label_version_id = rt.target_label_version_id
                 JOIN product p
                   ON p.product_id = lv.product_id
+                JOIN formula_version fv
+                  ON fv.formula_version_id = lv.formula_version_id
                 WHERE rt.review_task_id = ?
                 FOR UPDATE
                 """,
@@ -380,7 +429,10 @@ public class JdbcLabelReviewCommandRepository
                                         : rs.getTimestamp("resolved_at").toLocalDateTime(),
                                 rs.getString("lifecycle_status"),
                                 rs.getString("product_id"),
-                                rs.getString("data_provenance_id")
+                                rs.getString("data_provenance_id"),
+                                rs.getBoolean("is_current_formula"),
+                                rs.getBoolean("is_latest_label_version"),
+                                rs.getBoolean("has_approve_record")
                         ))
                         : Optional.empty(),
                 reviewTaskId
