@@ -292,7 +292,11 @@ class LabelReviewServiceTest {
 
         when(repository.updateReviewTaskStatus(
                 "review_1",
-                "CLOSED"
+                "label_v1",
+                "CLOSED",
+                "REJECT",
+                "user_reviewer",
+                true
         )).thenReturn(1);
 
         service.recordDecision(
@@ -309,7 +313,11 @@ class LabelReviewServiceTest {
 
         verify(repository).updateReviewTaskStatus(
                 "review_1",
-                "CLOSED"
+                "label_v1",
+                "CLOSED",
+                "REJECT",
+                "user_reviewer",
+                true
         );
 
         verify(repository).createApprovalRecord(
@@ -366,6 +374,9 @@ class LabelReviewServiceTest {
         verify(repository, never())
                 .updateDecisionState(anyString(), anyString());
         verify(repository, never())
-                .updateReviewTaskStatus(anyString(), anyString());
+                .updateReviewTaskStatus(
+                        anyString(), anyString(), anyString(), anyString(),
+                        anyString(), anyBoolean()
+                );
     }
 }
