@@ -166,6 +166,7 @@ export function Labels() {
       !local ||
       !demoEnabled ||
       !canCreate ||
+      allergenState.status !== 'ready' ||
       !productId ||
       !currentFormulaId || formulaLoading ||
       uncertain
@@ -386,6 +387,7 @@ export function Labels() {
                 !local ||
                 !demoEnabled ||
                 !canCreate ||
+                allergenState.status !== 'ready' ||
                 busy ||
                 uncertain ||
                 formulaLoading || !currentFormulaId
