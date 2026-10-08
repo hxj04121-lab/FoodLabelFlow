@@ -1,6 +1,10 @@
 # S3 login/demo identity and staging proposals
 
 Status: **PROPOSED — owner decisions pending**. Prepared 8 October 2026.
+The later [isolated compound-maker regression](../evidence/S3-compound-maker-negative-20261008.md)
+adds a disposable test-only identity and permitted-creator database/HTTP/browser
+qualification. It changes no production identity, grants, configuration or owner
+decision. Dated fixture statements below retain their earlier execution scope.
 Decision owners: M4 for login/demo identity (SCRUM-50); M5 for staging
 (SCRUM-51). These alternatives are reviewable proposals. They do not record
 a team decision, change security configuration, deploy, or grant permissions.

@@ -1,4 +1,12 @@
 import { expect, test } from '@playwright/test'
+import { mkdirSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+function evidencePath(name: string, previousPath: string) {
+  if (!process.env.S3_EVIDENCE_DIR) return previousPath
+  mkdirSync(process.env.S3_EVIDENCE_DIR, { recursive: true })
+  return resolve(process.env.S3_EVIDENCE_DIR, name)
+}
 test('creates, publishes and preserves old content through the full stack', async ({ page,request }) => {
   test.skip(process.env.LIVE_WRITES !== '1', 'Explicit opt-in required for writes to local course data')
   const productId='prod_usda_1106285'
@@ -12,17 +20,17 @@ test('creates, publishes and preserves old content through the full stack', asyn
   await page.getByLabel('Quantity (optional)').fill('12.5')
   await page.getByLabel('Unit (optional)').fill('kg')
   await page.getByRole('button',{name:'Preview formula',exact:true}).click()
-  await page.screenshot({path:'../test-artifacts/sprint1/screenshots/wo-m3-formula-create-preview.png',fullPage:true})
+  await page.screenshot({path:evidencePath('wo-m3-formula-create-preview.png','../test-artifacts/sprint1/screenshots/wo-m3-formula-create-preview.png'),fullPage:true})
   await page.getByRole('checkbox',{name:'Enable local demo identity for this form'}).check()
   await page.getByRole('button',{name:'Save draft',exact:true}).click()
   await expect(page.getByRole('status')).toContainText('Draft saved to the server')
   await page.getByRole('button',{name:'Publish formula',exact:true}).click()
   await page.getByRole('button',{name:'Confirm publication',exact:true}).click()
   await expect(page.getByText(/published successfully/)).toBeVisible()
-  await page.screenshot({path:'../test-artifacts/sprint1/screenshots/wo-m1-formula-published.png',fullPage:true})
+  await page.screenshot({path:evidencePath('wo-m1-formula-published.png','../test-artifacts/sprint1/screenshots/wo-m1-formula-published.png'),fullPage:true})
   await page.getByRole('button',{name:'Refresh server history'}).click()
   await expect(page.getByRole('region',{name:'Formula history'})).toContainText('RELEASED')
-  await page.screenshot({path:'../test-artifacts/sprint1/screenshots/wo-m1-version-history.png',fullPage:true})
+  await page.screenshot({path:evidencePath('wo-m1-version-history.png','../test-artifacts/sprint1/screenshots/wo-m1-version-history.png'),fullPage:true})
   const after=await (await request.get('/api/catalog/products/'+productId)).json()
   expect(after.current_formula_version_id).not.toBe(before.current_formula_version_id)
   const preserved=await (await request.get('/api/catalog/formulas/'+before.current_formula_version_id)).json()
@@ -32,5 +40,5 @@ test('creates, publishes and preserves old content through the full stack', asyn
   await page.reload()
   await page.getByRole('textbox',{name:'Search products'}).fill('1106285')
   await expect(page.locator('tbody tr')).toHaveCount(1)
-  await page.screenshot({path:'../test-artifacts/sprint1/screenshots/wo-m5-product-detail-after-reload.png',fullPage:true})
+  await page.screenshot({path:evidencePath('wo-m5-product-detail-after-reload.png','../test-artifacts/sprint1/screenshots/wo-m5-product-detail-after-reload.png'),fullPage:true})
 })

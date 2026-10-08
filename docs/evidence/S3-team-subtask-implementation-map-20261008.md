@@ -1,5 +1,10 @@
 # S3 team subtask implementation and acceptance map
 
+Later test scope: [compound-maker negative and enabled live opt-ins](S3-compound-maker-negative-20261008.md).
+This uses an isolated test identity with existing roles; older officer/unit/service
+rows retain their execution scope. No production actor switch or owner acceptance
+is inferred from that fixture.
+
 Prepared 8 October 2026 from the complete 26-row Jira query
 `parent in (SCRUM-47, SCRUM-49, SCRUM-50, SCRUM-51)`.
 This maps substantive criteria to real sources and tests. Jira state alone is

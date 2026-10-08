@@ -21,6 +21,14 @@ async function json(request: APIRequestContext, path: string) {
   return response.json()
 }
 
+// Context reads preserve the same trusted fixture actor as the command. They do
+// not substitute the helper's ordinary officer/admin headers.
+async function actorJson(request: APIRequestContext, path: string) {
+  const response = await request.get(path)
+  expect(response.status(), `${path}: ${await response.text()}`).toBe(200)
+  return response.json()
+}
+
 async function post(request: APIRequestContext, path: string, data: object, subject: string, status: number) {
   const response = await request.post(path, { data, headers: subjectHeaders(subject) })
   expect(response.status(), `${path}: ${await response.text()}`).toBe(status)
@@ -40,6 +48,12 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
 }, testInfo) => {
   test.skip(process.env.LIVE_S3_FLOW !== '1', 'Requires an isolated real backend seeded with released specification input only')
   test.setTimeout(300_000)
+  const compoundMakerSubject = process.env.S3_COMPOUND_MAKER_SUBJECT
+  const compoundMakerAliasSubject = process.env.S3_COMPOUND_MAKER_ALIAS_SUBJECT
+  const compoundMakerUserId = process.env.S3_COMPOUND_MAKER_USER_ID
+  if (!compoundMakerSubject || !compoundMakerAliasSubject || !compoundMakerUserId) {
+    throw new Error('LIVE_S3_FLOW requires the isolated compound-maker subject, alias subject and user ID fixture; this negative must not be skipped')
+  }
   const evidenceDir = resolve(process.env.S3_EVIDENCE_DIR || 'test-results')
   mkdirSync(evidenceDir, { recursive: true })
   expect(golden).toHaveLength(60)
@@ -53,6 +67,11 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
   const makerContext = await browser.newContext({ baseURL: testInfo.project.use.baseURL,
     extraHTTPHeaders: subjectHeaders('dev-external-label-officer') })
   const officerPage = await makerContext.newPage()
+  const compoundMakerContext = await browser.newContext({ baseURL: testInfo.project.use.baseURL,
+    extraHTTPHeaders: subjectHeaders(compoundMakerSubject) })
+  const compoundMakerPage = await compoundMakerContext.newPage()
+  const compoundAliasContext = await browser.newContext({ baseURL: testInfo.project.use.baseURL,
+    extraHTTPHeaders: subjectHeaders(compoundMakerAliasSubject) })
   const adminContext = await browser.newContext({ baseURL: testInfo.project.use.baseURL,
     extraHTTPHeaders: subjectHeaders('dev-external-admin') })
   const changeContext = await browser.newContext({ baseURL: testInfo.project.use.baseURL,
@@ -63,6 +82,13 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
     extraHTTPHeaders: subjectHeaders('dev-external-publisher') })
   try {
     const catalogAllergens = await json(request, '/api/v1/allergens?jurisdictionCode=US')
+    const compoundMakerIdentity = await actorJson(compoundMakerContext.request, '/api/identity/current')
+    expect(compoundMakerIdentity.userId).toBe(compoundMakerUserId)
+    for (const permission of ['LABEL.CREATE', 'LABEL.VALIDATE', 'LABEL.SUBMIT_REVIEW', 'LABEL.APPROVE']) {
+      expect(compoundMakerIdentity.permissions).toContain(permission)
+    }
+    const compoundAliasIdentity = await actorJson(compoundAliasContext.request, '/api/identity/current')
+    expect(compoundAliasIdentity).toEqual(compoundMakerIdentity)
     const adminIdentityResponse = await adminContext.request.get('/api/identity/current')
     expect(adminIdentityResponse.status()).toBe(200)
     const adminIdentity = await adminIdentityResponse.json()
@@ -136,8 +162,10 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
         continue
       }
       expect(finding.missingAllergenCodes).toEqual(['SOY'])
-      const page = officerPage
-      const expectedCreator = 'user_label_officer'
+      const isCompoundMaker = published.size === 0
+      const page = isCompoundMaker ? compoundMakerPage : officerPage
+      const expectedCreator = isCompoundMaker ? compoundMakerUserId : 'user_label_officer'
+      const expectedMakerSubject = isCompoundMaker ? compoundMakerSubject : 'dev-external-label-officer'
       const expectedAllergenIds = [...new Set<string>([
         ...before.get(finding.productId)!.declarations.declarations.map((declaration: any) => declaration.allergenId),
         'all_soy',
@@ -155,6 +183,12 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
       await page.goto(initialPath)
       await expect(page.getByLabel('Product', { exact: true })).toHaveValue(finding.productId)
       await expect(page.getByLabel('Review task ID')).toHaveValue(reviewTaskId)
+      if (isCompoundMaker) {
+        const identity = page.getByRole('region', { name: 'Connected identity' })
+        await expect(identity).toContainText(compoundMakerUserId)
+        await expect(identity).toContainText('LABEL.CREATE')
+        await expect(identity).toContainText('LABEL.APPROVE')
+      }
       for (const allergenId of expectedAllergenIds) {
         const allergen = catalogAllergens.find((entry: any) => entry.allergenId === allergenId)
         expect(allergen, `The explicit historical/SOY input ${allergenId} must exist in the catalog`).toBeTruthy()
@@ -198,20 +232,65 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
       reachedStage = 'actual HTTP review submission from maker UI'
       await page.getByRole('button', { name: 'Submit for review', exact: true }).click()
       await expect(page.getByRole('region', { name: 'Label draft details' })).toContainText('PENDING_REVIEW')
-      if (published.size === 0) {
+      if (isCompoundMaker) {
+        reachedStage = 'actual permitted-maker UI guard and policy denial with unchanged persisted binding'
         await page.getByRole('checkbox', { name: 'Use the connected identity for review and publication' }).check()
-        // This existing maker lacks LABEL.APPROVE. The browser proves UI and ACL
-        // rejection; the independent maker-checker policy has separate unit/service tests.
+        await expect(page.getByRole('checkbox', { name: 'Use the connected identity for review and publication' })).toBeChecked()
+        await expect(page.getByText('Your connected identity created this label. An independent reviewer must make the decision.')).toBeVisible()
         await expect(page.getByRole('button', { name: 'Approve label', exact: true })).toBeDisabled()
-        const denied = await post(makerContext.request, `/api/labels/${draft.labelVersionId}/review-decisions`, {
-          decision: 'APPROVE', comments: 'Existing maker without approval permission must be rejected',
-        }, 'dev-external-label-officer', 403)
+        const beforeSelfApproval = {
+          label: await actorJson(compoundMakerContext.request, `/api/labels/${draft.labelVersionId}`),
+          task: await actorJson(compoundMakerContext.request, `/api/review-tasks/${reviewTaskId}`),
+        }
+        expect(beforeSelfApproval.label.createdByUserId).toBe(compoundMakerIdentity.userId)
+        expect(beforeSelfApproval.label.lifecycleStatus).toBe('PENDING_REVIEW')
+        expect(beforeSelfApproval.task.status).toBe('IN_REVIEW')
+        expect(beforeSelfApproval.task.draftLabelVersionId).toBe(draft.labelVersionId)
+        expect(beforeSelfApproval.task.targetLabelVersionId).toBe(draft.labelVersionId)
+        expect(beforeSelfApproval.task.decision).toBeNull()
+        const denied = await post(compoundMakerContext.request, `/api/labels/${draft.labelVersionId}/review-decisions`, {
+          decision: 'APPROVE', comments: 'Permitted creator must fail the independent maker-checker policy',
+        }, compoundMakerSubject, 403)
         expect(denied.code).toBe('AUTHORIZATION_DENIED')
-        expect(denied.message).toContain('LABEL.APPROVE')
-        expect((await json(request, `/api/review-tasks/${reviewTaskId}`)).decision).toBeNull()
-        await expect(page.getByRole('region', { name: 'Label draft details' })).toContainText('PENDING_REVIEW')
-        lastAttempt = { ...lastAttempt, actualMakerAcl: { status: 403, response: denied,
-          normalUiApproveDisabled: true, storedDecision: null, independentMakerCheckerPolicyReached: false } }
+        expect(denied.message).toBe('Maker-checker violation: creator cannot approve own label')
+        const afterSelfApproval = {
+          label: await actorJson(compoundMakerContext.request, `/api/labels/${draft.labelVersionId}`),
+          task: await actorJson(compoundMakerContext.request, `/api/review-tasks/${reviewTaskId}`),
+        }
+        expect(afterSelfApproval).toEqual(beforeSelfApproval)
+        // A second real subject spelling must resolve to the same persisted user;
+        // the actor's stable user ID, rather than the subject text, enforces the rule.
+        const aliasDenied = await post(compoundAliasContext.request, `/api/labels/${draft.labelVersionId}/review-decisions`, {
+          decision: 'APPROVE', comments: 'The same permitted creator remains the maker through its fixture alias',
+        }, compoundMakerAliasSubject, 403)
+        expect(aliasDenied.code).toBe('AUTHORIZATION_DENIED')
+        expect(aliasDenied.message).toBe('Maker-checker violation: creator cannot approve own label')
+        const afterAliasSelfApproval = {
+          label: await actorJson(compoundAliasContext.request, `/api/labels/${draft.labelVersionId}`),
+          task: await actorJson(compoundAliasContext.request, `/api/review-tasks/${reviewTaskId}`),
+        }
+        expect(afterAliasSelfApproval).toEqual(beforeSelfApproval)
+        // Separately preserve the existing officer permission negative. This caller
+        // is not the compound maker and its ACL403 is not maker-checker evidence.
+        const officerDenied = await post(makerContext.request, `/api/labels/${draft.labelVersionId}/review-decisions`, {
+          decision: 'APPROVE', comments: 'Existing officer without approval permission must be rejected',
+        }, 'dev-external-label-officer', 403)
+        expect(officerDenied.code).toBe('AUTHORIZATION_DENIED')
+        expect(officerDenied.message).toContain('LABEL.APPROVE')
+        expect({
+          label: await actorJson(compoundMakerContext.request, `/api/labels/${draft.labelVersionId}`),
+          task: await actorJson(compoundMakerContext.request, `/api/review-tasks/${reviewTaskId}`),
+        }).toEqual(beforeSelfApproval)
+        await page.screenshot({ path: resolve(evidenceDir, 's3-live-compound-maker-self-approval-disabled.png'), fullPage: true })
+        lastAttempt = { ...lastAttempt, actualMakerChecker: {
+          actualIdentity: compoundMakerIdentity, actualAliasIdentity: compoundAliasIdentity,
+          makerSubject: compoundMakerSubject, aliasSubject: compoundMakerAliasSubject,
+          normalUiApproveDisabled: true, connectedConsentChecked: true,
+          httpStatus: 403, response: denied, aliasHttpStatus: 403, aliasResponse: aliasDenied,
+          before: beforeSelfApproval, after: afterSelfApproval, afterAlias: afterAliasSelfApproval,
+          persistedStateUnchanged: true, independentMakerCheckerPolicyReached: true,
+        }, actualOfficerAcl: { status: 403, response: officerDenied, storedDecision: null,
+          independentMakerCheckerPolicyReached: false } }
       }
       const actorPath = `${initialPath}&labelVersionId=${draft.labelVersionId}`
       const qaPage = await loadActorLabel(qaContext, actorPath, draft.labelVersionId)
@@ -233,10 +312,10 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
       expect((await json(request, `/api/catalog/products/${finding.productId}`)).current_published_label_version_id)
         .toBe(draft.labelVersionId)
       published.set(finding.productId, draft.labelVersionId)
-      observations.push({ productId: finding.productId, reviewTaskId, draft, validation,
+      observations.push({ productId: finding.productId, reviewTaskId, draft, validation, makerUserId: expectedCreator, makerSubject: expectedMakerSubject,
         checkerSubject: 'dev-external-qa-approver', publisherSubject: 'dev-external-publisher',
         persistedCurrentLabelVersionId: draft.labelVersionId, declarations: immutableDeclarations,
-        repeatPublicationHttpStatus: 409, actualMakerAcl: lastAttempt.actualMakerAcl })
+        repeatPublicationHttpStatus: 409, actualMakerChecker: lastAttempt.actualMakerChecker, actualOfficerAcl: lastAttempt.actualOfficerAcl })
       if (published.size === 1 || published.size === 20) {
         await publisherPage.screenshot({ path: resolve(evidenceDir, `s3-live-publication-${published.size}.png`), fullPage: true })
       }
@@ -302,11 +381,11 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
       expect(await json(request, `/api/labels/${original.label.labelVersionId}/declarations`)).toEqual(original.declarations)
     }
     const evidence = { browserExecuted: true, mockedResponses: false, fixtureSqlWrites:
-      ['Released spec_chocolate_v2 and its specification components only; catalog and historic label inputs from Flyway'],
+      ['Released spec_chocolate_v2 and its specification components; isolated NEW compound test user with existing officer/approver role links only; catalog and historic labels from unchanged Flyway'],
       declarationWrites: 'Only the actual first-creation draft UI/API', validationWrites: 'Only the actual evaluator HTTP API',
-      identityCoverage: 'Existing explicit local maker opt-in and isolated preauthenticated QA/publisher fixture browser contexts; production login decision remains separate',
-      publisherIdentity, adminIdentity, closedReviewTasks: closedTasks,
-      makerGuardCoverage: 'Existing officer UI self-approval disabled and actual HTTP ACL403 with zero decision writes. Compound CREATE+APPROVE browser identity was not introduced; independent maker-checker policy is covered separately in unit/service tests. This browser does not prove a permitted-creator database self-approval negative.',
+      identityCoverage: 'One isolated test-only compound CREATE+APPROVE maker, nineteen unchanged existing officer makers, independent existing QA/publisher fixture contexts and a same-user subject alias; production login decision remains separate',
+      publisherIdentity, adminIdentity, compoundMakerIdentity, compoundAliasIdentity, closedReviewTasks: closedTasks,
+      makerGuardCoverage: 'The actual creator has CREATE+APPROVE, selected connected consent, and cannot approve in the normal UI. Actual HTTP requests from this creator and a verified same-user alias reach maker-checker policy403; exact persisted label/task snapshots remain unchanged before independent QA approval and publication. Officer ACL403 is recorded separately.',
       counts: { goldenProducts: 60, actualAdoptions: adopted.size, findings: analysis.findings.length,
         noAction: analysis.noActionCount, reviewRequired: analysis.reviewRequiredCount, published: published.size,
         immutableHistoricLabelsChecked: before.size }, observations }
@@ -317,6 +396,8 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
     writeFileSync(resolve(evidenceDir, 's3-product-flow-progress.json'), JSON.stringify({ reachedStage, lastAttempt,
       actualAdoptionsCompleted: adopted.size, actualPublicationsCompleted: published.size, observations }, null, 2) + '\n')
     await makerContext.close()
+    await compoundMakerContext.close()
+    await compoundAliasContext.close()
     await adminContext.close()
     await changeContext.close()
     await qaContext.close()

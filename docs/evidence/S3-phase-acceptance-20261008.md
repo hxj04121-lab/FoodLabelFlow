@@ -1,5 +1,9 @@
 # Sprint 3 acceptance ledger — 8 October 2026
 
+[Later compound-maker regression and opt-in qualification](S3-compound-maker-negative-20261008.md)
+adds disposable permitted-creator database/HTTP/browser negatives while preserving
+dated records below. It does not adopt login/staging or supply team signoff.
+
 Repository: `hxj04121-lab/FoodLabelFlow`. Scope: Sprint 3 — Change Impact.
 This is an implementation/acceptance checklist, not a team signoff. Jira was read
 on 8 October 2026 using Sprint 37 and SCRUM-48. Source baseline for this

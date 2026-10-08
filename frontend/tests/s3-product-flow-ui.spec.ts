@@ -23,9 +23,9 @@ const task = {
   draftLabelVersionId: initial.labelVersionId, targetLabelVersionId: initial.labelVersionId,
   status: 'IN_PROGRESS', decision: null, resolvedAt: null,
 }
-async function reads(page: Page, label = initial) {
+async function reads(page: Page, label = initial, actorUserId?: string) {
   await page.route('**/api/identity/current', route => route.fulfill({ json: {
-    userId: label.lifecycleStatus === 'DRAFT' ? 'user_label_officer' : 'ui_fixture_checker',
+    userId: actorUserId ?? (label.lifecycleStatus === 'DRAFT' ? 'user_label_officer' : 'ui_fixture_checker'),
     username: 'ui.fixture', displayName: 'UI workflow fixture', roles: ['UI_FIXTURE'],
     permissions: ['LABEL.CREATE', 'LABEL.VALIDATE', 'LABEL.SUBMIT_REVIEW', 'LABEL.APPROVE', 'LABEL.REQUEST_CHANGES', 'LABEL.REJECT', 'LABEL.PUBLISH'],
   } }))
@@ -36,8 +36,8 @@ async function reads(page: Page, label = initial) {
   await page.route('**/api/review-tasks/*', route => route.fulfill({ json: task }))
   await page.route('**/api/labels/' + label.labelVersionId, route => route.fulfill({ json: label }))
 }
-async function open(page: Page, label = initial) {
-  await reads(page, label)
+async function open(page: Page, label = initial, actorUserId?: string) {
+  await reads(page, label, actorUserId)
   await page.goto('/labels?productId=' + label.productId + '&reviewTaskId=' + task.reviewTaskId + '&labelVersionId=' + label.labelVersionId)
   await expect(page.getByRole('region', { name: 'Label draft details' })).toContainText(label.labelVersionId)
 }
@@ -83,6 +83,24 @@ test('requires exact PASSED validation and preserves the connected workflow iden
   await expect(page.getByRole('button', { name: 'Approve label' })).toBeDisabled()
 })
 
+test('prevents a permitted maker from approving while connected consent is checked', async ({ page }) => {
+  let approvalWrites = 0
+  await page.route('**/review-decisions', route => {
+    approvalWrites++
+    return route.fulfill({ json: { ...initial, lifecycleStatus: 'APPROVED' } })
+  })
+  const pending = { ...initial, lifecycleStatus: 'PENDING_REVIEW', createdByUserId: 'ui_fixture_compound_maker' }
+  await open(page, pending, pending.createdByUserId)
+  await consent(page)
+  const identity = page.getByRole('region', { name: 'Connected identity' })
+  await expect(identity).toContainText(pending.createdByUserId)
+  await expect(identity).toContainText('LABEL.CREATE')
+  await expect(identity).toContainText('LABEL.APPROVE')
+  await expect(page.getByRole('checkbox', { name: 'Use the connected identity for review and publication' })).toBeChecked()
+  await expect(page.getByText('Your connected identity created this label. An independent reviewer must make the decision.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Approve label', exact: true })).toBeDisabled()
+  expect(approvalWrites).toBe(0)
+})
 test('shows denied independent review without inventing success or switching identity', async ({ page }) => {
   await page.route('**/review-decisions', route => route.fulfill({ status: 403,
     json: { code: 'AUTHORIZATION_DENIED', message: 'Approval permission is required.' } }))
