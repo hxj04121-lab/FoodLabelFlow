@@ -41,7 +41,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * S3-M2-SOY-SPEC-V2-IMPACT v1. Spec V2 and its N+1 adoption come from the shared fixture
  * until M2's real adoption is on main; the class owns its container because they commit.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "spectrace.dev-external-auth.enabled=true")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Sql(scripts = "/fixtures/s3-soy-spec-v2-adoption.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)

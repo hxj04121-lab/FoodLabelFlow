@@ -1,7 +1,6 @@
 package com.spectrace.workflow;
 
 import com.spectrace.identity.application.IdentityService;
-import com.spectrace.workflow.application.LabelReviewService;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
@@ -35,17 +34,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Local Day7 acceptance diagnostic. Only released specification input is fixture SQL.
+ * Strict Day7 acceptance. Only released specification input is fixture SQL.
  * Formula adoption, impact/tasks, drafts, validation, decisions and publication must
  * use real production code. No validation status or label content is seeded.
- * HTTP covers adoption, impact, draft and evaluator; review/publication use the actual
- * application service because this checkout exposes no workflow HTTP controller.
+ * HTTP covers adoption, impact, immutable first-creation declarations, evaluator,
+ * review submission, independent decision and publication. No direct service call
+ * stands in for a missing product endpoint.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "spectrace.dev-external-auth.enabled=true")
@@ -72,7 +73,6 @@ class Day7RealSoyPublicationPathMySqlTest {
     @LocalServerPort private int port;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private IdentityService identities;
-    @Autowired private LabelReviewService reviews;
 
     @Test
     @Timeout(240)
@@ -185,8 +185,19 @@ class Day7RealSoyPublicationPathMySqlTest {
                 String product = finding.get("productId").stringValue();
                 if (!"REVIEW_REQUIRED".equals(golden.get(product))) continue;
                 String taskId = finding.get("reviewTask").get("reviewTaskId").stringValue();
+                // Retain each product's explicit historical declarations and explicitly
+                // add SOY for this known specification change, including existing MILK.
+                var expectedAllergens = new TreeSet<String>();
+                originals.get(product).declarations().forEach(declaration ->
+                        expectedAllergens.add((String) declaration.get("allergen_id")));
+                expectedAllergens.add("all_soy");
+                var enteredDeclarations = expectedAllergens.stream().map(allergen -> Map.of(
+                        "allergenId", allergen, "declarationType", "CONTAINS",
+                        "displayText", "Contains " + allergen.substring(4))).toList();
+                String creationBody = JSON.writeValueAsString(Map.of("productId", product,
+                        "jurisdictionCode", "US", "reviewTaskId", taskId, "declarations", enteredDeclarations));
                 var draftResponse = request(client, "POST", "/api/labels/drafts",
-                        "{\"productId\":\"" + product + "\",\"jurisdictionCode\":\"US\"}",
+                        creationBody,
                         "dev-external-label-officer");
                 assertThat(draftResponse.statusCode()).as(draftResponse.body()).isEqualTo(201);
                 JsonNode draft = JSON.readTree(draftResponse.body());
@@ -194,6 +205,36 @@ class Day7RealSoyPublicationPathMySqlTest {
                 assertThat(draft.get("formulaVersionId").stringValue()).isEqualTo(adopted.get(product));
                 assertThat(task(taskId)).containsEntry("draft_label_version_id", draftId)
                         .containsEntry("status", "OPEN").containsEntry("target_label_version_id", draftId);
+                assertThat(declarations(draftId)).hasSize(expectedAllergens.size())
+                        .allSatisfy(declaration -> assertThat(declaration)
+                                .containsEntry("declaration_type", "CONTAINS")
+                                .containsEntry("declaration_source", "USER_ENTERED"));
+                assertThat(declarations(draftId).stream().map(declaration -> declaration.get("allergen_id")))
+                        .containsExactlyInAnyOrderElementsOf(expectedAllergens);
+                if (validations.isEmpty()) {
+                    int labelsBefore = count("label_version");
+                    int declarationsBefore = count("label_allergen_declaration");
+                    var taskBefore = task(taskId);
+                    var duplicate = request(client, "POST", "/api/labels/drafts",
+                            "{\"productId\":\"" + product + "\",\"jurisdictionCode\":\"US\","
+                                    + "\"reviewTaskId\":\"" + taskId + "\",\"declarations\":[]}",
+                            "dev-external-label-officer");
+                    assertThat(duplicate.statusCode()).as("repeat creation must not detach task: %s", duplicate.body())
+                            .isEqualTo(409);
+                    assertThat(count("label_version")).isEqualTo(labelsBefore);
+                    assertThat(count("label_allergen_declaration")).isEqualTo(declarationsBefore);
+                    assertThat(task(taskId)).isEqualTo(taskBefore);
+                    var unvalidated = request(client, "POST", "/api/labels/" + draftId + "/review-submissions",
+                            "{}", "dev-external-label-officer");
+                    assertThat(unvalidated.statusCode()).as("missing real PASS must block: %s", unvalidated.body())
+                            .isEqualTo(409);
+                    assertThat(task(taskId)).isEqualTo(taskBefore);
+                    assertThat(jdbc.queryForObject("SELECT lifecycle_status FROM label_version WHERE label_version_id=?",
+                            String.class, draftId)).isEqualTo("DRAFT");
+                    assertThat(count("approval_record")).isZero();
+                    assertThat(count("publication_record")).isZero();
+                    evidence.put("repeatDraftAndMissingPassRejectedAtomically", true);
+                }
                 var validation = request(client, "POST", "/api/v1/label-versions/" + draftId + "/validation-runs",
                         ruleBody, "dev-external-label-officer");
                 var validationEvidence = new LinkedHashMap<String, Object>();
@@ -224,14 +265,14 @@ class Day7RealSoyPublicationPathMySqlTest {
                 state.put("draftId", draftId);
                 int auditBeforeSubmission = Objects.requireNonNull(jdbc.queryForObject(
                         "SELECT COUNT(*) FROM audit_event WHERE entity_id=?", Integer.class, draftId));
-                RuntimeException submissionFailure = null;
-                try { reviews.submitForReview(draftId, maker); }
-                catch (RuntimeException failure) { submissionFailure = failure; }
-                state.put("submissionFailure", submissionFailure == null ? null : submissionFailure.toString());
+                var submission = request(client, "POST", "/api/labels/" + draftId + "/review-submissions",
+                        "{}", "dev-external-label-officer");
+                state.put("submissionHttpStatus", submission.statusCode());
+                state.put("submissionResponse", JSON.readTree(submission.body()));
                 state.put("taskAfterSubmission", task(taskId));
                 state.put("labelAfterSubmission", jdbc.queryForMap("SELECT * FROM label_version WHERE label_version_id=?", draftId));
                 workflow.add(state);
-                if (submissionFailure != null) {
+                if (submission.statusCode() != 200) {
                     assertThat(task(taskId)).containsEntry("status", "OPEN")
                             .containsEntry("draft_label_version_id", draftId)
                             .containsEntry("target_label_version_id", draftId)
@@ -246,16 +287,65 @@ class Day7RealSoyPublicationPathMySqlTest {
                     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE entity_id=?",
                             Integer.class, draftId)).isEqualTo(auditBeforeSubmission);
                     state.put("rejectionAtomicityAsserted", true);
-                    acceptance.assertThat(submissionFailure).as("actual submitForReview for %s", product).isNull();
+                    acceptance.assertThat(submission.statusCode()).as("actual HTTP submitForReview for %s: %s",
+                            product, submission.body()).isEqualTo(200);
                     continue; // Approval/publication were blocked, never declared successful.
                 }
+                assertThat(JSON.readTree(submission.body()).get("lifecycleStatus").stringValue())
+                        .isEqualTo("PENDING_REVIEW");
                 assertThat(task(taskId)).containsEntry("status", "IN_REVIEW")
                         .containsEntry("target_label_version_id", draftId);
-                reviews.recordDecision(draftId, "APPROVE", "Day7 independent actual checker approval", checker);
+                var approvalBefore = count("approval_record");
+                var taskBeforeDecision = task(taskId);
+                var unauthorizedApproval = request(client, "POST", "/api/labels/" + draftId + "/review-decisions",
+                        "{\"decision\":\"APPROVE\",\"comments\":\"maker cannot approve\"}",
+                        "dev-external-label-officer");
+                assertThat(unauthorizedApproval.statusCode()).as(unauthorizedApproval.body()).isEqualTo(403);
+                assertThat(count("approval_record")).isEqualTo(approvalBefore);
+                assertThat(task(taskId)).isEqualTo(taskBeforeDecision);
+                var decision = request(client, "POST", "/api/labels/" + draftId + "/review-decisions",
+                        "{\"decision\":\"APPROVE\",\"comments\":\"Day7 independent HTTP checker approval\"}",
+                        "dev-external-qa-approver");
+                assertThat(decision.statusCode()).as(decision.body()).isEqualTo(200);
+                assertThat(JSON.readTree(decision.body()).get("lifecycleStatus").stringValue()).isEqualTo("APPROVED");
+                state.put("approvalHttpStatus", decision.statusCode());
+                state.put("approvalResponse", JSON.readTree(decision.body()));
                 assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM approval_record WHERE label_version_id=? "
                         + "AND review_task_id=? AND decision='APPROVE' AND decided_by_user_id=?",
                         Integer.class, draftId, taskId, checker.userId())).isEqualTo(1);
-                reviews.publishReviewTask(taskId, draftId, publisher);
+                if (published.isEmpty()) {
+                    String mismatchedTask = findings.stream()
+                            .filter(other -> "REVIEW_REQUIRED".equals(other.get("outcome").stringValue()))
+                            .map(other -> other.get("reviewTask").get("reviewTaskId").stringValue())
+                            .filter(other -> !taskId.equals(other)).findFirst().orElseThrow();
+                    var wrongTaskBefore = task(mismatchedTask);
+                    var expectedTaskBefore = task(taskId);
+                    var mismatch = request(client, "POST", "/api/review-tasks/" + mismatchedTask + "/publications",
+                            "{\"labelVersionId\":\"" + draftId + "\"}", "dev-external-publisher");
+                    assertThat(mismatch.statusCode()).as(mismatch.body()).isEqualTo(409);
+                    assertThat(task(mismatchedTask)).isEqualTo(wrongTaskBefore);
+                    assertThat(task(taskId)).isEqualTo(expectedTaskBefore);
+                    assertThat(count("publication_record")).isZero();
+                    evidence.put("mismatchedPublicationRejectedAtomically", true);
+                }
+                String publicationPath = "/api/review-tasks/" + taskId + "/publications";
+                String publicationBody = "{\"labelVersionId\":\"" + draftId + "\"}";
+                var publication = request(client, "POST", publicationPath, publicationBody, "dev-external-publisher");
+                assertThat(publication.statusCode()).as(publication.body()).isEqualTo(200);
+                assertThat(JSON.readTree(publication.body()).get("lifecycleStatus").stringValue()).isEqualTo("PUBLISHED");
+                state.put("publicationHttpStatus", publication.statusCode());
+                state.put("publicationResponse", JSON.readTree(publication.body()));
+                var closedTask = task(taskId);
+                int publicationsBeforeReplay = count("publication_record");
+                int auditsBeforeReplay = count("audit_event");
+                var publicationReplay = request(client, "POST", publicationPath, publicationBody,
+                        "dev-external-publisher");
+                assertThat(publicationReplay.statusCode()).as(publicationReplay.body()).isEqualTo(409);
+                assertThat(task(taskId)).isEqualTo(closedTask);
+                assertThat(count("publication_record")).isEqualTo(publicationsBeforeReplay);
+                assertThat(count("audit_event")).isEqualTo(auditsBeforeReplay);
+                state.put("repeatPublicationHttpStatus", publicationReplay.statusCode());
+                state.put("repeatPublicationZeroAdditionalWrites", true);
                 published.put(product, draftId);
                 assertThat(task(taskId)).containsEntry("status", "CLOSED").containsEntry("decision", "APPROVE");
                 assertThat(task(taskId).get("resolved_at")).isNotNull();

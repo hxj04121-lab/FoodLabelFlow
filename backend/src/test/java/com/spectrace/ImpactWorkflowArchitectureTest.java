@@ -1,7 +1,13 @@
 package com.spectrace;
 
 import com.spectrace.archfixture.badimpact.application.BadImpactService;
+import com.spectrace.archfixture.badimpact.infrastructure.ForeignRootInfrastructureDependency;
+import com.spectrace.archfixture.badimpact.infrastructure.ForeignNestedInfrastructureDependency;
+import com.spectrace.archfixture.badimpact.infrastructure.OwnInfrastructureDependencies;
+import com.spectrace.archfixture.badimpact.infrastructure.OwnRepositoryAdapter;
+import com.spectrace.archfixture.badimpact.infrastructure.nested.OwnNestedRepositoryAdapter;
 import com.spectrace.archfixture.badworkflow.infrastructure.WorkflowAdapter;
+import com.spectrace.archfixture.badworkflow.infrastructure.nested.NestedWorkflowAdapter;
 import com.spectrace.audit.application.port.ImpactAuditEventPort;
 import com.spectrace.impact.application.ImpactAnalysisApplicationService;
 import com.spectrace.impact.application.port.ImpactAnalysisRunRepository;
@@ -82,6 +88,27 @@ class ImpactWorkflowArchitectureTest {
     }
 
     @Test
+    void infrastructure_rules_reject_foreign_root_and_nested_dependencies() {
+        ArchRule rule = infrastructureDoesNotDependOnForeignInfrastructure("com.spectrace.archfixture.badimpact");
+        JavaClasses rootFixture = new ClassFileImporter().importClasses(
+                ForeignRootInfrastructureDependency.class, WorkflowAdapter.class);
+        JavaClasses nestedFixture = new ClassFileImporter().importClasses(
+                ForeignNestedInfrastructureDependency.class, NestedWorkflowAdapter.class);
+
+        assertThat(rule.evaluate(rootFixture).hasViolation()).as("foreign root dependency").isTrue();
+        assertThat(rule.evaluate(nestedFixture).hasViolation()).as("foreign nested dependency").isTrue();
+    }
+
+    @Test
+    void infrastructure_rules_allow_own_root_and_nested_dependencies() {
+        JavaClasses fixture = new ClassFileImporter().importClasses(
+                OwnInfrastructureDependencies.class, OwnRepositoryAdapter.class, OwnNestedRepositoryAdapter.class);
+
+        assertThat(infrastructureDoesNotDependOnForeignInfrastructure("com.spectrace.archfixture.badimpact")
+                .evaluate(fixture).hasViolation()).isFalse();
+    }
+
+    @Test
     void real_impact_service_can_depend_on_application_ports() {
         JavaClasses productionTypes = new ClassFileImporter().importClasses(
                 ImpactAnalysisApplicationService.class,
@@ -124,14 +151,16 @@ class ImpactWorkflowArchitectureTest {
 
     private static DescribedPredicate<com.tngtech.archunit.core.domain.JavaClass> foreignInfrastructure(
             String ownerPackage) {
-        String ownInfrastructure = ownerPackage + ".infrastructure.";
+        String ownInfrastructure = ownerPackage + ".infrastructure";
         return new DescribedPredicate<>("reside in a foreign infrastructure package") {
             @Override
             public boolean test(com.tngtech.archunit.core.domain.JavaClass javaClass) {
                 String packageName = javaClass.getPackageName();
                 return packageName.startsWith("com.spectrace.")
-                        && packageName.contains(".infrastructure.")
-                        && !packageName.startsWith(ownInfrastructure);
+                        && (packageName.endsWith(".infrastructure")
+                            || packageName.contains(".infrastructure."))
+                        && !packageName.equals(ownInfrastructure)
+                        && !packageName.startsWith(ownInfrastructure + ".");
             }
         };
     }

@@ -3,10 +3,11 @@ package com.spectrace.impact.infrastructure;
 import com.spectrace.audit.application.port.ImpactAuditPort;
 import com.spectrace.identity.application.AuthorizationService;
 import com.spectrace.identity.application.IdentityService;
-import com.spectrace.identity.application.UnknownIdentityException;
+import com.spectrace.identity.application.ExternalActorResolver;
 import com.spectrace.identity.domain.AuthenticatedActor;
 import com.spectrace.impact.application.port.ImpactIntegration;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /** M4 bridge for trusted request identity and same-transaction impact audit. */
@@ -20,6 +21,7 @@ public class RequestImpactIntegration implements ImpactIntegration {
 
     private final HttpServletRequest request;
     private final IdentityService identityService;
+    private final ExternalActorResolver actors;
     private final AuthorizationService authorizationService;
     private final ImpactAuditPort auditEvents;
 
@@ -29,8 +31,21 @@ public class RequestImpactIntegration implements ImpactIntegration {
             AuthorizationService authorizationService,
             ImpactAuditPort auditEvents
     ) {
+        this(request, identityService, authorizationService, auditEvents,
+                new ExternalActorResolver(identityService, false));
+    }
+
+    @Autowired
+    public RequestImpactIntegration(
+            HttpServletRequest request,
+            IdentityService identityService,
+            AuthorizationService authorizationService,
+            ImpactAuditPort auditEvents,
+            ExternalActorResolver actors
+    ) {
         this.request = request;
         this.identityService = identityService;
+        this.actors = actors;
         this.authorizationService = authorizationService;
         this.auditEvents = auditEvents;
     }
@@ -71,9 +86,6 @@ public class RequestImpactIntegration implements ImpactIntegration {
     private AuthenticatedActor actor() {
         String provider = request.getHeader(AUTH_PROVIDER_HEADER);
         String subject = request.getHeader(AUTH_SUBJECT_HEADER);
-        if (provider == null || provider.isBlank() || subject == null || subject.isBlank()) {
-            throw new UnknownIdentityException("Authenticated identity headers are required");
-        }
-        return identityService.authenticate(provider, subject);
+        return actors.resolve(provider, subject);
     }
 }

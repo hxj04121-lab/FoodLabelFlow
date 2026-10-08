@@ -46,6 +46,9 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     private com.spectrace.label.application.LabelDraftService labelDraftService;
 
     @Autowired
+    private com.spectrace.label.application.port.LabelDraftRepository labelDraftRepository;
+
+    @Autowired
     private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     @Autowired
@@ -226,6 +229,7 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     @Test
     void allowsDraftToPendingReviewAfterPassedValidation() {
         createPassedValidation();
+        createReviewFixture();
 
         reviewService.submitForReview(
                 LABEL_ID,
@@ -238,6 +242,7 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     @Test
     void rejectsSecondSubmitAfterPendingReview() {
         createPassedValidation();
+        createReviewFixture();
 
         reviewService.submitForReview(
                 LABEL_ID,
@@ -260,11 +265,8 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     @Test
     void rejectsApprovalAfterAlreadyPendingReviewWithoutReviewTask() {
         createPassedValidation();
-
-        reviewService.submitForReview(
-                LABEL_ID,
-                reviewSubmitter()
-        );
+        // Legacy invalid state fixture: real submission now refuses to create an orphan.
+        jdbcTemplate.update("UPDATE label_version SET lifecycle_status = 'PENDING_REVIEW' WHERE label_version_id = ?", LABEL_ID);
 
         assertStatus("PENDING_REVIEW");
 
@@ -802,11 +804,12 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
             holder = executor.submit(() -> new org.springframework.transaction.support.TransactionTemplate(transactionManager)
                     .execute(status -> {
                         holderConnectionId.set(jdbcTemplate.queryForObject("SELECT CONNECTION_ID()", Long.class));
-                        // The actual draft service locks product/current formula and creates the
-                        // newer version in this outer transaction. No manual version INSERT.
-                        var draft = labelDraftService.createDraft(productId, jurisdiction,
-                                new AuthenticatedActor("user_label_officer", "user_label_officer", "Label Officer",
-                                        Set.of(), Set.of("LABEL.CREATE")));
+                        // Exercise the publication repository's defense against a lower-level version writer.
+                        // The public draft service now rejects a bound task, covered separately.
+                        // This actual repository still locks product and INSERTs the newer version
+                        // inside the held transaction; no manual label or PASS INSERT is added here.
+                        var draft = labelDraftRepository.createFromCurrentFormula(
+                                productId, jurisdiction, "user_label_officer");
                         newerDraftId.set(draft.labelVersionId());
                         draftCreatedHoldingProduct.countDown();
                         try {
@@ -964,6 +967,8 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     void firstPublicationWorksWithoutPreviousPublishedVersion() {
         createPassedValidation();
         createReviewFixture();
+        // Establish a legitimate bound approval before constructing the no-previous-pointer publication fixture.
+        approveTarget();
         jdbcTemplate.update("""
                 UPDATE label_version
                 SET lifecycle_status='SUPERSEDED', is_current_published='N'
@@ -978,7 +983,6 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
                 SET current_published_label_version_id = NULL
                 WHERE product_id = (SELECT product_id FROM label_version WHERE label_version_id = ?)
                 """, LABEL_ID);
-        approveTarget();
 
         reviewService.publishReviewTask(
                 REVIEW_TASK_ID, LABEL_ID, reviewApprover("LABEL.PUBLISH")
@@ -1450,5 +1454,31 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
                         REVIEW_TASK_ID
                 )
         );
+    }
+
+    @Test
+    void rejectsValidatedOrphanSubmissionAtomicallyWithoutAudit() {
+        createPassedValidation();
+        var beforeLabel = jdbcTemplate.queryForMap("SELECT * FROM label_version WHERE label_version_id = ?", LABEL_ID);
+        var beforeAudits = jdbcTemplate.queryForList("SELECT * FROM audit_event WHERE entity_id = ? ORDER BY audit_event_id", LABEL_ID);
+        assertThrows(LabelVersionConflictException.class, () -> reviewService.submitForReview(LABEL_ID, reviewSubmitter()));
+        assertEquals(beforeLabel, jdbcTemplate.queryForMap("SELECT * FROM label_version WHERE label_version_id = ?", LABEL_ID));
+        assertEquals(beforeAudits, jdbcTemplate.queryForList("SELECT * FROM audit_event WHERE entity_id = ? ORDER BY audit_event_id", LABEL_ID));
+        assertStatus("DRAFT");
+    }
+
+    @Test
+    void publicDraftCreationCannotObsoleteAnApprovedBoundTarget() {
+        createPassedValidation();
+        createReviewFixture();
+        approveTarget();
+        var before = racePublicationStateSnapshot();
+        assertThrows(LabelVersionConflictException.class, () -> labelDraftService.createDraft(
+                productIdForTarget(),
+                jdbcTemplate.queryForObject("SELECT jurisdiction_code FROM label_version WHERE label_version_id = ?", String.class, LABEL_ID),
+                java.util.List.of(new com.spectrace.label.application.LabelDeclarationInput("all_soy", "CONTAINS", "Contains soy")),
+                REVIEW_TASK_ID,
+                new AuthenticatedActor("user_label_officer", "user_label_officer", "Label Officer", Set.of(), Set.of("LABEL.CREATE"))));
+        assertEquals(before, racePublicationStateSnapshot());
     }
 }

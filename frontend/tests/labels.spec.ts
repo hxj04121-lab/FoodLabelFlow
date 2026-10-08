@@ -51,7 +51,7 @@ test('shows a loading state and renders canonical allergens from the API', async
   })
 
   await page.goto('/labels')
-  await expect(page.getByRole('status')).toContainText('Checking the canonical allergen endpoint')
+  await expect(page.getByRole('status').filter({ hasText: 'Checking the canonical allergen endpoint' })).toBeVisible()
   releaseResponse()
 
   await expect(page.getByText('Canonical allergen endpoint connected')).toBeVisible()
@@ -127,6 +127,7 @@ test('creates a label draft with the approved local identity and renders server 
     expect(route.request().postDataJSON()).toEqual({
       productId: draft.productId,
       jurisdictionCode: 'US',
+      declarations: [],
     })
     await route.fulfill({ status: 201, json: draft })
   })
@@ -135,7 +136,7 @@ test('creates a label draft with the approved local identity and renders server 
   const create = page.getByRole('button', { name: 'Create label draft' })
   await expect(create).toBeDisabled()
   await page
-    .getByRole('checkbox', { name: 'Enable the local demo label-officer identity' })
+    .getByRole('checkbox', { name: 'Use the connected identity to create this draft' })
     .check()
   await create.click()
 
@@ -181,7 +182,7 @@ test('keeps authorization errors visible and does not claim a created draft', as
   )
   await page.goto('/labels')
   await page
-    .getByRole('checkbox', { name: 'Enable the local demo label-officer identity' })
+    .getByRole('checkbox', { name: 'Use the connected identity to create this draft' })
     .check()
   await page.getByRole('button', { name: 'Create label draft' }).click()
 
@@ -200,7 +201,7 @@ for (const response of ['malformed body', 'invalid JSON']) {
         : route.fulfill({ status: 201, contentType: 'text/html', body: '<html>Response lost</html>' })
     })
     await page.goto('/labels')
-    await page.getByRole('checkbox', { name: 'Enable the local demo label-officer identity' }).check()
+    await page.getByRole('checkbox', { name: 'Use the connected identity to create this draft' }).check()
     await page.getByRole('button', { name: 'Create label draft' }).click()
 
     await expect(page.getByRole('alert')).toContainText('INVALID_RESPONSE')
@@ -220,7 +221,7 @@ test('reading an existing draft does not confirm uncertain draft creation', asyn
   })
   await page.route(`**/api/labels/${draft.labelVersionId}`, (route) => route.fulfill({ json: draft }))
   await page.goto('/labels')
-  await page.getByRole('checkbox', { name: 'Enable the local demo label-officer identity' }).check()
+  await page.getByRole('checkbox', { name: 'Use the connected identity to create this draft' }).check()
   await page.getByRole('button', { name: 'Create label draft' }).click()
   await expect(page.getByText('The write outcome may be unknown.')).toBeVisible()
 
@@ -236,7 +237,7 @@ test('changing products does not unlock uncertain draft creation', async ({ page
   await page.route('**/api/v1/allergens?*', (route) => route.fulfill({ json: allergens }))
   await page.route('**/api/labels/drafts', (route) => route.abort('failed'))
   await page.goto('/labels')
-  await page.getByRole('checkbox', { name: 'Enable the local demo label-officer identity' }).check()
+  await page.getByRole('checkbox', { name: 'Use the connected identity to create this draft' }).check()
   await page.getByRole('button', { name: 'Create label draft' }).click()
   await expect(page.getByText('The write outcome may be unknown.')).toBeVisible()
 

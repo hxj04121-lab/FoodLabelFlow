@@ -70,12 +70,30 @@ jobs:
         run: npm ci && npx playwright install --with-deps chromium
       - name: Start full stack
         run: docker compose up -d mysql backend frontend
-      - name: Validate PASS and blocking FAIL through the browser
+      - name: Seed only released specification input for the S3 browser scenario
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture_input="$(mktemp)"
+          sed '/^INSERT INTO formula_version/,$d' backend/src/test/resources/fixtures/s3-soy-spec-v2-adoption.sql > "$fixture_input"
+          test -s "$fixture_input"
+          if grep -Eiq 'INSERT INTO (formula_version|label_version|label_allergen_declaration|validation_run|review_task)' "$fixture_input"; then
+            echo "The S3 input fixture must not seed business outputs."
+            exit 1
+          fi
+          docker compose exec -T mysql sh -c 'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD" spectrace' < "$fixture_input"
+      - name: Validate PASS and blocking FAIL through the browser before S3 adoptions
         working-directory: frontend
         env:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:5173
           LIVE_VALIDATION: '1'
-        run: npx playwright test tests/validation-live.spec.ts
+        run: npx playwright test tests/validation-live.spec.ts --output=test-results/validation-browser
+      - name: Publish twenty independently approved S3 labels through the real browser
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:5173
+          LIVE_S3_FLOW: '1'
+        run: npx playwright test tests/s3-product-flow-live.spec.ts --output=test-results/s3-browser
       - name: Show container logs on failure
         if: failure()
         run: docker compose ps -a && docker compose logs --no-color mysql backend frontend

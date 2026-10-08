@@ -32,6 +32,12 @@ public class LabelReviewService {
         this.makerCheckerPolicy = makerCheckerPolicy;
     }
 
+    @Transactional(readOnly = true)
+    public ReviewTaskView getReviewTask(String reviewTaskId) {
+        return repository.findReviewTaskById(reviewTaskId)
+                .orElseThrow(() -> new ReviewTaskNotFoundException(reviewTaskId));
+    }
+
     @Transactional
     public void submitForReview(
             String labelVersionId,
@@ -91,9 +97,9 @@ public class LabelReviewService {
             );
         }
 
-        repository.markReviewTaskInReview(
-                labelVersionId
-        );
+        if (repository.markReviewTaskInReview(labelVersionId) != 1) {
+            throw new LabelVersionConflictException("Exactly one matching open ReviewTask is required for submission");
+        }
 
         repository.createSubmitAudit(
                 labelVersionId,
@@ -109,6 +115,9 @@ public class LabelReviewService {
             String comments,
             AuthenticatedActor actor
     ) {
+        if (comments != null && (comments.isBlank() || comments.length() > 1000)) {
+            throw new IllegalArgumentException("Decision comments must be non-blank and at most 1000 characters when provided");
+        }
         if (decision == null || decision.isBlank()) {
             throw new IllegalArgumentException(
                     "Workflow decision is required"
@@ -244,10 +253,9 @@ public class LabelReviewService {
         authorizationService.requirePermission(actor, "LABEL.PUBLISH");
 
         PublicationTarget task = repository.lockForPublication(reviewTaskId)
-                .orElseThrow(() -> new IllegalStateException(
-                        "ReviewTask or its target LabelVersion was not found: "
-                                + reviewTaskId
-                ));
+                .orElseThrow(() -> repository.findReviewTaskById(reviewTaskId).isPresent()
+                        ? new LabelVersionConflictException("ReviewTask has no matching target LabelVersion: " + reviewTaskId)
+                        : new ReviewTaskNotFoundException(reviewTaskId));
 
         if (!task.targetLabelVersionId().equals(labelVersionId)) {
             throw new LabelVersionConflictException(

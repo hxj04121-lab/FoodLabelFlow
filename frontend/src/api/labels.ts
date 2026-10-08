@@ -186,7 +186,7 @@ function isValidationRun(value: unknown): value is ValidationRun {
   )
 }
 
-function isLabelDraft(value: unknown): value is LabelDraft {
+export function isLabelDraft(value: unknown): value is LabelDraft {
   return (
     isRecord(value) &&
     typeof value.labelVersionId === 'string' &&
@@ -204,7 +204,7 @@ function isLabelDraft(value: unknown): value is LabelDraft {
   )
 }
 
-async function requestJson(path: string, init?: RequestInit): Promise<unknown> {
+export async function requestLabelJson(path: string, init?: RequestInit): Promise<unknown> {
   const response = await fetch(path, init)
   let body: unknown
   try {
@@ -243,11 +243,16 @@ export async function createLabelDraft(
   productId: string,
   jurisdictionCode: string,
   signal?: AbortSignal,
+  inputs?: {
+    declarations: Array<{ allergenId: string; declarationType: 'CONTAINS'; displayText?: string }>
+    reviewTaskId?: string
+  },
+  useConnectedIdentity = false,
 ): Promise<LabelDraft> {
-  const result = await requestJson('/api/labels/drafts', {
+  const result = await requestLabelJson('/api/labels/drafts', {
     method: 'POST',
-    headers: labelOfficerHeaders,
-    body: JSON.stringify({ productId, jurisdictionCode }),
+    headers: useConnectedIdentity ? { 'Content-Type': 'application/json' } : labelOfficerHeaders,
+    body: JSON.stringify({ productId, jurisdictionCode, ...inputs }),
     signal,
   })
   if (!isLabelDraft(result)) {
@@ -264,7 +269,7 @@ export async function getLabelDraft(
   labelVersionId: string,
   signal?: AbortSignal,
 ): Promise<LabelDraft> {
-  const result = await requestJson(
+  const result = await requestLabelJson(
     `/api/labels/${encodeURIComponent(labelVersionId)}`,
     { headers: labelOfficerHeaders, signal },
   )
@@ -289,7 +294,7 @@ export async function listAllergens(
   jurisdictionCode: string,
   signal?: AbortSignal,
 ): Promise<Allergen[]> {
-  const result = await requestJson(
+  const result = await requestLabelJson(
     `/api/v1/allergens?jurisdictionCode=${encodeURIComponent(jurisdictionCode)}`,
     { headers: labelOfficerHeaders, signal },
   )
@@ -307,7 +312,7 @@ export async function getLabelDerivedAllergens(
   draft: LabelDraft,
   signal?: AbortSignal,
 ): Promise<LabelAllergenFacts> {
-  const result = await requestJson(
+  const result = await requestLabelJson(
     `/api/v1/label-versions/${encodeURIComponent(draft.labelVersionId)}/derived-allergens`,
     { headers: labelOfficerHeaders, signal },
   )
@@ -333,7 +338,7 @@ export async function getLabelDeclarations(
   draft: LabelDraft,
   signal?: AbortSignal,
 ): Promise<LabelDeclarations> {
-  const result = await requestJson(
+  const result = await requestLabelJson(
     `/api/labels/${encodeURIComponent(draft.labelVersionId)}/declarations`,
     { headers: labelOfficerHeaders, signal },
   )
@@ -359,12 +364,13 @@ export async function runValidation(
   labelVersionId: string,
   ruleSetVersionId: string,
   signal?: AbortSignal,
+  useConnectedIdentity = false,
 ): Promise<ValidationRun> {
-  const result = await requestJson(
+  const result = await requestLabelJson(
     `/api/v1/label-versions/${encodeURIComponent(labelVersionId)}/validation-runs`,
     {
       method: 'POST',
-      headers: labelOfficerHeaders,
+      headers: useConnectedIdentity ? { 'Content-Type': 'application/json' } : labelOfficerHeaders,
       body: JSON.stringify({ ruleSetVersionId }),
       signal,
     },
@@ -383,7 +389,7 @@ export async function getValidationRun(
   validationRunId: string,
   signal?: AbortSignal,
 ): Promise<ValidationRun> {
-  const result = await requestJson(
+  const result = await requestLabelJson(
     `/api/v1/validation-runs/${encodeURIComponent(validationRunId)}`,
     { headers: labelOfficerHeaders, signal },
   )

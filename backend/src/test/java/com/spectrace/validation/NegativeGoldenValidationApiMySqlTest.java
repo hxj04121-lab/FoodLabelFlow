@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** Keep the original negative SQL isolated from positive fixtures and the V3 demonstration seed. */
 @Testcontainers
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "spring.flyway.target=2")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {"spring.flyway.target=2", "spectrace.dev-external-auth.enabled=true"})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Sql(scripts = NegativeGoldenFixtures.SQL_RESOURCE, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
 @Sql(statements = {
