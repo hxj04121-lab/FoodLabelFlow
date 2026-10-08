@@ -11,4 +11,7 @@ public interface ImpactFindingRepository {
 
     /** Findings of one run ordered by productId. Empty means the run found no relevant product. */
     List<ImpactFinding> findByRunId(String impactAnalysisRunId);
+
+    /** Replay reads include findings committed after the caller's transaction snapshot. */
+    List<ImpactFinding> findByRunIdForReplay(String impactAnalysisRunId);
 }

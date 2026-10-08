@@ -73,6 +73,13 @@ public class JdbcReviewTaskLinkageRepository implements ReviewTaskLinkageReposit
         return rows.stream().findFirst();
     }
 
+    @Override
+    public Optional<ReviewTaskLinkage> findByFindingIdForReplay(String impactFindingId) {
+        List<ReviewTaskLinkage> rows = jdbcTemplate.query(
+                SELECT + " FOR SHARE", this::mapReviewTaskLinkage, impactFindingId);
+        return rows.stream().findFirst();
+    }
+
     private ReviewTaskLinkage mapReviewTaskLinkage(java.sql.ResultSet resultSet, int rowNumber)
             throws java.sql.SQLException {
         return new ReviewTaskLinkage(

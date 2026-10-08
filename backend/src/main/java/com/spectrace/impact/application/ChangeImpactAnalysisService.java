@@ -29,7 +29,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static com.spectrace.shared.contract.ContractValues.requiredText;
@@ -93,12 +95,17 @@ public class ChangeImpactAnalysisService {
         if (ruleSetVersionId == null || ruleSetVersionId.isBlank()) {
             throw ImpactFailure.invalid("ruleSetVersionId must be supplied");
         }
-        // The row lock serialises concurrent runs of one request before anything is read.
+        // The row lock serialises runs; authentication may already have established a snapshot.
         ChangeRequest change = changeRequests.lockById(requiredText(changeRequestId, "changeRequestId"))
                 .filter(found -> found.changeType() == ChangeType.INGREDIENT_SPEC)
                 .orElseThrow(() -> ImpactFailure.notFound("Change request " + changeRequestId + " was not found"));
 
-        List<ImpactAnalysisRun> existing = runs.findByChangeRequestId(change.changeRequestId());
+        // A queued replay sees the winner's ANALYZED state through the CR locking read.
+        // Keep first-run SUBMITTED lookups ordinary: locking an absent run would add gap
+        // locks that can interfere with first analyses of unrelated change requests.
+        List<ImpactAnalysisRun> existing = change.status() == ChangeRequestStatus.SUBMITTED
+                ? runs.findByChangeRequestId(change.changeRequestId())
+                : runs.findByChangeRequestIdForReplay(change.changeRequestId());
         if (!existing.isEmpty()) {
             return replay(existing.getFirst(), ruleSetVersionId);
         }
@@ -145,7 +152,7 @@ public class ChangeImpactAnalysisService {
         integration.authenticate();
         ImpactAnalysisRun run = runs.findById(requiredText(impactAnalysisId, "impactAnalysisId"))
                 .orElseThrow(() -> ImpactFailure.notFound("Impact analysis " + impactAnalysisId + " was not found"));
-        return load(run);
+        return load(run, false);
     }
 
     private ImpactAnalysisView replay(ImpactAnalysisRun run, String ruleSetVersionId) {
@@ -153,13 +160,20 @@ public class ChangeImpactAnalysisService {
             throw ImpactFailure.conflict("The change request already has an analysis under rule set "
                     + run.ruleSetVersionId());
         }
-        return load(run);
+        return load(run, true);
     }
 
-    private ImpactAnalysisView load(ImpactAnalysisRun run) {
-        List<FindingView> views = findings.findByRunId(run.impactAnalysisRunId()).stream()
+    private ImpactAnalysisView load(ImpactAnalysisRun run, boolean replay) {
+        // A current run read does not advance a REPEATABLE READ snapshot. Its children
+        // must also use current reads in both replay paths; ordinary GET remains read-only.
+        List<ImpactFinding> loaded = replay
+                ? findings.findByRunIdForReplay(run.impactAnalysisRunId())
+                : findings.findByRunId(run.impactAnalysisRunId());
+        Function<String, Optional<ReviewTaskLinkage>> taskLookup = replay
+                ? reviewTasks::findByFindingIdForReplay : reviewTasks::findByFindingId;
+        List<FindingView> views = loaded.stream()
                 .map(finding -> new FindingView(finding, finding.requiresReviewTask()
-                        ? reviewTasks.findByFindingId(finding.impactFindingId())
+                        ? taskLookup.apply(finding.impactFindingId())
                                 .orElseThrow(() -> new IllegalStateException(
                                         "REVIEW_REQUIRED finding " + finding.impactFindingId() + " has no review task"))
                         : null))
