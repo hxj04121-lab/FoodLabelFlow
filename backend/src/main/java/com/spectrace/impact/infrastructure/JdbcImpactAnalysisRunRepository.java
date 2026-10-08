@@ -85,6 +85,16 @@ public class JdbcImpactAnalysisRunRepository implements ImpactAnalysisRunReposit
         );
     }
 
+    @Override
+    public List<ImpactAnalysisRun> findByChangeRequestIdForReplay(String changeRequestId) {
+        return jdbcTemplate.query(
+                SELECT.formatted("change_request_id")
+                        + " ORDER BY started_at ASC, impact_analysis_run_id ASC FOR SHARE",
+                this::mapImpactAnalysisRun,
+                changeRequestId
+        );
+    }
+
     private Optional<ImpactAnalysisRun> find(String column, String value) {
         List<ImpactAnalysisRun> rows = jdbcTemplate.query(
                 SELECT.formatted(column),

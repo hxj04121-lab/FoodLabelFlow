@@ -280,6 +280,11 @@ class ImpactAnalysisRollbackIntegrationTest extends MySqlIntegrationTestSupport 
                 public List<ImpactAnalysisRun> findByChangeRequestId(String changeRequestId) {
                     return delegate.findByChangeRequestId(changeRequestId);
                 }
+
+                @Override
+                public List<ImpactAnalysisRun> findByChangeRequestIdForReplay(String changeRequestId) {
+                    return delegate.findByChangeRequestIdForReplay(changeRequestId);
+                }
             };
         }
 
@@ -302,6 +307,11 @@ class ImpactAnalysisRollbackIntegrationTest extends MySqlIntegrationTestSupport 
                 public List<ImpactFinding> findByRunId(String runId) {
                     return delegate.findByRunId(runId);
                 }
+
+                @Override
+                public List<ImpactFinding> findByRunIdForReplay(String runId) {
+                    return delegate.findByRunIdForReplay(runId);
+                }
             };
         }
 
@@ -321,6 +331,11 @@ class ImpactAnalysisRollbackIntegrationTest extends MySqlIntegrationTestSupport 
                 @Override
                 public java.util.Optional<ReviewTaskLinkage> findByFindingId(String findingId) {
                     return delegate.findByFindingId(findingId);
+                }
+
+                @Override
+                public java.util.Optional<ReviewTaskLinkage> findByFindingIdForReplay(String findingId) {
+                    return delegate.findByFindingIdForReplay(findingId);
                 }
             };
         }

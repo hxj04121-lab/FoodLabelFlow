@@ -129,6 +129,7 @@ class ChangeImpactAnalysisServiceTest {
 
         assertThat(changeRequests.findById(CR).orElseThrow().status()).isEqualTo(ChangeRequestStatus.ANALYZED);
         assertThat(changeRequests.locked()).containsExactly(CR);
+        assertThat(runs.replayReads()).as("SUBMITTED first runs do not lock absent run keys").isEmpty();
         assertThat(audits).containsExactly(
                 "user_change_manager|" + run.impactAnalysisRunId() + "|" + CR + "|COMPLETED|prov_scenario_input");
         assertThat(integration.calls).containsExactly("requireActor:RUN_IMPACT", "reviewTaskAssignee");
@@ -148,6 +149,7 @@ class ChangeImpactAnalysisServiceTest {
         assertThat(replay.created()).isFalse();
         assertThat(replay.run()).isEqualTo(first.run());
         assertThat(replay.findings()).isEqualTo(first.findings());
+        assertThat(runs.replayReads()).as("ANALYZED replay reads the committed run").containsExactly(CR);
         assertThat(tasks.saved()).hasSize(1);
         assertThat(audits).hasSize(1);
         assertThat(service.get(first.run().impactAnalysisRunId()).findings()).isEqualTo(first.findings());
