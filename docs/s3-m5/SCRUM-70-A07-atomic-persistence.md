@@ -58,10 +58,12 @@ classDiagram
     class ImpactAnalysisRunRepository
     class ImpactFindingRepository
     class ReviewTaskLinkageRepository
+    class ChangeRequestRepository
     class ImpactAuditEventPort
     class JdbcImpactAnalysisRunRepository
     class JdbcImpactFindingRepository
     class JdbcReviewTaskLinkageRepository
+    class JdbcChangeRequestRepository
     class AuditApplicationService {
       +recordImpactEvent(...)
       Propagation.MANDATORY
@@ -75,6 +77,7 @@ classDiagram
 
     ChangeImpactAnalysisService --> ImpactStrategyRegistry : consumes M1 result
     ChangeImpactAnalysisService --> ImpactAnalysisApplicationService
+    ChangeImpactAnalysisService --> ChangeRequestRepository
     ImpactAnalysisApplicationService --> ImpactAnalysisRunRepository
     ImpactAnalysisApplicationService --> ImpactFindingRepository
     ImpactAnalysisApplicationService --> ReviewTaskLinkageRepository
@@ -82,6 +85,7 @@ classDiagram
     ImpactAnalysisRunRepository <|.. JdbcImpactAnalysisRunRepository
     ImpactFindingRepository <|.. JdbcImpactFindingRepository
     ReviewTaskLinkageRepository <|.. JdbcReviewTaskLinkageRepository
+    ChangeRequestRepository <|.. JdbcChangeRequestRepository
     ImpactAuditEventPort --> AuditApplicationService
     LabelReviewService --> LabelReviewCommandRepository
     LabelReviewCommandRepository <|.. JdbcLabelReviewCommandRepository
@@ -106,6 +110,7 @@ sequenceDiagram
     participant M1 as M1 strategy/result
     participant Persist as ImpactAnalysisApplicationService
     participant RunDB as JdbcImpactAnalysisRunRepository
+    participant ChangeDB as JdbcChangeRequestRepository
     participant FindingDB as JdbcImpactFindingRepository
     participant TaskDB as JdbcReviewTaskLinkageRepository
     participant Audit as AuditApplicationService
@@ -122,7 +127,7 @@ sequenceDiagram
     Persist->>FindingDB: insert findings
     Persist->>TaskDB: link one task for each REVIEW_REQUIRED finding
     Persist->>Audit: recordImpactEvent (MANDATORY)
-    Run->>RunDB: change request SUBMITTED -> ANALYZED
+    Run->>ChangeDB: change request SUBMITTED -> ANALYZED
     Run-->>API: analysis with persisted IDs/provenance
     API-->>User: analysis and task handoffs
     Note over Run,Audit: T1 commits; replay returns the same logical analysis without writes
