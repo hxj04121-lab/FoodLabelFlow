@@ -52,16 +52,13 @@ const navigation = [
   { path: '/reviews', label: 'Review workspace', icon: ClipboardCheck },
 ]
 import { CatalogConnection } from '@/components/CatalogConnection'
-import { useCurrentIdentity } from '@/components/CurrentIdentityPanel'
-import { demoIdentityChoices, switchDemoIdentity } from '@/api/identity-session'
-import { getCurrentIdentity, getDemoIdentityOptions } from '@/api/identity'
+import { ControlledDemoIdentitySwitcher, useCurrentIdentity } from '@/components/CurrentIdentityPanel'
 export function Shell() {
   const [mobile, setMobile] = useState(false)
   const [help, setHelp] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
   const identity = useCurrentIdentity()
-  const localDemoHost = ['127.0.0.1', 'localhost', '[::1]'].includes(window.location.hostname)
   useEffect(() => {
     setMobile(false)
   }, [location.pathname])
@@ -87,23 +84,7 @@ export function Shell() {
             <CircleHelp size={19} />
           </button>
           <span className="topbar-divider" />
-          {localDemoHost && <label className="identity-switcher">
-            <span>Demo identity</span>
-            <select aria-label="Demo identity" value={identity.session.selection}
-              disabled={identity.session.status === 'switching'}
-              onChange={event => {
-                const choice = demoIdentityChoices.find(item => item.key === event.target.value)
-                if (choice) void switchDemoIdentity(choice.key, async () => {
-                  const options = await getDemoIdentityOptions()
-                  if (!options.some(option => option.key === choice.key && option.subject === choice.subject)) {
-                    throw new Error(`The server does not expose the ${choice.label} demo identity.`)
-                  }
-                  return getCurrentIdentity()
-                })
-              }}>
-              {demoIdentityChoices.map(choice => <option key={choice.key} value={choice.key}>{choice.label}</option>)}
-            </select>
-          </label>}
+          <ControlledDemoIdentitySwitcher showStatus={false} />
           <span className="identity-status" aria-live="polite">
             {identity.session.status === 'switching' ? 'Refreshing permissions…'
               : identity.session.actor?.displayName || identity.session.error || 'Identity unavailable'}

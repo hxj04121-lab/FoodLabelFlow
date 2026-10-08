@@ -7,6 +7,7 @@ import {
   listAllergens,
   type Allergen,
   type LabelDraft,
+  type LabelDeclarations,
   type ValidationRun,
 } from '@/api/labels'
 import { catalogGet } from '@/api/catalog'
@@ -40,6 +41,13 @@ type PendingRevision = {
   previous: LabelDraft
   makerUserId: string
   declarations: EditableDeclaration[]
+}
+
+function matchesSubmittedDeclarations(stored: LabelDeclarations, submitted: EditableDeclaration[]) {
+  return stored.declarations.length === submitted.length && submitted.every(expected =>
+    stored.declarations.some(actual => actual.allergenId === expected.allergenId &&
+      actual.declarationType === expected.declarationType && actual.displayText === expected.displayText &&
+      actual.declarationSource === 'USER_ENTERED'))
 }
 
 const BASELINE_JURISDICTION = 'US'
@@ -95,6 +103,21 @@ export function Labels() {
     [currentFormulaId],
   )
 
+  function adoptDraft(label: LabelDraft, declarations?: Array<{ allergenId: string }>) {
+    setDraft(label)
+    setLookupId(label.labelVersionId)
+    setProductId(label.productId)
+    if (declarations) setDeclarationIds(declarations.map(row => row.allergenId))
+  }
+
+  function setTaskLabelLocation(taskId: string, label: LabelDraft) {
+    const next = new URLSearchParams(searchParams)
+    next.set('productId', label.productId)
+    next.set('reviewTaskId', taskId)
+    next.set('labelVersionId', label.labelVersionId)
+    setSearchParams(next, { replace: true })
+  }
+
   useEffect(() => {
     const controller = new AbortController()
     setFormulaLoading(true)
@@ -122,9 +145,7 @@ export function Labels() {
     setBusy(true)
     getLabelDraft(exactId, controller.signal).then(loaded => {
       if (controller.signal.aborted) return
-      setDraft(loaded)
-      setLookupId(loaded.labelVersionId)
-      setProductId(loaded.productId)
+      adoptDraft(loaded)
       setMessage(`Loaded ${loaded.labelVersionId} from the server.`)
     }).catch(cause => {
       if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Label read failed.')
@@ -159,10 +180,7 @@ export function Labels() {
       }
       const stored = await getLabelDeclarations(loaded, controller.signal)
       if (!active) return
-      setDraft(loaded)
-      setLookupId(loaded.labelVersionId)
-      setProductId(loaded.productId)
-      setDeclarationIds(stored.declarations.map(row => row.allergenId))
+      adoptDraft(loaded, stored.declarations)
       setMessage(`Loaded ${loaded.labelVersionId} from review task ${task.reviewTaskId}.`)
     }).catch((cause: unknown) => {
       if (active && !controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Review task handoff failed.')
@@ -244,8 +262,7 @@ export function Labels() {
           (identity.state.status === 'ready' && created.createdByUserId !== identity.state.actor.userId)) {
         throw new LabelApiError('DRAFT_CONTEXT_MISMATCH', 'The created draft does not match the selected current product formula and jurisdiction.', 200)
       }
-      setDraft(created)
-      setLookupId(created.labelVersionId)
+      adoptDraft(created)
       setDemoEnabled(false)
       setMessage(`Label draft V${created.versionNumber} created and read from the server.`)
     } catch (requestError: unknown) {
@@ -279,8 +296,7 @@ export function Labels() {
     setMessage('')
     try {
       const loaded = await getLabelDraft(exactId)
-      setDraft(loaded)
-      setProductId(loaded.productId)
+      adoptDraft(loaded)
       // Reading an existing version does not identify the outcome of that creation command.
       setMessage(
         `Loaded ${loaded.labelVersionId} from the server.` +
@@ -321,18 +337,11 @@ export function Labels() {
       }
       let confirmed = false
       const stored = await getLabelDeclarations(loaded)
-      setDeclarationIds(stored.declarations.map(row => row.allergenId))
       if (pendingCreation && loaded.productId === pendingCreation.productId &&
           loaded.formulaVersionId === pendingCreation.formulaVersionId && loaded.jurisdictionCode === BASELINE_JURISDICTION) {
-        const persisted = await getLabelDeclarations(loaded)
-        confirmed = persisted.declarations.length === pendingCreation.declarations.length &&
-          pendingCreation.declarations.every(expected => persisted.declarations.some(actual =>
-            actual.allergenId === expected.allergenId && actual.declarationType === expected.declarationType &&
-            actual.displayText === expected.displayText && actual.declarationSource === 'USER_ENTERED'))
+        confirmed = matchesSubmittedDeclarations(stored, pendingCreation.declarations)
       }
-      setDraft(loaded)
-      setLookupId(loaded.labelVersionId)
-      setProductId(loaded.productId)
+      adoptDraft(loaded, stored.declarations)
       setReviewTaskId(exactTaskId)
       if (confirmed) { setUncertain(false); setPendingCreation(null) }
       setMessage(`Loaded the existing draft ${loaded.labelVersionId} bound to ${exactTaskId}.` +
@@ -353,10 +362,7 @@ export function Labels() {
       throw new LabelApiError('REVISION_CONTEXT_MISMATCH', 'The original task returned a different label context.', 200)
     }
     const stored = await getLabelDeclarations(current)
-    const matchesSnapshot = stored.declarations.length === attempt.declarations.length &&
-      attempt.declarations.every(expected => stored.declarations.some(actual =>
-        actual.allergenId === expected.allergenId && actual.declarationType === expected.declarationType &&
-        actual.displayText === expected.displayText && actual.declarationSource === 'USER_ENTERED'))
+    const matchesSnapshot = matchesSubmittedDeclarations(stored, attempt.declarations)
     const matchingCurrentRevision = current.labelVersionId !== attempt.previous.labelVersionId &&
       current.versionNumber > attempt.previous.versionNumber &&
       current.formulaVersionId === attempt.previous.formulaVersionId &&
@@ -365,10 +371,7 @@ export function Labels() {
 
     setReviewTask(task)
     setReviewTaskId(attempt.reviewTaskId)
-    setDraft(current)
-    setLookupId(current.labelVersionId)
-    setProductId(current.productId)
-    setDeclarationIds(stored.declarations.map(row => row.allergenId))
+    adoptDraft(current, stored.declarations)
     setValidationRun(null)
     if (matchingCurrentRevision) {
       setUncertain(false)
@@ -378,11 +381,7 @@ export function Labels() {
       setUncertain(true)
       setRevisionRecoveryMessage(`Read ${current.labelVersionId} from the original task ${attempt.reviewTaskId}. The submitted revision is still unconfirmed; your declaration snapshot is retained and another revision write remains blocked.`)
     }
-    const next = new URLSearchParams(searchParams)
-    next.set('productId', current.productId)
-    next.set('reviewTaskId', attempt.reviewTaskId)
-    next.set('labelVersionId', current.labelVersionId)
-    setSearchParams(next, { replace: true })
+    setTaskLabelLocation(attempt.reviewTaskId, current)
   }
 
   async function saveReturnedRevision(declarations: EditableDeclaration[]) {
@@ -414,19 +413,13 @@ export function Labels() {
           || refreshedTask.decision !== null) {
         throw new LabelApiError('REVISION_BINDING_MISMATCH', 'The server did not confirm the new version binding.', 200)
       }
-      setDraft(revision)
+      adoptDraft(revision, declarations)
       setReviewTask(refreshedTask)
       setValidationRun(null)
-      setDeclarationIds(declarations.map(row => row.allergenId))
-      setLookupId(revision.labelVersionId)
       setUncertain(false)
       setPendingRevision(null)
       setMessage(`Created ${revision.labelVersionId} as a new immutable version. Run validation for this exact version before resubmitting.`)
-      const next = new URLSearchParams(searchParams)
-      next.set('productId', revision.productId)
-      next.set('reviewTaskId', refreshedTask.reviewTaskId)
-      next.set('labelVersionId', revision.labelVersionId)
-      setSearchParams(next, { replace: true })
+      setTaskLabelLocation(refreshedTask.reviewTaskId, revision)
     } catch (cause: unknown) {
       const apiError = cause instanceof LabelApiError ? cause : null
       setError(`${apiError?.code ?? 'NETWORK_ERROR'}: ${cause instanceof Error ? cause.message : 'Revision creation failed.'}`)

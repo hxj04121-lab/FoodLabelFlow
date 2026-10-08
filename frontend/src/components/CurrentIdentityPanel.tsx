@@ -53,36 +53,36 @@ export function CurrentIdentityPanel({ state, onRefresh }: { state: CurrentIdent
   </section>
 }
 
-export function ControlledDemoIdentitySwitcher() {
+export function ControlledDemoIdentitySwitcher({ showStatus = true }: { showStatus?: boolean }) {
   const identity = useCurrentIdentity()
   const localDemoHost = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname)
   if (!localDemoHost) return null
 
   return <label className="identity-switcher">
-    Demo identity
+    <span>Demo identity</span>
     <select
       aria-label="Demo identity"
       value={identity.session.selection}
       disabled={identity.session.status === 'switching'}
       onChange={event => {
         const choice = demoIdentityChoices.find(item => item.key === event.target.value)
-                if (choice) void switchDemoIdentity(choice.key, async () => {
-                  const options = await getDemoIdentityOptions()
-                  if (!options.some(option => option.key === choice.key && option.subject === choice.subject)) {
-                    throw new Error(`The server does not expose the ${choice.label} demo identity.`)
-                  }
-                  return getCurrentIdentity()
-                })
+        if (choice) void switchDemoIdentity(choice.key, async () => {
+          const options = await getDemoIdentityOptions()
+          if (!options.some(option => option.key === choice.key && option.subject === choice.subject)) {
+            throw new Error(`The server does not expose the ${choice.label} demo identity.`)
+          }
+          return getCurrentIdentity()
+        })
       }}
     >
       {demoIdentityChoices.map(choice => <option key={choice.key} value={choice.key}>{choice.label}</option>)}
     </select>
-    <span aria-live="polite">
+    {showStatus && <span aria-live="polite">
       {identity.session.status === 'switching'
         ? 'Refreshing identity and permissions…'
         : identity.session.status === 'ready'
           ? identity.session.actor?.displayName ?? ''
           : identity.session.error || 'Identity unavailable'}
-    </span>
+    </span>}
   </label>
 }
