@@ -70,6 +70,22 @@ public class JdbcChangeRequestRepository implements ChangeRequestRepository {
     }
 
     @Override
+    public Optional<ChangeRequest> lockById(String changeRequestId) {
+        return jdbc.query("SELECT " + COLUMNS + " FROM change_request WHERE change_request_id = ? FOR UPDATE",
+                        (row, index) -> map(row), changeRequestId)
+                .stream().findFirst();
+    }
+
+    @Override
+    public void updateStatus(String changeRequestId, ChangeRequestStatus from, ChangeRequestStatus to) {
+        int updated = jdbc.update("UPDATE change_request SET status = ? WHERE change_request_id = ? AND status = ?",
+                to.name(), changeRequestId, from.name());
+        if (updated != 1) {
+            throw new IllegalStateException("Change request " + changeRequestId + " is not " + from);
+        }
+    }
+
+    @Override
     public Optional<ChangeRequest> findOpenByVersionChange(ChangeType changeType, VersionChange versionChange) {
         String prefix = columnPrefix(Objects.requireNonNull(changeType, "changeType"));
         // A locking read sees rows committed after this transaction's snapshot was taken,

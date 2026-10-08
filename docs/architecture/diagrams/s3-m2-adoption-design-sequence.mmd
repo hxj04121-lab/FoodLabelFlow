@@ -1,0 +1,62 @@
+%% SCRUM-57 / A07 design interaction, validation failures may exit at their actual step.
+%% Source baseline: 20a41e48c71e0851bf9c71de9ba580cf1623323a.
+sequenceDiagram
+    autonumber
+    actor Client
+    participant Web as CatalogController / Spring MVC
+    participant Tx as Spring transaction interceptor
+    participant S as CatalogService
+    participant I as RequestCatalogIntegration
+    participant DB as CatalogStore / MySQL via JdbcTemplate
+    participant A as AuditApplicationService
+    participant Err as CatalogErrors
+
+    Client->>Web: POST /api/catalog/products/{id}/formula-adoptions<br/>sourceFormulaVersionId, targetSpecificationVersionId
+    Note over Web,S: CatalogCommands.AdoptSpecification validates body IDs, response uses existing Map shape
+    Web->>Tx: adoptSpecification(productId, command)
+    Tx->>S: Begin write transaction, invoke adoptSpecification
+    S->>S: Reject null request or invalid productId
+    S->>S: Resolve CatalogIntegration, unavailable adapter gives 503
+    S->>I: requireActor(DATA.MAINTAIN)
+    S->>I: requireActor(FORMULA.RELEASE)
+    Note over I: Each call authenticates headers via IdentityService<br/>and checks AuthorizationService, actor comes from identity
+    S->>DB: get(PRODUCT, productId, true)
+    S->>DB: get(FORMULA, sourceId, true) via service adoptionReference
+    Note over S,DB: FOR UPDATE: product before source,<br/>compare product pointer, RELEASED state and source current flag Y
+    S->>DB: formulaItems(sourceId)
+    S->>S: Require non-empty items
+    loop Distinct source material IDs in TreeSet order
+        S->>DB: get(MATERIAL, materialId, true)
+    end
+    loop Target and source specification IDs in TreeSet order
+        S->>DB: get(SPECIFICATION, specificationId, true) via service adoptionReference
+    end
+    S->>S: Validate target RELEASED and effective by UTC date,<br/>material bindings, not already adopted, newer than all replacements,<br/>unchanged specifications RELEASED and effective
+    Note over S,DB: Replaced historical specification may be RETIRED,<br/>all copied item materials are locked before specification locks and FK inserts
+    alt No guard, persistence or audit exception
+        S->>DB: adoptFormula(productId, sourceId, targetMaterialId, targetId, targetProvenanceId, actor)
+        DB->>DB: formulaVersion: latest version FOR UPDATE, allocate MAX+1, insert DRAFT<br/>Copy every source item with fresh ID and original sequence / quantity / unit
+        S->>I: audit(actor, FORMULA_CREATED, newId, targetProvenanceId)
+        I->>A: recordCatalogEvent(...)
+        A->>A: MANDATORY: INSERT audit_event in caller transaction
+        S->>DB: releaseFormula(newId, productId, actor)
+        DB->>DB: Old current flag N, new formula RELEASED / Y with release facts,<br/>product.current_formula_version_id = newId
+        S->>I: audit(actor, FORMULA_RELEASED, newId, targetProvenanceId)
+        I->>A: recordCatalogEvent(...)
+        S->>I: auditSpecificationAdoption(actor, newId, sourceId, targetId, targetProvenanceId)
+        I->>A: recordSpecificationAdoptionEvent(...)
+        A->>A: MANDATORY: INSERT three-reference JSON audit payload
+        S->>DB: get(FORMULA, newId, false) + formulaItems(newId)
+        S-->>Tx: Released formula Map with items
+        Tx->>Tx: COMMIT catalog and all three audits together
+        Tx-->>Web: Committed response
+        Web-->>Client: 201 Created, snake_case formula fields + items
+    else Any guard, persistence or audit runtime exception at its step
+        Note over S,A: The failing step exits immediately, later calls above are not executed.<br/>Even an exception after the third real audit INSERT rolls back all writes.
+        S-->>Tx: Throw CatalogFailure / data conflict / unexpected runtime exception
+        Tx->>Tx: ROLLBACK formula, items, pointer / flags and audit events
+        Tx-->>Web: Rethrow original exception
+        Web->>Err: Resolve Catalog exception handler
+        Err-->>Client: HTTP status + ApiError(code, message, null, null)
+    end
+    Note over Web,DB: Malformed body fails before service, framework 405 / 415 keep their statuses.<br/>Published label pointer, label rows and declarations are never written by adoption.

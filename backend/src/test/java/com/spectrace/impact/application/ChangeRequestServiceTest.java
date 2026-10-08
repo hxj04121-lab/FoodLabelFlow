@@ -274,5 +274,10 @@ class ChangeRequestServiceTest {
                 String actorId, String changeRequestId, String impactAnalysisRunId, String dataProvenanceId) {
             throw new UnsupportedOperationException("Change requests do not audit impact runs");
         }
+
+        @Override
+        public String reviewTaskAssignee() {
+            throw new UnsupportedOperationException("Change requests do not open review tasks");
+        }
     }
 }
