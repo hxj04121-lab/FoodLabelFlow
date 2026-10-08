@@ -1,4 +1,12 @@
 import { expect, test } from '@playwright/test'
+import { mkdirSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+function evidencePath(name: string, previousPath: string) {
+  if (!process.env.S3_EVIDENCE_DIR) return previousPath
+  mkdirSync(process.env.S3_EVIDENCE_DIR, { recursive: true })
+  return resolve(process.env.S3_EVIDENCE_DIR, name)
+}
 
 test('validates a seeded PASS and a new blocking FAIL through the browser and persisted API', async ({
   page,
@@ -37,7 +45,7 @@ test('validates a seeded PASS and a new blocking FAIL through the browser and pe
   await expect(declarations).toContainText('FORMULA_DERIVED')
   await derived.getByText(/Derivation evidence for SOY/).click()
   await expect(derived.getByText('Data provenance', { exact: true }).first()).toBeVisible()
-  await derived.screenshot({ path: 'test-results/derived-allergens-live.png' })
+  await derived.screenshot({ path: evidencePath('derived-allergens-live.png', 'test-results/derived-allergens-live.png') })
   await page
     .getByRole('checkbox', {
       name: 'Use the connected identity to validate this exact version',
@@ -51,7 +59,7 @@ test('validates a seeded PASS and a new blocking FAIL through the browser and pe
   const persistedRunId = await page.getByLabel('Existing validation run ID').inputValue()
   expect(persistedRunId).not.toBe('')
   await passResults.scrollIntoViewIfNeeded()
-  await page.screenshot({ path: 'test-results/validation-live-pass.png' })
+  await page.screenshot({ path: evidencePath('validation-live-pass.png', 'test-results/validation-live-pass.png') })
 
   // Re-read the committed run rather than re-evaluating current inputs.
   await page.reload()
@@ -90,5 +98,5 @@ test('validates a seeded PASS and a new blocking FAIL through the browser and pe
   await expect(failResults).toContainText('ALLERGEN_DECLARATION_MISSING')
   await expect(failResults).toContainText('Blocking')
   await failResults.scrollIntoViewIfNeeded()
-  await page.screenshot({ path: 'test-results/validation-live-fail.png' })
+  await page.screenshot({ path: evidencePath('validation-live-fail.png', 'test-results/validation-live-fail.png') })
 })

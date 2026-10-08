@@ -1,5 +1,10 @@
 # S3 label product-flow A07 integration supplement
 
+Later qualification: [compound-maker negative and live opt-ins](../evidence/S3-compound-maker-negative-20261008.md)
+defines the disposable permitted-creator MySQL/HTTP/browser regression and
+retains earlier officer ACL403 and unit/service evidence with their original
+scope. Actual passing results require their own source-bound receipts.
+
 Prepared 8 October 2026. Status: **implemented-source candidate; acceptance pending**.
 M2's required use case remains UC-M2-SPEC-ADOPT: Adopt Specification Change into
 Formula, documented by its original SAD, pattern decision and four adoption
