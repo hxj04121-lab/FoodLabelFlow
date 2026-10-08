@@ -1,4 +1,10 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './catalog-fixture'
+
+test.beforeEach(async ({ page }) => {
+  // Reuse coverage collection while preserving these tests' anonymous startup.
+  // Their identity routes are registered after the fixture and override its defaults.
+  await page.setExtraHTTPHeaders({})
+})
 
 const identities = {
   'dev-external-label-officer': { userId: 'user_label_officer', username: 'label.officer', displayName: 'Demo Label Officer', roles: ['LABEL_OFFICER'], permissions: ['LABEL.CREATE', 'LABEL.VALIDATE', 'LABEL.SUBMIT_REVIEW'] },
