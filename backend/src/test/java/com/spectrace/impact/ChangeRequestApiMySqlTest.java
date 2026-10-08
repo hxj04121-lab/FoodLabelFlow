@@ -50,7 +50,8 @@ import static org.mockito.Mockito.doThrow;
 
 /** SCRUM-76: real HTTP, committed MySQL rows and same-transaction audit, with no test-managed transaction. */
 @Testcontainers
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "spectrace.dev-external-auth.enabled=true")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Sql(statements = {
         "INSERT INTO supplier_material(supplier_material_id, supplier_id, ingredient_id, material_code, "

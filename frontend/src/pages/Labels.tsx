@@ -1,15 +1,21 @@
 import {
   createLabelDraft,
   getLabelDraft,
+  getLabelDeclarations,
   LabelApiError,
   listAllergens,
   type Allergen,
   type LabelDraft,
+  type ValidationRun,
 } from '@/api/labels'
+import { catalogGet } from '@/api/catalog'
+import { getReviewTask } from '@/api/label-workflow'
+import { useCurrentIdentity } from '@/components/CurrentIdentityPanel'
 import { Panel, SectionHead, SourceBadge } from '@/components/catalog-shared'
 import { LabelValidationPanel } from '@/components/LabelValidationPanel'
 import { LabelAllergenPanel } from '@/components/LabelAllergenPanel'
 import { LabelDeclarationsPanel } from '@/components/LabelDeclarationsPanel'
+import { LabelWorkflowPanel } from '@/components/LabelWorkflowPanel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { data } from '@/data/catalog'
@@ -20,6 +26,7 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 
 type AllergenState =
   | { status: 'loading' }
@@ -31,20 +38,36 @@ const UNCONFIRMED_DRAFT_MESSAGE =
   'The earlier draft creation is still unconfirmed. Verify its outcome on the server before creating another draft.'
 
 export function Labels() {
+  const [searchParams] = useSearchParams()
   const [allergenAttempt, setAllergenAttempt] = useState(0)
   const [allergenState, setAllergenState] = useState<AllergenState>({
     status: 'loading',
   })
-  const [productId, setProductId] = useState(data.product[0]?.product_id ?? '')
+  const [productId, setProductId] = useState(searchParams.get('productId') ?? data.product[0]?.product_id ?? '')
   const [lookupId, setLookupId] = useState('')
   const [draft, setDraft] = useState<LabelDraft | null>(null)
+  const [validationRun, setValidationRun] = useState<ValidationRun | null>(null)
+  const [reviewTaskId, setReviewTaskId] = useState(searchParams.get('reviewTaskId') ?? '')
+  const [declarationIds, setDeclarationIds] = useState<string[]>([])
+  const [currentFormulaId, setCurrentFormulaId] = useState<string | null>(null)
+  const [formulaLoading, setFormulaLoading] = useState(true)
+  const [formulaError, setFormulaError] = useState('')
   const [demoEnabled, setDemoEnabled] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [uncertain, setUncertain] = useState(false)
+  const [pendingCreation, setPendingCreation] = useState<{
+    reviewTaskId: string
+    productId: string
+    formulaVersionId: string
+    declarations: Array<{ allergenId: string; declarationType: 'CONTAINS'; displayText: string }>
+  } | null>(null)
   const writeLock = useRef(false)
   const local = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname)
+  const identity = useCurrentIdentity()
+  const connected = identity.state.status === 'ready'
+  const canCreate = connected && identity.hasPermission('LABEL.CREATE')
 
   const product = useMemo(
     () => data.product.find((candidate) => candidate.product_id === productId),
@@ -54,10 +77,47 @@ export function Labels() {
     () =>
       data.formula_version.find(
         (candidate) =>
-          candidate.formula_version_id === product?.current_formula_version_id,
+          candidate.formula_version_id === currentFormulaId,
       ),
-    [product],
+    [currentFormulaId],
   )
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setFormulaLoading(true)
+    setFormulaError('')
+    setCurrentFormulaId(null)
+    catalogGet(`/products/${encodeURIComponent(productId)}`, controller.signal)
+      .then(value => {
+        if (controller.signal.aborted) return
+        const product = value as { product_id?: unknown; current_formula_version_id?: unknown }
+        if (product?.product_id !== productId ||
+            !(product.current_formula_version_id === null || typeof product.current_formula_version_id === 'string')) {
+          throw new Error('The catalog API returned an invalid current product formula.')
+        }
+        setCurrentFormulaId(product.current_formula_version_id)
+      })
+      .catch(cause => { if (!controller.signal.aborted) setFormulaError(cause instanceof Error ? cause.message : 'Current formula read failed.') })
+      .finally(() => { if (!controller.signal.aborted) setFormulaLoading(false) })
+    return () => controller.abort()
+  }, [productId])
+
+  useEffect(() => {
+    const exactId = searchParams.get('labelVersionId')?.trim()
+    if (!exactId) return
+    const controller = new AbortController()
+    setBusy(true)
+    getLabelDraft(exactId, controller.signal).then(loaded => {
+      if (controller.signal.aborted) return
+      setDraft(loaded)
+      setLookupId(loaded.labelVersionId)
+      setProductId(loaded.productId)
+      setMessage(`Loaded ${loaded.labelVersionId} from the server.`)
+    }).catch(cause => {
+      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Label read failed.')
+    }).finally(() => { if (!controller.signal.aborted) setBusy(false) })
+    return () => controller.abort()
+  }, [searchParams])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -92,6 +152,9 @@ export function Labels() {
   function selectProduct(nextProductId: string) {
     setProductId(nextProductId)
     setDraft(null)
+    setValidationRun(null)
+    setDeclarationIds([])
+    setReviewTaskId('')
     setLookupId('')
     setMessage(uncertain ? UNCONFIRMED_DRAFT_MESSAGE : '')
     setError('')
@@ -102,8 +165,10 @@ export function Labels() {
       writeLock.current ||
       !local ||
       !demoEnabled ||
+      !canCreate ||
+      allergenState.status !== 'ready' ||
       !productId ||
-      !product?.current_formula_version_id ||
+      !currentFormulaId || formulaLoading ||
       uncertain
     ) {
       return
@@ -112,8 +177,22 @@ export function Labels() {
     setBusy(true)
     setError('')
     setMessage('')
+    const selectedDeclarations = allergenState.status === 'ready'
+      ? allergenState.allergens.filter(allergen => declarationIds.includes(allergen.allergenId))
+        .map(allergen => ({ allergenId: allergen.allergenId, declarationType: 'CONTAINS' as const,
+          displayText: `Contains ${allergen.displayName}` })) : []
+    const requestedTaskId = reviewTaskId.trim()
+    const requestedFormulaId = currentFormulaId
     try {
-      const created = await createLabelDraft(productId, BASELINE_JURISDICTION)
+      const created = await createLabelDraft(productId, BASELINE_JURISDICTION, undefined, {
+        declarations: selectedDeclarations,
+        ...(requestedTaskId ? { reviewTaskId: requestedTaskId } : {}),
+      }, true)
+      if (created.productId !== productId || created.jurisdictionCode !== BASELINE_JURISDICTION ||
+          created.formulaVersionId !== currentFormulaId || created.lifecycleStatus !== 'DRAFT' ||
+          (identity.state.status === 'ready' && created.createdByUserId !== identity.state.actor.userId)) {
+        throw new LabelApiError('DRAFT_CONTEXT_MISMATCH', 'The created draft does not match the selected current product formula and jurisdiction.', 200)
+      }
       setDraft(created)
       setLookupId(created.labelVersionId)
       setDemoEnabled(false)
@@ -125,8 +204,12 @@ export function Labels() {
           requestError instanceof Error ? requestError.message : 'Draft creation failed.'
         }`,
       )
-      if (!apiError || apiError.status >= 500 || apiError.code === 'INVALID_RESPONSE') {
+      if (!apiError || apiError.status >= 500 || ['INVALID_RESPONSE', 'DRAFT_CONTEXT_MISMATCH'].includes(apiError.code)) {
         setUncertain(true)
+        if (requestedTaskId && requestedFormulaId) setPendingCreation({
+          reviewTaskId: requestedTaskId, productId, formulaVersionId: requestedFormulaId,
+          declarations: selectedDeclarations,
+        })
         setMessage(
           'The write outcome may be unknown. Do not create another draft; load the expected label ID or verify the server before retrying.',
         )
@@ -162,6 +245,43 @@ export function Labels() {
     } finally {
       setBusy(false)
     }
+  }
+
+  async function loadTaskDraft() {
+    const exactTaskId = pendingCreation?.reviewTaskId ?? reviewTaskId.trim()
+    if (!exactTaskId || busy || writeLock.current) return
+    setBusy(true)
+    setError('')
+    setMessage('')
+    try {
+      const task = await getReviewTask(exactTaskId)
+      if (!task.draftLabelVersionId) {
+        setMessage(`Review task ${exactTaskId} has no bound draft.` + (uncertain ? ` ${UNCONFIRMED_DRAFT_MESSAGE}` : ''))
+        return
+      }
+      const loaded = await getLabelDraft(task.draftLabelVersionId)
+      if (task.productId !== loaded.productId || task.targetLabelVersionId !== loaded.labelVersionId) {
+        throw new LabelApiError('REVIEW_TASK_TARGET_MISMATCH', 'The server task and label binding do not match.', 200)
+      }
+      let confirmed = false
+      if (pendingCreation && loaded.productId === pendingCreation.productId &&
+          loaded.formulaVersionId === pendingCreation.formulaVersionId && loaded.jurisdictionCode === BASELINE_JURISDICTION) {
+        const persisted = await getLabelDeclarations(loaded)
+        confirmed = persisted.declarations.length === pendingCreation.declarations.length &&
+          pendingCreation.declarations.every(expected => persisted.declarations.some(actual =>
+            actual.allergenId === expected.allergenId && actual.declarationType === expected.declarationType &&
+            actual.displayText === expected.displayText && actual.declarationSource === 'USER_ENTERED'))
+      }
+      setDraft(loaded)
+      setLookupId(loaded.labelVersionId)
+      setProductId(loaded.productId)
+      setReviewTaskId(exactTaskId)
+      if (confirmed) { setUncertain(false); setPendingCreation(null) }
+      setMessage(`Loaded the existing draft ${loaded.labelVersionId} bound to ${exactTaskId}.` +
+        (uncertain && !confirmed ? ` ${UNCONFIRMED_DRAFT_MESSAGE}` : ''))
+    } catch (cause: unknown) {
+      setError(`${cause instanceof LabelApiError ? cause.code : 'NETWORK_ERROR'}: ${cause instanceof Error ? cause.message : 'Review task read failed.'}`)
+    } finally { setBusy(false) }
   }
 
   return (
@@ -209,7 +329,7 @@ export function Labels() {
 
             <div className="label-formula-summary">
               <span>Current formula</span>
-              <strong>{product?.current_formula_version_id ?? 'Not available'}</strong>
+              <strong>{formulaLoading ? 'Checking current formula…' : currentFormulaId ?? 'Not available'}</strong>
               <small>
                 {formula
                   ? `V${formula.version_number} · ${formula.lifecycle_status}`
@@ -218,14 +338,33 @@ export function Labels() {
             </div>
           </div>
 
+          {formulaError && <p className="error-notice" role="alert">{formulaError}</p>}
+          <fieldset className="declaration-entry" disabled={busy}>
+            <legend>Declarations for the new draft</legend>
+            <p>Select the declarations you intend to record. They are saved with this new version and cannot be edited after creation; validation checks them against the formula.</p>
+            {allergenState.status === 'ready' && allergenState.allergens.map(allergen =>
+              <label key={allergen.allergenId}><input type="checkbox"
+                checked={declarationIds.includes(allergen.allergenId)}
+                onChange={event => setDeclarationIds(ids => event.target.checked
+                  ? [...ids, allergen.allergenId] : ids.filter(id => id !== allergen.allergenId))} />
+                Declare {allergen.displayName} ({allergen.allergenCode})</label>)}
+            {allergenState.status !== 'ready' && <p>The canonical allergen catalog must load before declarations can be selected.</p>}
+            <label htmlFor="label-review-task-id">Review task ID</label>
+            <input id="label-review-task-id" value={reviewTaskId} onChange={event => setReviewTaskId(event.target.value)}
+              placeholder="Optional existing impact review task" />
+            <Button variant="outline" disabled={busy || (!reviewTaskId.trim() && !pendingCreation)}
+              onClick={loadTaskDraft}>Load review task draft</Button>
+            <p>A review task binds only its first matching draft. Reopening a bound task loads its existing version.</p>
+          </fieldset>
+
           <label className="demo-consent label-demo-consent">
             <input
               type="checkbox"
               checked={demoEnabled}
-              disabled={!local || busy}
+              disabled={!local || busy || !canCreate}
               onChange={(event) => setDemoEnabled(event.target.checked)}
             />
-            Enable the local demo label-officer identity for this form
+            Use the connected identity to create this draft
           </label>
           {!local && (
             <p role="alert">
@@ -247,9 +386,11 @@ export function Labels() {
               disabled={
                 !local ||
                 !demoEnabled ||
+                !canCreate ||
+                allergenState.status !== 'ready' ||
                 busy ||
                 uncertain ||
-                !product?.current_formula_version_id
+                formulaLoading || !currentFormulaId
               }
               onClick={createDraft}
             >
@@ -372,7 +513,11 @@ export function Labels() {
       <LabelValidationPanel
         key={`validation:${productId}:${draft?.labelVersionId ?? ''}:${draft?.ruleSetVersionId ?? ''}`}
         draft={draft}
+        onRunChange={setValidationRun}
+        identityState={identity.state}
       />
+      <LabelWorkflowPanel draft={draft} validationRun={validationRun} reviewTaskId={reviewTaskId}
+        onDraftChange={setDraft} identity={identity} />
     </>
   )
 }

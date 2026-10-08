@@ -1,8 +1,10 @@
 # A07 draft — M1 Impact Strategy design problem
 
 Owner: Huang Xiangjia / M1. Related: SCRUM-47, SCRUM-78 (built on SCRUM-77).
-Date: 2026-10-04. Status: draft. The classification code and its tests are implemented;
-the class names below are the real ones in `com.spectrace.impact.application.strategy`.
+Date: 2026-10-04, finalised 2026-10-06 (SCRUM-80). Status: **final**. The class names below
+are the real ones in `com.spectrace.impact.application.strategy`, and the orchestration that
+uses them is SCRUM-79's `ChangeImpactAnalysisService`. The use-case diagrams are in
+[A07 Run Change Impact Analysis](S3-M1-A07-run-change-impact-analysis.md).
 
 ## Problem statement
 
@@ -74,11 +76,15 @@ ImpactFinding classify(ChangeRequest change, Product product) {
 **After:** the orchestrator asks the registry and depends only on the interface.
 
 ```java
-ImpactStrategy strategy = registry.require(change.changeType());   // fails if unregistered
-for (RelevantProductTarget product : discovery.discover(materialId)) {
-    ProductImpactAssessment assessment = strategy.assess(change, product, ruleSetVersionId);
-    findings.add(assessment.toFinding(newId(), run.impactAnalysisRunId(), provenance));
-}
+// ChangeImpactAnalysisService.run (SCRUM-79)
+ImpactStrategy strategy = strategies.require(change.changeType());   // fails if unregistered
+List<ProductImpactAssessment> assessments = discovery.discover(materialId).stream()
+        .map(product -> strategy.assess(change, product, ruleSetVersionId))
+        .toList();                                                    // every 422 before a write
+...
+List<ImpactFinding> newFindings = assessments.stream()
+        .map(assessment -> assessment.toFinding(ids.get(), runId, provenance))
+        .toList();
 ```
 
 ```mermaid
@@ -154,10 +160,23 @@ sequenceDiagram
   REVIEW_REQUIRED with `[SOY]`, and the 20 negative controls absent. Before adoption, every
   product is `FORMULA_ADOPTION_PENDING`.
 
-## Open items for the final A07
+## Outcome (SCRUM-79/80)
 
-- Replace the Spec V2 / N+1 test fixtures with M2's real adoption (SCRUM-48) once it merges.
-- Add the SCRUM-79 orchestration to the sequence diagram from real code, and link main CI
-  evidence.
+- **The orchestrator never names a change type.** `ChangeImpactAnalysisService` asks the
+  registry and calls `assess`. Adding `FORMULA` means one new `ImpactStrategy` bean and
+  adding the type to the required set in `ImpactInfrastructureConfiguration`; the service
+  does not change.
+- **Fail-closed holds end to end.** A strategy failure (`FORMULA_ADOPTION_PENDING`, or an
+  incomplete derivation) happens before `ImpactAnalysisApplicationService.execute`, so the
+  API test shows no run, finding, task or audit row and an unchanged SUBMITTED status.
+- **The verdicts are correct on real data.** `SoyGoldenImpactRunMySqlTest` drives the SOY
+  scenario over HTTP, and every one of the 60 products matches M2's golden. The 20
+  REVIEW_REQUIRED products each have exactly one OPEN task, and the 20 negative controls
+  have no finding.
+
+## Remaining items
+
+- Replace the Spec V2 / N+1 test fixture (`fixtures/s3-soy-spec-v2-adoption.sql`) with M2's
+  real adoption (SCRUM-55/56) once it merges.
 - Contract decision pending with M2: whether an incomplete derivation gets its own 422
   code. Today it is a 500 rollback under the frozen v1 error matrix.

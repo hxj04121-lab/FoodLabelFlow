@@ -55,7 +55,7 @@ import static org.mockito.Mockito.verify;
 
 /** No test-managed transaction: every assertion observes a service commit or rollback. */
 @Testcontainers
-@SpringBootTest(properties = "spring.flyway.target=2")
+@SpringBootTest(properties = {"spring.flyway.target=2", "spectrace.dev-external-auth.enabled=true"})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Sql(scripts = PositiveGoldenFixtures.SQL_RESOURCE, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
 @Sql(statements = {

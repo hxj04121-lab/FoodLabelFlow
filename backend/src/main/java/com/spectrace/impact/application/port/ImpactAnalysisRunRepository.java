@@ -15,4 +15,7 @@ public interface ImpactAnalysisRunRepository {
 
     /** List shape retained for M1 callers; live persistence permits one analysis per change request. */
     List<ImpactAnalysisRun> findByChangeRequestId(String changeRequestId);
+
+    /** Reads the latest committed run after the caller has locked its analysed change request. */
+    List<ImpactAnalysisRun> findByChangeRequestIdForReplay(String changeRequestId);
 }

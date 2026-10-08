@@ -1,0 +1,53 @@
+%% SCRUM-57 / A07 analysis interaction, participants are conceptual responsibilities.
+%% Source baseline: 20a41e48c71e0851bf9c71de9ba580cf1623323a.
+sequenceDiagram
+    autonumber
+    actor M as Authorized maintainer
+    participant B as Adoption boundary
+    participant C as Adoption control
+    participant I as Identity boundary
+    participant R as Catalog records
+    participant E as Audit evidence
+
+    M->>B: Submit product + exact source formula + target specification IDs
+    B->>C: Adopt newer specification explicitly
+    C->>I: Authenticate and require DATA.MAINTAIN + FORMULA.RELEASE
+    alt Identity missing or permission denied
+        I-->>C: Reject identity or authorization
+        C-->>B: 401 AUTHENTICATION_REQUIRED or 403 AUTHORIZATION_DENIED
+        B-->>M: Error, no catalog or adoption audit writes
+    else Authorized actor
+        Note over C,E: One transaction governs validation, snapshot, selection and all audit writes
+        C->>R: Serialize product, then exact source version
+        R-->>C: Current pointer, source release state and source items
+        C->>C: Check source ownership, RELEASED state, current pointer and Y flag
+        Note over C,R: Any failed guard exits at its step, without executing later calls
+        C->>R: Serialize distinct material IDs in sorted order
+        C->>R: Serialize target + source specification IDs in sorted order
+        R-->>C: Exact specification versions and evidence
+        C->>C: Validate specification/material bindings, target eligibility and newness
+        alt Source stale or a precondition fails
+            C-->>B: 400 / 404 / 409 / 422 business rejection
+            B-->>M: Stable error, no new snapshot or audit residue
+        else Eligible explicit adoption
+            C->>R: Create fresh draft at highest allocated version + 1
+            C->>R: Copy all items, replace target-material specification references
+            Note over C,R: Preserve material, sequence, quantity and unit, allocate fresh item IDs
+            C->>E: FORMULA_CREATED
+            C->>R: Release new formula and select it as current
+            Note over C,R: Old selection Y to N, old content and release facts stay unchanged
+            C->>E: FORMULA_RELEASED
+            C->>E: FORMULA_SPECIFICATION_ADOPTED with source, target and new IDs
+            alt Every persistence and audit step succeeds
+                C->>R: Commit transaction
+                C-->>B: Released new formula snapshot with items
+                B-->>M: 201 Created
+            else Any persistence or audit step fails before commit
+                Note over C,E: Failure can occur at any write above, all changes share this transaction
+                C->>R: Roll back snapshot, items, selection and all audit events
+                C-->>B: Conflict or generic internal error
+                B-->>M: 409 DATA_CONFLICT or 500 INTERNAL_ERROR
+            end
+        end
+        Note over C,R: Published label, declarations and label pointer remain unchanged
+    end

@@ -6,6 +6,10 @@ import com.spectrace.support.MySqlIntegrationTestSupport;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 import org.springframework.test.annotation.DirtiesContext;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -16,6 +20,9 @@ class IdentityRepositoryIntegrationTest extends MySqlIntegrationTestSupport {
 
     @Autowired
     private IdentityRepository identityRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     void mapsSeededExternalIdentityToRbacActor() {
@@ -45,5 +52,22 @@ class IdentityRepositoryIntegrationTest extends MySqlIntegrationTestSupport {
                         "does-not-exist"
                 )
                 .isEmpty());
+    }
+
+    @Test
+    @Transactional
+    void listsOnlyActiveHoldersOfAPermissionInUserIdOrder() {
+        assertEquals(List.of("user_label_officer"),
+                identityRepository.findActiveUserIdsWithPermission("LABEL.CREATE"));
+        assertEquals(List.of(), identityRepository.findActiveUserIdsWithPermission("NO.SUCH_PERMISSION"));
+
+        jdbcTemplate.update("INSERT INTO user_role (user_id, role_id, assigned_at) "
+                + "VALUES ('user_admin', 'role_label_officer', '2026-10-01 00:00:00')");
+        assertEquals(List.of("user_admin", "user_label_officer"),
+                identityRepository.findActiveUserIdsWithPermission("LABEL.CREATE"));
+
+        jdbcTemplate.update("UPDATE user_account SET is_active = 'N' WHERE user_id = 'user_admin'");
+        assertEquals(List.of("user_label_officer"),
+                identityRepository.findActiveUserIdsWithPermission("LABEL.CREATE"));
     }
 }

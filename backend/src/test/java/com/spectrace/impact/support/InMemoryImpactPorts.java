@@ -6,6 +6,7 @@ import com.spectrace.impact.application.ImpactRunAlreadyExistsException;
 import com.spectrace.impact.application.port.ChangeRequestRepository;
 import com.spectrace.impact.application.port.ImpactAnalysisRunRepository;
 import com.spectrace.impact.application.port.ImpactFindingRepository;
+import com.spectrace.impact.application.port.ReviewTaskLinkageRepository;
 import com.spectrace.impact.application.port.ReviewTaskPort;
 import com.spectrace.impact.domain.ChangeRequest;
 import com.spectrace.impact.domain.ChangeRequest.VersionChange;
@@ -13,6 +14,7 @@ import com.spectrace.impact.domain.ChangeRequestStatus;
 import com.spectrace.impact.domain.ChangeType;
 import com.spectrace.impact.domain.ImpactAnalysisRun;
 import com.spectrace.impact.domain.ImpactFinding;
+import com.spectrace.impact.domain.ReviewTaskLinkage;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -36,6 +38,7 @@ public final class InMemoryImpactPorts {
 
     public static final class ChangeRequests implements ChangeRequestRepository {
         private final Map<String, ChangeRequest> byId = new LinkedHashMap<>();
+        private final List<String> locked = new ArrayList<>();
 
         @Override
         public void save(ChangeRequest changeRequest) {
@@ -51,6 +54,23 @@ public final class InMemoryImpactPorts {
         @Override
         public Optional<ChangeRequest> findById(String changeRequestId) {
             return Optional.ofNullable(byId.get(changeRequestId));
+        }
+
+        @Override
+        public Optional<ChangeRequest> lockById(String changeRequestId) {
+            locked.add(changeRequestId);
+            return findById(changeRequestId);
+        }
+
+        @Override
+        public void updateStatus(String changeRequestId, ChangeRequestStatus from, ChangeRequestStatus to) {
+            ChangeRequest saved = byId.get(changeRequestId);
+            if (saved == null || saved.status() != from) {
+                throw new IllegalStateException("Change request " + changeRequestId + " is not " + from);
+            }
+            byId.put(changeRequestId, new ChangeRequest(saved.changeRequestId(), saved.changeRequestCode(),
+                    saved.changeType(), to, saved.requestedAt(), saved.requestedByUserId(), saved.description(),
+                    saved.versionChange(), saved.dataProvenanceId()));
         }
 
         @Override
@@ -76,10 +96,15 @@ public final class InMemoryImpactPorts {
         public List<ChangeRequest> saved() {
             return List.copyOf(byId.values());
         }
+
+        public List<String> locked() {
+            return List.copyOf(locked);
+        }
     }
 
     public static final class Runs implements ImpactAnalysisRunRepository {
         private final Map<String, ImpactAnalysisRun> byId = new LinkedHashMap<>();
+        private final List<String> replayReads = new ArrayList<>();
 
         @Override
         public void save(ImpactAnalysisRun run) {
@@ -112,6 +137,16 @@ public final class InMemoryImpactPorts {
                             .thenComparing(ImpactAnalysisRun::impactAnalysisRunId))
                     .toList();
         }
+
+        @Override
+        public List<ImpactAnalysisRun> findByChangeRequestIdForReplay(String changeRequestId) {
+            replayReads.add(changeRequestId);
+            return findByChangeRequestId(changeRequestId);
+        }
+
+        public List<String> replayReads() {
+            return List.copyOf(replayReads);
+        }
     }
 
     public static final class Findings implements ImpactFindingRepository {
@@ -140,6 +175,11 @@ public final class InMemoryImpactPorts {
                     .sorted(Comparator.comparing(ImpactFinding::productId))
                     .toList();
         }
+
+        @Override
+        public List<ImpactFinding> findByRunIdForReplay(String impactAnalysisRunId) {
+            return findByRunId(impactAnalysisRunId);
+        }
     }
 
     public static final class ReviewTasks implements ReviewTaskPort {
@@ -155,6 +195,31 @@ public final class InMemoryImpactPorts {
         }
 
         public List<OpenReviewTask> opened() {
+            return List.copyOf(byFindingId.values());
+        }
+    }
+
+    /** review_task: one task per finding, saveOrGetExisting returns the stored row on replay. */
+    public static final class ReviewTaskLinkages implements ReviewTaskLinkageRepository {
+        private final Map<String, ReviewTaskLinkage> byFindingId = new LinkedHashMap<>();
+
+        @Override
+        public ReviewTaskLinkage saveOrGetExisting(ReviewTaskLinkage linkage) {
+            return byFindingId.computeIfAbsent(Objects.requireNonNull(linkage, "linkage").impactFindingId(),
+                    ignored -> linkage);
+        }
+
+        @Override
+        public Optional<ReviewTaskLinkage> findByFindingId(String impactFindingId) {
+            return Optional.ofNullable(byFindingId.get(impactFindingId));
+        }
+
+        @Override
+        public Optional<ReviewTaskLinkage> findByFindingIdForReplay(String impactFindingId) {
+            return findByFindingId(impactFindingId);
+        }
+
+        public List<ReviewTaskLinkage> saved() {
             return List.copyOf(byFindingId.values());
         }
     }

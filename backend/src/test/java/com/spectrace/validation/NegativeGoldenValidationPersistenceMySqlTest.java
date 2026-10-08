@@ -33,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Exact negative SQL in its own database; no test transaction hides commit/rollback. */
 @Testcontainers
-@SpringBootTest(properties = "spring.flyway.target=2")
+@SpringBootTest(properties = {"spring.flyway.target=2", "spectrace.dev-external-auth.enabled=true"})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Sql(scripts = NegativeGoldenFixtures.SQL_RESOURCE, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
 @Sql(statements = {

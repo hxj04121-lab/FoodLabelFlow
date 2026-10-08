@@ -53,6 +53,7 @@ class LabelReviewServiceTest {
 
         when(repository.markPendingReview("label_v1"))
                 .thenReturn(1);
+        when(repository.markReviewTaskInReview("label_v1")).thenReturn(1);
 
         service.submitForReview(
                 "label_v1",
@@ -292,7 +293,11 @@ class LabelReviewServiceTest {
 
         when(repository.updateReviewTaskStatus(
                 "review_1",
-                "CLOSED"
+                "label_v1",
+                "CLOSED",
+                "REJECT",
+                "user_reviewer",
+                true
         )).thenReturn(1);
 
         service.recordDecision(
@@ -309,7 +314,11 @@ class LabelReviewServiceTest {
 
         verify(repository).updateReviewTaskStatus(
                 "review_1",
-                "CLOSED"
+                "label_v1",
+                "CLOSED",
+                "REJECT",
+                "user_reviewer",
+                true
         );
 
         verify(repository).createApprovalRecord(
@@ -366,6 +375,26 @@ class LabelReviewServiceTest {
         verify(repository, never())
                 .updateDecisionState(anyString(), anyString());
         verify(repository, never())
-                .updateReviewTaskStatus(anyString(), anyString());
+                .updateReviewTaskStatus(
+                        anyString(), anyString(), anyString(), anyString(),
+                        anyString(), anyBoolean()
+                );
+    }
+
+    @Test
+    void rejectsSubmissionWithoutExactlyOneMatchingTaskBeforeAudit() {
+        when(repository.lockForReview("label_v1")).thenReturn(Optional.of(target("DRAFT", true)));
+        when(repository.hasPassingValidation("label_v1", "rules_v1")).thenReturn(true);
+        when(repository.markPendingReview("label_v1")).thenReturn(1);
+        when(repository.markReviewTaskInReview("label_v1")).thenReturn(0);
+        assertThrows(LabelVersionConflictException.class, () -> service.submitForReview("label_v1", submitter()));
+        verify(repository, never()).createSubmitAudit(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void rejectsDecisionCommentThatCannotBeStoredBeforeAnyMutation() {
+        assertThrows(IllegalArgumentException.class, () -> service.recordDecision("label_v1", "APPROVE",
+                "x".repeat(1001), submitter()));
+        verifyNoInteractions(repository);
     }
 }

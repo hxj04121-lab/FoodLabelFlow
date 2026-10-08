@@ -8,6 +8,13 @@ test('validates a seeded PASS and a new blocking FAIL through the browser and pe
     'Explicit opt-in required for writes to local course validation data',
   )
 
+  // Existing seeded fixture actor, supplied before the first identity read. This
+  // does not select identities or grant permissions in the production UI.
+  await page.context().setExtraHTTPHeaders({
+    'X-Auth-Provider': 'DEV_EXTERNAL',
+    'X-External-Subject': 'dev-external-label-officer',
+  })
+
   await page.goto('/labels')
   await expect(page.getByText('Connected to the M1 read-only API')).toBeVisible({
     timeout: 30_000,
@@ -33,7 +40,7 @@ test('validates a seeded PASS and a new blocking FAIL through the browser and pe
   await derived.screenshot({ path: 'test-results/derived-allergens-live.png' })
   await page
     .getByRole('checkbox', {
-      name: 'Enable the local demo label-officer identity to validate this exact version',
+      name: 'Use the connected identity to validate this exact version',
     })
     .check()
   await page.getByRole('button', { name: 'Run validation' }).click()
@@ -63,7 +70,7 @@ test('validates a seeded PASS and a new blocking FAIL through the browser and pe
   await page.getByLabel('Product').selectOption('prod_usda_1106285')
   await page
     .getByRole('checkbox', {
-      name: 'Enable the local demo label-officer identity for this form',
+      name: 'Use the connected identity to create this draft',
     })
     .check()
   await page.getByRole('button', { name: 'Create label draft' }).click()
@@ -73,7 +80,7 @@ test('validates a seeded PASS and a new blocking FAIL through the browser and pe
   )
   await page
     .getByRole('checkbox', {
-      name: 'Enable the local demo label-officer identity to validate this exact version',
+      name: 'Use the connected identity to validate this exact version',
     })
     .check()
   await page.getByRole('button', { name: 'Run validation' }).click()

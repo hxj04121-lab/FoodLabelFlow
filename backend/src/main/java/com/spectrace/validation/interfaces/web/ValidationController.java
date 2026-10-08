@@ -3,6 +3,8 @@ package com.spectrace.validation.interfaces.web;
 import com.spectrace.allergen.application.port.AllergenEntry;
 import com.spectrace.allergen.application.port.AllergenFactsPort;
 import com.spectrace.identity.application.IdentityService;
+import com.spectrace.identity.application.ExternalActorResolver;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.spectrace.identity.application.UnknownIdentityException;
 import com.spectrace.validation.application.LabelAllergenFacts;
 import com.spectrace.validation.application.LabelAllergenQueryService;
@@ -40,16 +42,24 @@ public class ValidationController {
 
     private final ValidationApplicationService validation;
     private final AllergenFactsPort allergens;
-    private final IdentityService identities;
+    private final ExternalActorResolver actors;
     private final LabelAllergenQueryService labelAllergens;
 
     public ValidationController(
             ValidationApplicationService validation, AllergenFactsPort allergens, IdentityService identities,
             LabelAllergenQueryService labelAllergens
     ) {
+        this(validation, allergens, identities, labelAllergens, new ExternalActorResolver(identities, false));
+    }
+
+    @Autowired
+    public ValidationController(
+            ValidationApplicationService validation, AllergenFactsPort allergens, IdentityService identities,
+            LabelAllergenQueryService labelAllergens, ExternalActorResolver actors
+    ) {
         this.validation = validation;
         this.allergens = allergens;
-        this.identities = identities;
+        this.actors = actors;
         this.labelAllergens = labelAllergens;
     }
 
@@ -113,6 +123,6 @@ public class ValidationController {
         if (provider == null || provider.isBlank() || subject == null || subject.isBlank()) {
             throw new UnknownIdentityException("Authenticated identity headers are required");
         }
-        identities.authenticate(provider, subject);
+        actors.resolve(provider, subject);
     }
 }

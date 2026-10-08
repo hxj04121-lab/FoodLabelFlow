@@ -51,7 +51,7 @@ test('shows a loading state and renders canonical allergens from the API', async
   })
 
   await page.goto('/labels')
-  await expect(page.getByRole('status')).toContainText('Checking the canonical allergen endpoint')
+  await expect(page.getByRole('status').filter({ hasText: 'Checking the canonical allergen endpoint' })).toBeVisible()
   releaseResponse()
 
   await expect(page.getByText('Canonical allergen endpoint connected')).toBeVisible()
@@ -65,6 +65,74 @@ test('shows an honest empty state', async ({ page }) => {
 
   await expect(page.getByText('Canonical allergen endpoint connected')).toBeVisible()
   await expect(page.getByText('0 entries returned for US.')).toBeVisible()
+})
+
+test('keeps bound-task creation disabled while the declaration catalog is loading', async ({ page }) => {
+  let releaseResponse!: () => void
+  const responseGate = new Promise<void>((resolve) => {
+    releaseResponse = resolve
+  })
+  let creates = 0
+  await page.route('**/api/v1/allergens?*', async (route) => {
+    await responseGate
+    await route.fulfill({ json: allergens })
+  })
+  await page.route('**/api/labels/drafts', (route) => {
+    creates++
+    return route.fulfill({ status: 201, json: draft })
+  })
+  await page.goto('/labels?productId=' + draft.productId + '&reviewTaskId=task_catalog_loading')
+  try {
+    await page.getByRole('checkbox', { name: 'Use the connected identity to create this draft' }).check()
+    await expect(page.getByRole('status').filter({ hasText: 'Checking the canonical allergen endpoint' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Create label draft' })).toBeDisabled()
+    await expect(page.getByRole('checkbox', { name: 'Declare Soy (SOY)' })).toHaveCount(0)
+    expect(creates).toBe(0)
+  } finally {
+    releaseResponse()
+  }
+  await expect(page.getByText('Canonical allergen endpoint connected')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Create label draft' })).toBeEnabled()
+  expect(creates).toBe(0)
+})
+
+test('keeps bound-task creation disabled after the declaration catalog fails', async ({ page }) => {
+  let creates = 0
+  await page.route('**/api/v1/allergens?*', (route) => route.fulfill({
+    status: 503,
+    json: { code: 'UNAVAILABLE', message: 'Declaration catalog unavailable.' },
+  }))
+  await page.route('**/api/labels/drafts', (route) => {
+    creates++
+    return route.fulfill({ status: 201, json: draft })
+  })
+  await page.goto('/labels?productId=' + draft.productId + '&reviewTaskId=task_catalog_failed')
+  await page.getByRole('checkbox', { name: 'Use the connected identity to create this draft' }).check()
+  await expect(page.getByRole('alert')).toHaveText('Declaration catalog unavailable.')
+  await expect(page.getByRole('button', { name: 'Create label draft' })).toBeDisabled()
+  await expect(page.getByRole('checkbox', { name: 'Declare Soy (SOY)' })).toHaveCount(0)
+  expect(creates).toBe(0)
+})
+
+test('allows explicit empty declarations after the canonical catalog successfully returns empty', async ({ page }) => {
+  let creates = 0
+  await page.route('**/api/v1/allergens?*', (route) => route.fulfill({ json: [] }))
+  await page.route('**/api/labels/drafts', async (route) => {
+    creates++
+    expect(route.request().postDataJSON()).toEqual({
+      productId: draft.productId,
+      jurisdictionCode: 'US',
+      declarations: [],
+      reviewTaskId: 'task_catalog_empty',
+    })
+    await route.fulfill({ status: 201, json: draft })
+  })
+  await page.goto('/labels?productId=' + draft.productId + '&reviewTaskId=task_catalog_empty')
+  await expect(page.getByText('0 entries returned for US.')).toBeVisible()
+  await page.getByRole('checkbox', { name: 'Use the connected identity to create this draft' }).check()
+  await page.getByRole('button', { name: 'Create label draft' }).click()
+  await expect(page.getByRole('region', { name: 'Label draft details' })).toContainText(draft.labelVersionId)
+  expect(creates).toBe(1)
 })
 
 test('shows API errors without seed fallback and retries the request', async ({ page }) => {
@@ -127,6 +195,7 @@ test('creates a label draft with the approved local identity and renders server 
     expect(route.request().postDataJSON()).toEqual({
       productId: draft.productId,
       jurisdictionCode: 'US',
+      declarations: [],
     })
     await route.fulfill({ status: 201, json: draft })
   })
@@ -135,7 +204,7 @@ test('creates a label draft with the approved local identity and renders server 
   const create = page.getByRole('button', { name: 'Create label draft' })
   await expect(create).toBeDisabled()
   await page
-    .getByRole('checkbox', { name: 'Enable the local demo label-officer identity' })
+    .getByRole('checkbox', { name: 'Use the connected identity to create this draft' })
     .check()
   await create.click()
 
@@ -181,7 +250,7 @@ test('keeps authorization errors visible and does not claim a created draft', as
   )
   await page.goto('/labels')
   await page
-    .getByRole('checkbox', { name: 'Enable the local demo label-officer identity' })
+    .getByRole('checkbox', { name: 'Use the connected identity to create this draft' })
     .check()
   await page.getByRole('button', { name: 'Create label draft' }).click()
 
@@ -200,7 +269,7 @@ for (const response of ['malformed body', 'invalid JSON']) {
         : route.fulfill({ status: 201, contentType: 'text/html', body: '<html>Response lost</html>' })
     })
     await page.goto('/labels')
-    await page.getByRole('checkbox', { name: 'Enable the local demo label-officer identity' }).check()
+    await page.getByRole('checkbox', { name: 'Use the connected identity to create this draft' }).check()
     await page.getByRole('button', { name: 'Create label draft' }).click()
 
     await expect(page.getByRole('alert')).toContainText('INVALID_RESPONSE')
@@ -220,7 +289,7 @@ test('reading an existing draft does not confirm uncertain draft creation', asyn
   })
   await page.route(`**/api/labels/${draft.labelVersionId}`, (route) => route.fulfill({ json: draft }))
   await page.goto('/labels')
-  await page.getByRole('checkbox', { name: 'Enable the local demo label-officer identity' }).check()
+  await page.getByRole('checkbox', { name: 'Use the connected identity to create this draft' }).check()
   await page.getByRole('button', { name: 'Create label draft' }).click()
   await expect(page.getByText('The write outcome may be unknown.')).toBeVisible()
 
@@ -236,7 +305,7 @@ test('changing products does not unlock uncertain draft creation', async ({ page
   await page.route('**/api/v1/allergens?*', (route) => route.fulfill({ json: allergens }))
   await page.route('**/api/labels/drafts', (route) => route.abort('failed'))
   await page.goto('/labels')
-  await page.getByRole('checkbox', { name: 'Enable the local demo label-officer identity' }).check()
+  await page.getByRole('checkbox', { name: 'Use the connected identity to create this draft' }).check()
   await page.getByRole('button', { name: 'Create label draft' }).click()
   await expect(page.getByText('The write outcome may be unknown.')).toBeVisible()
 

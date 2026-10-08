@@ -3,6 +3,8 @@ package com.spectrace.workflow.application.port;
 import java.util.Optional;
 
 public interface LabelReviewCommandRepository {
+    Optional<com.spectrace.workflow.application.ReviewTaskView> findReviewTaskById(String reviewTaskId);
+
 
     Optional<ReviewTarget> lockForReview(
             String labelVersionId
@@ -17,7 +19,7 @@ public interface LabelReviewCommandRepository {
             String labelVersionId
     );
 
-    void markReviewTaskInReview(
+    int markReviewTaskInReview(
             String labelVersionId
     );
 
@@ -39,7 +41,38 @@ public interface LabelReviewCommandRepository {
 
     int updateReviewTaskStatus(
             String reviewTaskId,
-            String newStatus
+            String labelVersionId,
+            String newStatus,
+            String decision,
+            String resolverUserId,
+            boolean resolved
+    );
+
+    Optional<PublicationTarget> lockForPublication(String reviewTaskId);
+
+    int supersedePublishedVersion(String labelVersionId);
+
+    int publishApprovedVersion(String labelVersionId);
+
+    int updateCurrentPublishedVersion(String productId, String labelVersionId);
+
+    void createPublicationRecord(
+            String labelVersionId,
+            String actorUserId,
+            String dataProvenanceId
+    );
+
+    void createPublicationAudit(
+            String labelVersionId,
+            String reviewTaskId,
+            String actorUserId,
+            String dataProvenanceId
+    );
+
+    int resolvePublishedReviewTask(
+            String reviewTaskId,
+            String labelVersionId,
+            String resolverUserId
     );
 
     void createApprovalRecord(
@@ -77,6 +110,21 @@ public interface LabelReviewCommandRepository {
             boolean current,
             boolean currentFormula,
             String dataProvenanceId
+    ) {
+    }
+
+    record PublicationTarget(
+            String reviewTaskId,
+            String targetLabelVersionId,
+            String decision,
+            String taskStatus,
+            java.time.LocalDateTime resolvedAt,
+            String lifecycleStatus,
+            String productId,
+            String dataProvenanceId,
+            boolean currentFormula,
+            boolean latestLabelVersion,
+            boolean hasApproveRecord
     ) {
     }
 }

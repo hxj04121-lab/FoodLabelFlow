@@ -177,7 +177,7 @@ class Scrum29MySqlIntegrationTest extends MySqlIntegrationTestSupport {
         assertThat(ruleSets.findById("ruleset_us_falcpa_demo_v2")).isPresent();
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM flyway_schema_history WHERE success = TRUE", Integer.class))
-                .isEqualTo(6);
+                .isEqualTo(8);
     }
 
     private RequestAuthorizationAdapter adapter(
@@ -187,6 +187,7 @@ class Scrum29MySqlIntegrationTest extends MySqlIntegrationTestSupport {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader(RequestAuthorizationAdapter.AUTH_PROVIDER_HEADER, "DEV_EXTERNAL");
         request.addHeader(RequestAuthorizationAdapter.AUTH_SUBJECT_HEADER, externalSubject);
-        return new RequestAuthorizationAdapter(request, identityService, authorizationService, audit);
+        return new RequestAuthorizationAdapter(request, identityService, authorizationService, audit,
+                new com.spectrace.identity.application.ExternalActorResolver(identityService, true));
     }
 }

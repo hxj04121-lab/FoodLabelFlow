@@ -1,0 +1,30 @@
+sequenceDiagram
+    actor Maker
+    actor Checker
+    actor Publisher
+    participant Boundary as Label workflow boundary
+    participant Control as Snapshot/review control
+    participant Validation as Real validator
+    participant Store as Transactional records
+    Maker->>Boundary: Create replacement with explicit declarations and task ID
+    Boundary->>Control: Authorize maker and validate input
+    Control->>Store: Lock product, require first unbound task
+    Control->>Store: Insert snapshot/declarations and bind target
+    Store-->>Maker: Fresh exact label binding
+    Maker->>Validation: Validate exact label and rule set
+    Validation->>Store: Record actual rule results
+    alt Latest exact validation passes
+        Maker->>Boundary: Submit exact label
+        Boundary->>Control: Require permission, current bindings and validation
+        Control->>Store: Label pending, task in review, submit audit
+        Checker->>Boundary: APPROVE exact label
+        Boundary->>Control: Require permitted independent checker
+        Control->>Store: Approved label, approval/task/audit
+        Publisher->>Boundary: Publish exact task and target
+        Boundary->>Control: Require approved target/record and current guards
+        Control->>Store: Atomic old/new publication, pointer, task and evidence
+        Store-->>Publisher: Durable published state
+    else Missing or failed validation
+        Maker->>Boundary: Attempt submission
+        Boundary-->>Maker: Conflict with zero review or publication writes
+    end

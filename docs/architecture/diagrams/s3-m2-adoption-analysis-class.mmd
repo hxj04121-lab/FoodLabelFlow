@@ -1,0 +1,98 @@
+%% SCRUM-57 / A07 analysis model; conceptual roles, not additional Java classes.
+%% Source baseline: 20a41e48c71e0851bf9c71de9ba580cf1623323a.
+classDiagram
+    direction TB
+    class Maintainer {
+        <<actor>>
+        +requestExplicitAdoption()
+    }
+    class AdoptionBoundary {
+        <<boundary>>
+        +submit(productId, sourceFormulaId, targetSpecificationId)
+        +presentCreatedSnapshotOrError()
+    }
+    class IdentityBoundary {
+        <<boundary>>
+        +authenticate()
+        +requireDataMaintenance()
+        +requireFormulaRelease()
+    }
+    class AdoptionControl {
+        <<control>>
+        +validateExplicitSourceAndTarget()
+        +serializeSelectionAndVersionAllocation()
+        +copyReleaseAndSelectNewSnapshot()
+        +recordAtomicEvidence()
+    }
+    class Product {
+        <<entity>>
+        productId
+        currentFormulaVersionId
+        currentPublishedLabelVersionId
+    }
+    class FormulaVersion {
+        <<entity>>
+        formulaVersionId
+        versionNumber
+        lifecycleStatus
+        isCurrentReleased
+        releaseActorAndTime
+        provenanceId
+    }
+    class FormulaItem {
+        <<entity>>
+        itemId
+        sequenceNo
+        quantityValue
+        quantityUnit
+    }
+    class SupplierMaterial {
+        <<entity>>
+        materialId
+    }
+    class SpecificationVersion {
+        <<entity>>
+        specificationVersionId
+        versionNumber
+        lifecycleStatus
+        effectiveDate
+    }
+    class DataProvenance {
+        <<entity>>
+        provenanceId
+    }
+    class PublishedLabelVersion {
+        <<entity>>
+        labelVersionId
+        pinnedFormulaVersionId
+    }
+    class AdoptionEvidence {
+        <<entity>>
+        actorId
+        sourceFormulaVersionId
+        targetSpecificationVersionId
+        newFormulaVersionId
+    }
+
+    Maintainer --> AdoptionBoundary : submits exact IDs
+    AdoptionBoundary --> AdoptionControl : requests adoption
+    AdoptionControl --> IdentityBoundary : requires both permissions
+    AdoptionControl --> Product : serializes current selection
+    AdoptionControl --> FormulaVersion : creates and releases copy
+    AdoptionControl --> SpecificationVersion : checks newer eligible target
+    AdoptionControl --> AdoptionEvidence : records within same transaction
+    Product "1" --> "0..*" FormulaVersion : owns versions
+    Product "1" --> "0..1" FormulaVersion : selects current
+    FormulaVersion "1" *-- "1..*" FormulaItem : snapshot items
+    FormulaItem "0..*" --> "1" SupplierMaterial : identifies material
+    FormulaItem "0..*" --> "1" SpecificationVersion : pins exact version
+    SupplierMaterial "1" --> "0..*" SpecificationVersion : owns specifications
+    SpecificationVersion "0..*" --> "1" DataProvenance : has evidence
+    FormulaVersion "0..*" --> "1" DataProvenance : has evidence
+    Product "1" --> "0..1" PublishedLabelVersion : selects published label
+    PublishedLabelVersion "0..*" --> "1" FormulaVersion : preserves pinned history
+
+    note for AdoptionControl "Maps to existing CatalogService.<br/>Allocate highest version + 1."
+    note for FormulaVersion "Old content, items and release facts stay.<br/>Selection metadata may change Y to N."
+    note for PublishedLabelVersion "Keep label, declarations and pointer.<br/>Published label is optional for adoption."
+    note for AdoptionEvidence "CREATED, RELEASED, ADOPTED.<br/>Commit or roll back all writes together."
