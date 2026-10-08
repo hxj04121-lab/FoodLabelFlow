@@ -61,7 +61,10 @@ export function LabelValidationPanel({ draft }: { draft: LabelDraft | null }) {
           requestError instanceof Error ? requestError.message : 'Validation failed.'
         }`,
       )
-      if (!apiError || apiError.status >= 500 || apiError.code === 'VALIDATION_TARGET_MISMATCH') {
+      if (
+        !apiError || apiError.status >= 500 ||
+        apiError.code === 'INVALID_RESPONSE' || apiError.code === 'VALIDATION_TARGET_MISMATCH'
+      ) {
         setUncertain(true)
         setMessage(
           'The validation write outcome may be unknown. Do not submit it again; load the run ID or verify the server first.',
@@ -83,8 +86,12 @@ export function LabelValidationPanel({ draft }: { draft: LabelDraft | null }) {
     try {
       const loaded = requireCurrentTarget(await getValidationRun(exactId), draft)
       setRun(loaded)
-      setUncertain(false)
-      setMessage(`Loaded validation run ${loaded.validationRunId}.`)
+      // An older run for this target cannot identify the outcome of the pending write.
+      setMessage(
+        `Loaded validation run ${loaded.validationRunId}.` + (uncertain
+          ? ' The earlier validation write is still unconfirmed. Verify its outcome on the server before submitting again.'
+          : ''),
+      )
     } catch (requestError: unknown) {
       const apiError = requestError instanceof LabelApiError ? requestError : null
       setError(
