@@ -70,6 +70,10 @@ public class LabelReviewService {
             );
         }
 
+        if (repository.requiresDraftRevision(labelVersionId)) {
+            throw new IllegalStateException("REQUEST_CHANGES requires a new draft revision before resubmission");
+        }
+
         transitionPolicy.requireTransition(
                 target.lifecycleStatus(),
                 "PENDING_REVIEW"

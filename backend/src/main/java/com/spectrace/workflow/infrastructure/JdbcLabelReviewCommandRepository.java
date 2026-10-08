@@ -157,6 +157,23 @@ public class JdbcLabelReviewCommandRepository
     }
 
     @Override
+    public boolean requiresDraftRevision(String labelVersionId) {
+        return !jdbc.query("""
+                SELECT rt.review_task_id FROM review_task rt
+                WHERE rt.target_label_version_id = ?
+                  AND (rt.draft_label_version_id = ? OR rt.draft_label_version_id IS NULL)
+                  AND rt.status = 'OPEN' AND rt.resolved_at IS NULL
+                  AND (rt.decision = 'REQUEST_CHANGES' OR EXISTS (
+                      SELECT 1 FROM approval_record ar
+                      WHERE ar.review_task_id = rt.review_task_id
+                        AND ar.label_version_id = rt.target_label_version_id
+                        AND ar.decision = 'REQUEST_CHANGES' FOR SHARE
+                  ))
+                FOR UPDATE
+                """, (rs, row) -> rs.getString("review_task_id"), labelVersionId, labelVersionId).isEmpty();
+    }
+
+    @Override
     public int markReviewTaskInReview(
             String labelVersionId
     ) {

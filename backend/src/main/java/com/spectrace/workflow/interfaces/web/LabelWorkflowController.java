@@ -4,6 +4,7 @@ import com.spectrace.identity.application.ExternalActorResolver;
 import com.spectrace.identity.application.UnknownIdentityException;
 import com.spectrace.identity.domain.AuthenticatedActor;
 import com.spectrace.label.application.LabelDraftService;
+import com.spectrace.label.application.LabelDeclarationInput;
 import com.spectrace.label.domain.LabelDraft;
 import com.spectrace.shared.api.StrictCommandJson;
 import com.spectrace.workflow.application.LabelReviewService;
@@ -17,6 +18,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Set;
+import java.util.ArrayList;
+import java.net.URI;
+import org.springframework.http.ResponseEntity;
 
 @RestController
 public class LabelWorkflowController {
@@ -54,6 +58,28 @@ public class LabelWorkflowController {
         String labelId = StrictCommandJson.text(input, "labelVersionId", 120);
         reviews.publishReviewTask(reviewTaskId, labelId, actor);
         return labels.getById(labelId);
+    }
+
+    @PostMapping(value = "/api/review-tasks/{reviewTaskId}/draft-revisions", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<LabelDraft> revise(@PathVariable String reviewTaskId, @RequestBody String body,
+                                            HttpServletRequest request) {
+        AuthenticatedActor actor = authenticate(request);
+        var input = StrictCommandJson.object(body, Set.of("expectedLabelVersionId", "declarations"), Set.of());
+        String expectedLabelId = StrictCommandJson.text(input, "expectedLabelVersionId", 120);
+        var rows = input.get("declarations");
+        if (!rows.isArray() || rows.size() > 100) {
+            throw new com.spectrace.label.application.InvalidLabelDraftRequestException(
+                    "declarations must be an array with at most 100 entries");
+        }
+        var entered = new ArrayList<LabelDeclarationInput>();
+        for (var row : rows) {
+            StrictCommandJson.checkFields(row, Set.of("allergenId", "declarationType"), Set.of("displayText"));
+            entered.add(new LabelDeclarationInput(StrictCommandJson.text(row, "allergenId", 80),
+                    StrictCommandJson.text(row, "declarationType", 40),
+                    row.has("displayText") ? StrictCommandJson.text(row, "displayText", 300) : null));
+        }
+        LabelDraft revision = labels.reviseReturnedDraft(reviewTaskId, expectedLabelId, entered, actor);
+        return ResponseEntity.created(URI.create("/api/labels/" + revision.labelVersionId())).body(revision);
     }
 
     @GetMapping("/api/review-tasks/{reviewTaskId}")
