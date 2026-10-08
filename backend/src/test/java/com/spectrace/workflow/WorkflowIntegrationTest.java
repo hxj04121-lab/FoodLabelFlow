@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doAnswer;
 
 @SpringBootTest
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -40,6 +41,12 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
 
     @Autowired
     private LabelReviewService reviewService;
+
+    @Autowired
+    private com.spectrace.label.application.LabelDraftService labelDraftService;
+
+    @Autowired
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -735,6 +742,206 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
             jdbcTemplate.update(
                     "DELETE FROM label_version WHERE label_version_id = 'label_scrum82_newer'");
         }
+    }
+
+    @Test
+    void rejectsPublicationWhenNewerDraftCommitsWhilePublicationWaitsForProductLock() throws Exception {
+        // Existing SQL helpers supply validation/impact prerequisites. Submission and APPROVE
+        // below use the real transactional service, rather than synthetic APPROVED state.
+        createPassedValidation();
+        createReviewFixture();
+        approveTarget();
+        assertStatus("APPROVED");
+        assertReviewTaskStatus("IN_REVIEW");
+        assertTrue(workflowRepository.findVersion(LABEL_ID).orElseThrow().current());
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM approval_record WHERE review_task_id=? AND label_version_id=? AND decision='APPROVE'",
+                Integer.class, REVIEW_TASK_ID, LABEL_ID));
+        assertEquals(0, publicationCount());
+
+        String productId = productIdForTarget();
+        String jurisdiction = jdbcTemplate.queryForObject(
+                "SELECT jurisdiction_code FROM label_version WHERE label_version_id=?", String.class, LABEL_ID);
+        CountDownLatch draftCreatedHoldingProduct = new CountDownLatch(1);
+        CountDownLatch allowDraftCommit = new CountDownLatch(1);
+        CountDownLatch publicationEntered = new CountDownLatch(1);
+        CountDownLatch publicationGuardRead = new CountDownLatch(1);
+        CountDownLatch allowPublicationService = new CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicLong holderConnectionId = new java.util.concurrent.atomic.AtomicLong();
+        java.util.concurrent.atomic.AtomicLong publisherConnectionId = new java.util.concurrent.atomic.AtomicLong();
+        java.util.concurrent.atomic.AtomicReference<String> newerDraftId = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<String> publisherIsolation = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<LabelReviewCommandRepository.PublicationTarget> observedTarget =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<RuntimeException> publicationFailure = new java.util.concurrent.atomic.AtomicReference<>();
+
+        // Observe connection-local metadata before the real repository call; this adds no
+        // table read or data mutation. After its real query, pause only to snapshot committed
+        // state including the intentionally created draft before publication can write.
+        doAnswer(invocation -> {
+            publisherConnectionId.set(jdbcTemplate.queryForObject("SELECT CONNECTION_ID()", Long.class));
+            publisherIsolation.set(jdbcTemplate.queryForObject("SELECT @@transaction_isolation", String.class));
+            publicationEntered.countDown();
+            @SuppressWarnings("unchecked")
+            java.util.Optional<LabelReviewCommandRepository.PublicationTarget> target =
+                    (java.util.Optional<LabelReviewCommandRepository.PublicationTarget>) invocation.callRealMethod();
+            observedTarget.set(target.orElseThrow());
+            publicationGuardRead.countDown();
+            if (!allowPublicationService.await(20, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Test orchestration timed out after real publication guard read");
+            }
+            return target;
+        }).when(commandRepository).lockForPublication(REVIEW_TASK_ID);
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        Future<?> holder = null;
+        Future<?> publisher = null;
+        java.util.Map<String, Object> waitEvidence;
+        try (Connection observer = java.sql.DriverManager.getConnection(MYSQL.getJdbcUrl(), "root", MYSQL.getPassword())) {
+            System.out.printf("PR67_RACE_CONTAINER: id=%s mysql=%s%n", MYSQL.getContainerId(), MYSQL.getDockerImageName());
+            holder = executor.submit(() -> new org.springframework.transaction.support.TransactionTemplate(transactionManager)
+                    .execute(status -> {
+                        holderConnectionId.set(jdbcTemplate.queryForObject("SELECT CONNECTION_ID()", Long.class));
+                        // The actual draft service locks product/current formula and creates the
+                        // newer version in this outer transaction. No manual version INSERT.
+                        var draft = labelDraftService.createDraft(productId, jurisdiction,
+                                new AuthenticatedActor("user_label_officer", "user_label_officer", "Label Officer",
+                                        Set.of(), Set.of("LABEL.CREATE")));
+                        newerDraftId.set(draft.labelVersionId());
+                        draftCreatedHoldingProduct.countDown();
+                        try {
+                            if (!allowDraftCommit.await(20, TimeUnit.SECONDS)) {
+                                throw new IllegalStateException("Test orchestration timed out before draft commit");
+                            }
+                        } catch (InterruptedException failure) {
+                            Thread.currentThread().interrupt();
+                            throw new IllegalStateException(failure);
+                        }
+                        return draft;
+                    }));
+            assertTrue(draftCreatedHoldingProduct.await(20, TimeUnit.SECONDS), "Actual draft creation did not reach held transaction");
+            publisher = executor.submit(() -> {
+                try {
+                    reviewService.publishReviewTask(REVIEW_TASK_ID, LABEL_ID, reviewApprover("LABEL.PUBLISH"));
+                } catch (RuntimeException failure) {
+                    publicationFailure.set(failure);
+                }
+            });
+            assertTrue(publicationEntered.await(10, TimeUnit.SECONDS));
+            // Commit only after MySQL itself reports this exact publisher waiting on this
+            // exact holder's product lock. No timing sleep substitutes for lock observation.
+            waitEvidence = awaitPublicationProductLockWait(observer, publisherConnectionId.get(), holderConnectionId.get());
+            System.out.printf("PR67_RACE_LOCK_WAIT: %s%n", waitEvidence);
+            assertEquals("REPEATABLE-READ", publisherIsolation.get());
+            allowDraftCommit.countDown();
+            holder.get(20, TimeUnit.SECONDS);
+            assertTrue(publicationGuardRead.await(20, TimeUnit.SECONDS), "Real publication guard query did not complete");
+            int oldVersion = jdbcTemplate.queryForObject(
+                    "SELECT version_number FROM label_version WHERE label_version_id=?", Integer.class, LABEL_ID);
+            int newVersion = jdbcTemplate.queryForObject(
+                    "SELECT version_number FROM label_version WHERE label_version_id=?", Integer.class, newerDraftId.get());
+            assertTrue(newVersion > oldVersion);
+            assertEquals("DRAFT", jdbcTemplate.queryForObject(
+                    "SELECT lifecycle_status FROM label_version WHERE label_version_id=?", String.class, newerDraftId.get()));
+            java.util.Map<String, Object> beforePublication = racePublicationStateSnapshot();
+            allowPublicationService.countDown();
+            publisher.get(20, TimeUnit.SECONDS);
+            java.util.Map<String, Object> afterPublication = racePublicationStateSnapshot();
+            var target = observedTarget.get();
+            RuntimeException failure = publicationFailure.get();
+            System.out.printf("PR67_RACE_RESULT: holder=%d publisher=%d isolation=%s oldVersion=%d newVersion=%d "
+                            + "guardCurrentFormula=%s guardLatest=%s guardApproveRecord=%s exception=%s "
+                            + "label=%s task=%s publicationRecords=%d publicationAudits=%d unchanged=%s%n",
+                    holderConnectionId.get(), publisherConnectionId.get(), publisherIsolation.get(), oldVersion, newVersion,
+                    target.currentFormula(), target.latestLabelVersion(), target.hasApproveRecord(),
+                    failure == null ? "none" : failure.getClass().getSimpleName(),
+                    jdbcTemplate.queryForObject("SELECT lifecycle_status FROM label_version WHERE label_version_id=?", String.class, LABEL_ID),
+                    jdbcTemplate.queryForObject("SELECT status FROM review_task WHERE review_task_id=?", String.class, REVIEW_TASK_ID),
+                    publicationCount(), jdbcTemplate.queryForObject(
+                            "SELECT COUNT(*) FROM audit_event WHERE event_type='LABEL_PUBLISHED' AND entity_id=?", Integer.class, LABEL_ID),
+                    beforePublication.equals(afterPublication));
+            org.junit.jupiter.api.Assertions.assertAll("Concurrent draft must invalidate publication after lock acquisition",
+                    () -> assertFalse(target.latestLabelVersion(), "Guard must read newly committed draft after product lock wait"),
+                    () -> assertTrue(failure instanceof LabelVersionConflictException, "Actual publication must reject stale label; actual=" + failure),
+                    () -> assertEquals(beforePublication, afterPublication,
+                            "All label rows, product fields, task, approvals, publication and audit rows must remain unchanged"),
+                    () -> assertPublicationUnchanged(1));
+        } finally {
+            allowDraftCommit.countDown();
+            allowPublicationService.countDown();
+            if (holder != null) {
+                try { holder.get(20, TimeUnit.SECONDS); } catch (Exception ignored) { }
+            }
+            if (publisher != null) {
+                try { publisher.get(20, TimeUnit.SECONDS); } catch (Exception ignored) { }
+            }
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS), "Owned race workers must stop before fixture cleanup");
+            if (newerDraftId.get() != null) {
+                jdbcTemplate.update("DELETE FROM label_version WHERE label_version_id=?", newerDraftId.get());
+            }
+        }
+    }
+
+    private java.util.Map<String, Object> awaitPublicationProductLockWait(Connection observer, long publisherId, long holderId)
+            throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
+        String sql = """
+                SELECT waiter.PROCESSLIST_ID AS publisher_connection_id,
+                       holder.PROCESSLIST_ID AS holder_connection_id,
+                       requested.OBJECT_SCHEMA, requested.OBJECT_NAME,
+                       requested.INDEX_NAME, requested.LOCK_TYPE, requested.LOCK_MODE,
+                       requested.LOCK_STATUS, requested.LOCK_DATA
+                FROM performance_schema.data_lock_waits waits
+                JOIN performance_schema.threads waiter ON waiter.THREAD_ID = waits.REQUESTING_THREAD_ID
+                JOIN performance_schema.threads holder ON holder.THREAD_ID = waits.BLOCKING_THREAD_ID
+                JOIN performance_schema.data_locks requested
+                  ON requested.ENGINE = waits.ENGINE
+                 AND requested.ENGINE_LOCK_ID = waits.REQUESTING_ENGINE_LOCK_ID
+                WHERE waiter.PROCESSLIST_ID = ? AND holder.PROCESSLIST_ID = ?
+                  AND requested.OBJECT_SCHEMA = 'spectrace' AND requested.OBJECT_NAME = 'product'
+                """;
+        while (System.nanoTime() < deadline) {
+            try (PreparedStatement query = observer.prepareStatement(sql)) {
+                query.setLong(1, publisherId);
+                query.setLong(2, holderId);
+                try (java.sql.ResultSet rows = query.executeQuery()) {
+                    if (rows.next()) {
+                        java.util.Map<String, Object> evidence = new java.util.LinkedHashMap<>();
+                        for (int column = 1; column <= rows.getMetaData().getColumnCount(); column++) {
+                            evidence.put(rows.getMetaData().getColumnLabel(column), rows.getObject(column));
+                        }
+                        return evidence;
+                    }
+                }
+            }
+            java.util.concurrent.locks.LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(10));
+        }
+        throw new java.util.concurrent.TimeoutException("MySQL did not report expected product row lock wait: publisher="
+                + publisherId + ", holder=" + holderId);
+    }
+
+    private java.util.Map<String, Object> racePublicationStateSnapshot() {
+        return java.util.Map.of(
+                "labels", jdbcTemplate.queryForList("""
+                        SELECT * FROM label_version WHERE product_id =
+                            (SELECT product_id FROM label_version WHERE label_version_id = ?)
+                        ORDER BY label_version_id
+                        """, LABEL_ID),
+                "product", jdbcTemplate.queryForMap("""
+                        SELECT * FROM product WHERE product_id =
+                            (SELECT product_id FROM label_version WHERE label_version_id = ?)
+                        """, LABEL_ID),
+                "task", jdbcTemplate.queryForMap("SELECT * FROM review_task WHERE review_task_id = ?", REVIEW_TASK_ID),
+                "approvals", jdbcTemplate.queryForList("SELECT * FROM approval_record WHERE label_version_id = ? ORDER BY approval_record_id", LABEL_ID),
+                "publications", jdbcTemplate.queryForList("SELECT * FROM publication_record WHERE label_version_id = ? ORDER BY publication_record_id", LABEL_ID),
+                "audits", jdbcTemplate.queryForList("SELECT * FROM audit_event WHERE entity_type = 'LABEL_VERSION' AND entity_id = ? ORDER BY audit_event_id", LABEL_ID));
+    }
+
+    static {
+        // Other classes share this test-JVM fixture; release it after every
+        // selected class has finished instead of invalidating later contexts.
+        Runtime.getRuntime().addShutdownHook(new Thread(MYSQL::stop, "workflow-test-mysql-cleanup"));
     }
 
     @Test

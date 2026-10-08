@@ -378,6 +378,9 @@ public class JdbcLabelReviewCommandRepository
                 productId
         );
 
+        // The product lookup can establish a REPEATABLE READ snapshot before
+        // the lock wait. Nested reads must lock explicitly to see commits made
+        // while waiting, just as the outer FOR UPDATE query does.
         return jdbc.query(
                 """
                 SELECT
@@ -396,10 +399,13 @@ public class JdbcLabelReviewCommandRepository
                         THEN 1 ELSE 0
                     END AS is_current_formula,
                     CASE WHEN lv.version_number = (
-                        SELECT MAX(latest.version_number)
+                        SELECT latest.version_number
                         FROM label_version latest
                         WHERE latest.product_id = lv.product_id
                           AND latest.jurisdiction_code = lv.jurisdiction_code
+                        ORDER BY latest.version_number DESC
+                        LIMIT 1
+                        FOR SHARE
                     ) THEN 1 ELSE 0 END AS is_latest_label_version,
                     EXISTS (
                         SELECT 1
@@ -407,6 +413,7 @@ public class JdbcLabelReviewCommandRepository
                         WHERE ar.review_task_id = rt.review_task_id
                           AND ar.label_version_id = rt.target_label_version_id
                           AND ar.decision = 'APPROVE'
+                        FOR SHARE
                     ) AS has_approve_record
                 FROM review_task rt
                 JOIN label_version lv
