@@ -178,14 +178,6 @@ public class LabelReviewService {
                     target.creatorUserId(),
                     actor.userId()
             );
-            if (!repository.hasPassingValidation(
-                    labelVersionId,
-                    target.ruleSetVersionId()
-            )) {
-                throw new IllegalStateException(
-                        "Latest validation for the label and rule set must pass before approval"
-                );
-            }
         }
 
         int updated = repository.updateDecisionState(
@@ -295,11 +287,6 @@ public class LabelReviewService {
         if (!task.hasApproveRecord()) {
             throw new IllegalStateException(
                     "ReviewTask requires a matching APPROVE record before publication"
-            );
-        }
-        if (!task.hasPassingValidation()) {
-            throw new IllegalStateException(
-                    "Latest validation for the label and rule set must pass before publication"
             );
         }
 

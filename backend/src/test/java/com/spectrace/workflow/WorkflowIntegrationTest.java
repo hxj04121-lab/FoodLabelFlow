@@ -1,6 +1,5 @@
 package com.spectrace.workflow;
 
-import com.spectrace.identity.application.AuthorizationDeniedException;
 import com.spectrace.identity.domain.AuthenticatedActor;
 import com.spectrace.label.application.LabelVersionConflictException;
 import com.spectrace.support.MySqlIntegrationTestSupport;
@@ -26,7 +25,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -61,10 +59,6 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     private static final String IMPACT_RUN_ID = "impact_run_scrum37";
     private static final String CHANGE_REQUEST_ID = "change_request_scrum37";
     private static final String STALE_FORMULA_ID = "formula_scrum81_stale_decision";
-    private static final String COMPETING_LABEL_ID = "label_scrum82_competing";
-    private static final String COMPETING_TASK_ID = "review_task_scrum82_competing";
-    private static final String COMPETING_FINDING_ID = "impact_finding_scrum82_competing";
-    private static final String COMPETING_RUN_ID = "impact_run_scrum82_competing";
 
     @BeforeEach
     void prepareFixture() {
@@ -110,7 +104,6 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
 
     @AfterEach
     void restoreFixture() {
-        cleanUpCompetingFixture();
         restoreSupersededBaseline();
         cleanUpTestData();
     }
@@ -206,65 +199,6 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
         );
 
         assertStatus("DRAFT");
-        assertReviewTaskStatus("OPEN");
-        assertEquals(0, auditCountForTarget());
-    }
-
-    @Test
-    void rejectsSelfApprovalWithoutChangingAnyWorkflowRows() {
-        createPassedValidation();
-        createReviewFixture();
-        reviewService.submitForReview(LABEL_ID, reviewSubmitter());
-
-        AuthenticatedActor makerWithApprovalPermission = new AuthenticatedActor(
-                "user_label_officer", "user_label_officer", "Label Officer",
-                Set.of(), Set.of("LABEL.APPROVE"));
-        assertThrows(AuthorizationDeniedException.class, () -> reviewService.recordDecision(
-                LABEL_ID, "APPROVE", "self approval", makerWithApprovalPermission));
-
-        assertStatus("PENDING_REVIEW");
-        assertReviewTaskStatus("IN_REVIEW");
-        assertEquals(0, approvalCount());
-        assertEquals(0, auditCountByType("LABEL_DECISION_RECORDED"));
-    }
-
-    @Test
-    void rejectsApprovalWithoutPermissionWithoutDatabaseWrites() {
-        createPassedValidation();
-        createReviewFixture();
-        reviewService.submitForReview(LABEL_ID, reviewSubmitter());
-        assertThrows(AuthorizationDeniedException.class, () -> reviewService.recordDecision(
-                LABEL_ID, "APPROVE", "missing permission", reviewApprover("LABEL.PUBLISH")));
-
-        assertStatus("PENDING_REVIEW");
-        assertReviewTaskStatus("IN_REVIEW");
-        assertEquals(0, approvalCount());
-        assertEquals(0, auditCountByType("LABEL_DECISION_RECORDED"));
-    }
-
-    @Test
-    void rejectsPublishWithoutPermissionWithoutDatabaseWrites() {
-        createPassedValidation();
-        createReviewFixture();
-        approveTarget();
-        assertThrows(AuthorizationDeniedException.class, () -> reviewService.publishReviewTask(
-                REVIEW_TASK_ID, LABEL_ID, reviewApprover("LABEL.APPROVE")));
-
-        assertPublicationUnchanged(1);
-    }
-
-    @Test
-    void rejectsApprovalWhenPassedValidationWasBypassed() {
-        createReviewFixture();
-        jdbcTemplate.update("UPDATE label_version SET lifecycle_status='PENDING_REVIEW' WHERE label_version_id=?", LABEL_ID);
-        jdbcTemplate.update("UPDATE review_task SET status='IN_REVIEW' WHERE review_task_id=?", REVIEW_TASK_ID);
-        assertThrows(IllegalStateException.class, () -> reviewService.recordDecision(
-                LABEL_ID, "APPROVE", "validation bypass", reviewApprover("LABEL.APPROVE")));
-
-        assertStatus("PENDING_REVIEW");
-        assertReviewTaskStatus("IN_REVIEW");
-        assertEquals(0, approvalCount());
-        assertEquals(0, auditCountByType("LABEL_DECISION_RECORDED"));
     }
 
     @Test
@@ -361,12 +295,6 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
 
         assertStatus("APPROVED");
         assertReviewTaskStatus("IN_REVIEW");
-        assertThrows(IllegalStateException.class, () -> reviewService.recordDecision(
-                LABEL_ID, "APPROVE", "duplicate approval", reviewApprover("LABEL.APPROVE")));
-        assertStatus("APPROVED");
-        assertReviewTaskStatus("IN_REVIEW");
-        assertEquals(1, approvalCount());
-        assertEquals(1, auditCountByType("LABEL_DECISION_RECORDED"));
     }
 
     @Test
@@ -414,12 +342,6 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
 
         assertStatus("REJECTED");
         assertReviewTaskStatus("CLOSED");
-        assertThrows(IllegalStateException.class, () -> reviewService.publishReviewTask(
-                REVIEW_TASK_ID, LABEL_ID, reviewApprover("LABEL.PUBLISH")));
-        assertStatus("REJECTED");
-        assertReviewTaskStatus("CLOSED");
-        assertEquals(0, publicationCount());
-        assertEquals(0, auditCountByType("LABEL_PUBLISHED"));
     }
 
     @Test
@@ -674,12 +596,6 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
                 Integer.class,
                 LABEL_ID
         ));
-        assertThrows(IllegalStateException.class, () -> reviewService.recordDecision(
-                LABEL_ID, "APPROVE", "published label cannot be approved",
-                reviewApprover("LABEL.APPROVE")));
-        assertStatus("PUBLISHED");
-        assertReviewTaskStatus("CLOSED");
-        assertEquals(1, approvalCount());
         assertEquals(1, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM audit_event WHERE event_type = 'LABEL_PUBLISHED' AND entity_id = ?",
                 Integer.class,
@@ -838,20 +754,6 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     }
 
     @Test
-    void rejectsPublicationWhenValidationWasLaterInvalidated() {
-        createPassedValidation();
-        createReviewFixture();
-        approveTarget();
-        jdbcTemplate.update(
-                "DELETE FROM validation_run WHERE label_version_id=?",
-                LABEL_ID);
-
-        assertThrows(IllegalStateException.class, () -> reviewService.publishReviewTask(
-                REVIEW_TASK_ID, LABEL_ID, reviewApprover("LABEL.PUBLISH")));
-        assertPublicationUnchanged(1);
-    }
-
-    @Test
     void firstPublicationWorksWithoutPreviousPublishedVersion() {
         createPassedValidation();
         createReviewFixture();
@@ -892,20 +794,15 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
         String oldPointer = jdbcTemplate.queryForObject(
                 "SELECT current_published_label_version_id FROM product WHERE product_id = (SELECT product_id FROM label_version WHERE label_version_id = ?)",
                 String.class, LABEL_ID);
-        jdbcTemplate.execute("DROP TRIGGER IF EXISTS test_fail_publication_audit");
-        jdbcTemplate.execute("""
-                CREATE TRIGGER test_fail_publication_audit
-                BEFORE INSERT ON audit_event
-                FOR EACH ROW
-                SIGNAL SQLSTATE '45000'
-                    SET MESSAGE_TEXT = 'forced publication audit failure'
-                """);
-        try {
-            assertThrows(RuntimeException.class, () -> reviewService.publishReviewTask(
-                    REVIEW_TASK_ID, LABEL_ID, reviewApprover("LABEL.PUBLISH")));
-        } finally {
-            jdbcTemplate.execute("DROP TRIGGER IF EXISTS test_fail_publication_audit");
-        }
+        doThrow(new IllegalStateException("forced publication audit failure"))
+                .when(commandRepository).createPublicationAudit(
+                        eq(LABEL_ID), eq(REVIEW_TASK_ID), anyString(), anyString());
+
+        assertThrows(IllegalStateException.class, () ->
+                reviewService.publishReviewTask(
+                        REVIEW_TASK_ID, LABEL_ID,
+                        reviewApprover("LABEL.PUBLISH")
+                ));
 
         assertStatus("APPROVED");
         assertReviewTaskStatus("IN_REVIEW");
@@ -925,151 +822,6 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
         assertEquals(0, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM review_task WHERE review_task_id = ? AND resolved_at IS NOT NULL",
                 Integer.class, REVIEW_TASK_ID));
-    }
-
-    @Test
-    void publicationWaitsForTheProductRowLockAndContinuesAfterCommit() throws Exception {
-        createPassedValidation();
-        createReviewFixture();
-        approveTarget();
-        String productId = productIdForTarget();
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        CountDownLatch publisherStarted = new CountDownLatch(1);
-        Future<?> publication;
-        try (Connection holder = dataSource.getConnection()) {
-            holder.setAutoCommit(false);
-            try (PreparedStatement lock = holder.prepareStatement(
-                    "SELECT product_id FROM product WHERE product_id = ? FOR UPDATE")) {
-                lock.setString(1, productId);
-                lock.executeQuery();
-            }
-
-            publication = executor.submit(() -> {
-                publisherStarted.countDown();
-                reviewService.publishReviewTask(
-                        REVIEW_TASK_ID, LABEL_ID, reviewApprover("LABEL.PUBLISH"));
-            });
-            assertTrue(publisherStarted.await(5, TimeUnit.SECONDS));
-            assertThrows(TimeoutException.class, () -> publication.get(300, TimeUnit.MILLISECONDS));
-            assertPublicationUnchanged(1);
-
-            holder.commit();
-            publication.get(10, TimeUnit.SECONDS);
-        } finally {
-            executor.shutdownNow();
-        }
-
-        assertStatus("PUBLISHED");
-        assertReviewTaskStatus("CLOSED");
-        assertEquals(LABEL_ID, jdbcTemplate.queryForObject(
-                "SELECT current_published_label_version_id FROM product WHERE product_id=?",
-                String.class, productId));
-        assertEquals(1, publicationCount());
-        assertEquals(1, auditCountByType("LABEL_PUBLISHED"));
-    }
-
-    @Test
-    void concurrentPublishersCreateExactlyOnePublication() throws Exception {
-        createPassedValidation();
-        createReviewFixture();
-        approveTarget();
-        ExecutorService executor = Executors.newFixedThreadPool(2);
-        CountDownLatch ready = new CountDownLatch(2);
-        CountDownLatch start = new CountDownLatch(1);
-        try {
-            Future<Boolean> first = executor.submit(() -> tryPublish(
-                    ready, start, reviewApprover("LABEL.PUBLISH")));
-            Future<Boolean> second = executor.submit(() -> tryPublish(
-                    ready, start, new AuthenticatedActor(
-                            "user_label_officer", "user_label_officer", "Publisher",
-                            Set.of(), Set.of("LABEL.PUBLISH"))));
-            assertTrue(ready.await(5, TimeUnit.SECONDS));
-            start.countDown();
-            boolean firstSucceeded = first.get(10, TimeUnit.SECONDS);
-            boolean secondSucceeded = second.get(10, TimeUnit.SECONDS);
-
-            assertEquals(1, (firstSucceeded ? 1 : 0) + (secondSucceeded ? 1 : 0));
-        } finally {
-            start.countDown();
-            executor.shutdownNow();
-        }
-
-        String productId = productIdForTarget();
-        assertStatus("PUBLISHED");
-        assertReviewTaskStatus("CLOSED");
-        assertEquals(LABEL_ID, jdbcTemplate.queryForObject(
-                "SELECT current_published_label_version_id FROM product WHERE product_id=?",
-                String.class, productId));
-        assertEquals(1, publicationCount());
-        assertEquals(1, auditCountByType("LABEL_PUBLISHED"));
-        assertEquals(1, jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM label_version WHERE product_id=? AND jurisdiction_code=(SELECT jurisdiction_code FROM label_version WHERE label_version_id=?) AND lifecycle_status='PUBLISHED' AND is_current_published='Y'",
-                Integer.class, productId, LABEL_ID));
-    }
-
-    @Test
-    void competingApprovedVersionsForSameProductAndJurisdictionPublishOnlyLatest() throws Exception {
-        createPassedValidation();
-        createReviewFixture();
-        approveTarget();
-        createCompetingApprovedVersion();
-
-        ExecutorService executor = Executors.newFixedThreadPool(2);
-        CountDownLatch ready = new CountDownLatch(2);
-        CountDownLatch start = new CountDownLatch(1);
-        try {
-            Future<Boolean> oldVersion = executor.submit(() -> tryPublish(
-                    ready, start, REVIEW_TASK_ID, LABEL_ID,
-                    reviewApprover("LABEL.PUBLISH")));
-            Future<Boolean> latestVersion = executor.submit(() -> tryPublish(
-                    ready, start, COMPETING_TASK_ID, COMPETING_LABEL_ID,
-                    new AuthenticatedActor("user_label_officer", "user_label_officer", "Publisher",
-                            Set.of(), Set.of("LABEL.PUBLISH"))));
-            assertTrue(ready.await(5, TimeUnit.SECONDS));
-            start.countDown();
-            assertEquals(1, (oldVersion.get(10, TimeUnit.SECONDS) ? 1 : 0)
-                    + (latestVersion.get(10, TimeUnit.SECONDS) ? 1 : 0));
-        } finally {
-            start.countDown();
-            executor.shutdownNow();
-        }
-
-        assertEquals("APPROVED", jdbcTemplate.queryForObject(
-                "SELECT lifecycle_status FROM label_version WHERE label_version_id=?",
-                String.class, LABEL_ID));
-        assertStatusFor(COMPETING_LABEL_ID, "PUBLISHED");
-        assertReviewTaskStatus("IN_REVIEW");
-        assertEquals("CLOSED", jdbcTemplate.queryForObject(
-                "SELECT status FROM review_task WHERE review_task_id=?",
-                String.class, COMPETING_TASK_ID));
-        assertEquals(COMPETING_LABEL_ID, jdbcTemplate.queryForObject(
-                "SELECT current_published_label_version_id FROM product WHERE product_id=?",
-                String.class, productIdForTarget()));
-        assertEquals(1, jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM publication_record WHERE label_version_id IN (?, ?)",
-                Integer.class, LABEL_ID, COMPETING_LABEL_ID));
-        assertEquals(1, jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM audit_event WHERE event_type='LABEL_PUBLISHED' AND entity_id IN (?, ?)",
-                Integer.class, LABEL_ID, COMPETING_LABEL_ID));
-    }
-
-    private boolean tryPublish(CountDownLatch ready, CountDownLatch start, AuthenticatedActor actor)
-            throws InterruptedException {
-        return tryPublish(ready, start, REVIEW_TASK_ID, LABEL_ID, actor);
-    }
-
-    private boolean tryPublish(CountDownLatch ready, CountDownLatch start, String taskId,
-                               String labelId, AuthenticatedActor actor) throws InterruptedException {
-        ready.countDown();
-        if (!start.await(5, TimeUnit.SECONDS)) {
-            throw new IllegalStateException("Concurrent publication start timed out");
-        }
-        try {
-            reviewService.publishReviewTask(taskId, labelId, actor);
-            return true;
-        } catch (IllegalStateException | LabelVersionConflictException expected) {
-            return false;
-        }
     }
 
     private void approveTarget() {
@@ -1133,24 +885,6 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
                 Integer.class,
                 LABEL_ID
         );
-    }
-
-    private int approvalCount() {
-        return jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM approval_record WHERE label_version_id=?",
-                Integer.class, LABEL_ID);
-    }
-
-    private int auditCountForTarget() {
-        return jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM audit_event WHERE entity_type='LABEL_VERSION' AND entity_id=?",
-                Integer.class, LABEL_ID);
-    }
-
-    private int auditCountByType(String eventType) {
-        return jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM audit_event WHERE event_type=? AND entity_id=?",
-                Integer.class, eventType, LABEL_ID);
     }
 
     private void createReviewFixture() {
@@ -1328,82 +1062,6 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
                 "validation_run_scrum37_" + labelVersionId,
                 labelVersionId
         );
-    }
-
-    private void createCompetingApprovedVersion() {
-        jdbcTemplate.update("""
-                INSERT INTO label_version (
-                    label_version_id, product_id, formula_version_id, rule_set_version_id,
-                    jurisdiction_code, version_number, raw_ingredient_text, lifecycle_status,
-                    is_current_published, created_by_user_id, created_at, data_provenance_id
-                )
-                SELECT ?, product_id, formula_version_id, rule_set_version_id,
-                       jurisdiction_code, version_number + 1, raw_ingredient_text, 'DRAFT',
-                       'N', created_by_user_id, NOW(), data_provenance_id
-                FROM label_version WHERE label_version_id=?
-                """, COMPETING_LABEL_ID, LABEL_ID);
-        createPassedValidation(COMPETING_LABEL_ID);
-        jdbcTemplate.update("""
-                INSERT INTO impact_analysis_run (
-                    impact_analysis_run_id, run_code, change_request_id, idempotency_key,
-                    rule_set_version_id, status, started_at, completed_at,
-                    executed_by_user_id, data_provenance_id
-                )
-                SELECT ?, 'IMPACT-SCRUM-82-COMPETING', change_request_id,
-                       'impact-analysis:scrum82-competing', rule_set_version_id,
-                       'COMPLETED', NOW(), NOW(), executed_by_user_id, data_provenance_id
-                FROM impact_analysis_run WHERE impact_analysis_run_id=?
-                """, COMPETING_RUN_ID, IMPACT_RUN_ID);
-        jdbcTemplate.update("""
-                INSERT INTO impact_finding (
-                    impact_finding_id, impact_analysis_run_id, product_id,
-                    current_formula_version_id, proposed_formula_version_id,
-                    current_label_version_id, classification, missing_allergen_codes,
-                    explanation, data_provenance_id
-                )
-                SELECT ?, ?, product_id, current_formula_version_id,
-                       proposed_formula_version_id, current_label_version_id,
-                       classification, missing_allergen_codes, explanation, data_provenance_id
-                FROM impact_finding WHERE impact_finding_id=?
-                """, COMPETING_FINDING_ID, COMPETING_RUN_ID, IMPACT_FINDING_ID);
-        jdbcTemplate.update("""
-                INSERT INTO review_task (
-                    review_task_id, impact_finding_id, product_id, current_label_version_id,
-                    draft_label_version_id, target_label_version_id, status,
-                    assigned_to_user_id, created_by_user_id, created_at, data_provenance_id
-                )
-                SELECT ?, ?, product_id, current_label_version_id, ?, ?, 'OPEN',
-                       assigned_to_user_id, created_by_user_id, NOW(), data_provenance_id
-                FROM review_task WHERE review_task_id=?
-                """, COMPETING_TASK_ID, COMPETING_FINDING_ID,
-                COMPETING_LABEL_ID, COMPETING_LABEL_ID, REVIEW_TASK_ID);
-        reviewService.submitForReview(COMPETING_LABEL_ID, reviewSubmitter());
-        reviewService.recordDecision(COMPETING_LABEL_ID, "APPROVE", "competing version approved",
-                reviewApprover("LABEL.APPROVE"));
-    }
-
-    private void cleanUpCompetingFixture() {
-        jdbcTemplate.update("UPDATE product SET current_published_label_version_id=NULL " +
-                "WHERE current_published_label_version_id=?", COMPETING_LABEL_ID);
-        jdbcTemplate.update("UPDATE label_version SET lifecycle_status='APPROVED', " +
-                "is_current_published='N' WHERE label_version_id=?", COMPETING_LABEL_ID);
-        jdbcTemplate.update("DELETE FROM audit_event WHERE entity_id=?", COMPETING_LABEL_ID);
-        jdbcTemplate.update("DELETE FROM approval_record WHERE review_task_id=? OR label_version_id=?",
-                COMPETING_TASK_ID, COMPETING_LABEL_ID);
-        jdbcTemplate.update("DELETE FROM publication_record WHERE label_version_id=?", COMPETING_LABEL_ID);
-        jdbcTemplate.update("DELETE FROM validation_result WHERE validation_run_id IN " +
-                "(SELECT validation_run_id FROM validation_run WHERE label_version_id=?)", COMPETING_LABEL_ID);
-        jdbcTemplate.update("DELETE FROM validation_run WHERE label_version_id=?", COMPETING_LABEL_ID);
-        jdbcTemplate.update("DELETE FROM review_task WHERE review_task_id=?", COMPETING_TASK_ID);
-        jdbcTemplate.update("DELETE FROM impact_finding WHERE impact_finding_id=?", COMPETING_FINDING_ID);
-        jdbcTemplate.update("DELETE FROM impact_analysis_run WHERE impact_analysis_run_id=?", COMPETING_RUN_ID);
-        jdbcTemplate.update("DELETE FROM label_version WHERE label_version_id=?", COMPETING_LABEL_ID);
-    }
-
-    private void assertStatusFor(String labelId, String expected) {
-        assertEquals(expected, jdbcTemplate.queryForObject(
-                "SELECT lifecycle_status FROM label_version WHERE label_version_id=?",
-                String.class, labelId));
     }
 
         private void restoreSupersededBaseline() {

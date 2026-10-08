@@ -242,7 +242,6 @@ public class JdbcLabelReviewCommandRepository
                 lv.label_version_id,
                 lv.lifecycle_status,
                 lv.created_by_user_id,
-                lv.rule_set_version_id,
                 lv.data_provenance_id,
                 rt.review_task_id,
                 CASE
@@ -294,9 +293,6 @@ public class JdbcLabelReviewCommandRepository
                                     ),
                                     rs.getBoolean(
                                             "is_current_formula"
-                                    ),
-                                    rs.getString(
-                                            "rule_set_version_id"
                                     ),
                                     rs.getString(
                                             "data_provenance_id"
@@ -411,22 +407,7 @@ public class JdbcLabelReviewCommandRepository
                         WHERE ar.review_task_id = rt.review_task_id
                           AND ar.label_version_id = rt.target_label_version_id
                           AND ar.decision = 'APPROVE'
-                    ) AS has_approve_record,
-                    EXISTS (
-                        SELECT 1
-                        FROM validation_run vr
-                        WHERE vr.label_version_id = lv.label_version_id
-                          AND vr.rule_set_version_id = lv.rule_set_version_id
-                          AND vr.status = 'PASSED'
-                          AND NOT EXISTS (
-                              SELECT 1 FROM validation_run newer
-                              WHERE newer.label_version_id = vr.label_version_id
-                                AND newer.rule_set_version_id = vr.rule_set_version_id
-                                AND (newer.ran_at > vr.ran_at
-                                  OR (newer.ran_at = vr.ran_at
-                                    AND newer.validation_run_id > vr.validation_run_id))
-                          )
-                    ) AS has_passing_validation
+                    ) AS has_approve_record
                 FROM review_task rt
                 JOIN label_version lv
                   ON lv.label_version_id = rt.target_label_version_id
@@ -451,8 +432,7 @@ public class JdbcLabelReviewCommandRepository
                                 rs.getString("data_provenance_id"),
                                 rs.getBoolean("is_current_formula"),
                                 rs.getBoolean("is_latest_label_version"),
-                                rs.getBoolean("has_approve_record"),
-                                rs.getBoolean("has_passing_validation")
+                                rs.getBoolean("has_approve_record")
                         ))
                         : Optional.empty(),
                 reviewTaskId

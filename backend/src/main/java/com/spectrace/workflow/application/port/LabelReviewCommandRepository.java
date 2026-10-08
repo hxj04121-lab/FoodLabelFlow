@@ -98,7 +98,6 @@ public interface LabelReviewCommandRepository {
             String reviewTaskId,
             boolean current,
             boolean currentFormula,
-            String ruleSetVersionId,
             String dataProvenanceId
     ) {
     }
@@ -123,8 +122,7 @@ public interface LabelReviewCommandRepository {
             String dataProvenanceId,
             boolean currentFormula,
             boolean latestLabelVersion,
-            boolean hasApproveRecord,
-            boolean hasPassingValidation
+            boolean hasApproveRecord
     ) {
     }
 }

@@ -196,7 +196,6 @@ class LabelReviewServiceTest {
                                 "review_1",
                                 true,
                                 true,
-                                "rules_1",
                                 "prov_1"
                         )
                 ));
@@ -273,7 +272,6 @@ class LabelReviewServiceTest {
                                 "review_1",
                                 true,
                                 true,
-                                "rules_1",
                                 "prov_1"
                         )
                 ));
@@ -352,7 +350,6 @@ class LabelReviewServiceTest {
                                 "review_1",
                                 true,
                                 false,
-                                "rules_1",
                                 "prov_1"
                         )
                 ));
