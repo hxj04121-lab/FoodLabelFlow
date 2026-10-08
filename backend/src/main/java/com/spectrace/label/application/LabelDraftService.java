@@ -3,6 +3,7 @@ package com.spectrace.label.application;
 import com.spectrace.identity.application.AuthorizationService;
 import com.spectrace.identity.domain.AuthenticatedActor;
 import com.spectrace.label.application.port.LabelDraftRepository;
+import com.spectrace.label.application.port.ReviewTaskDraftBinding;
 import com.spectrace.label.domain.LabelDraft;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,13 +13,16 @@ public class LabelDraftService {
 
     private final LabelDraftRepository repository;
     private final AuthorizationService authorizationService;
+    private final ReviewTaskDraftBinding reviewTaskDraftBinding;
 
     public LabelDraftService(
             LabelDraftRepository repository,
-            AuthorizationService authorizationService
+            AuthorizationService authorizationService,
+            ReviewTaskDraftBinding reviewTaskDraftBinding
     ) {
         this.repository = repository;
         this.authorizationService = authorizationService;
+        this.reviewTaskDraftBinding = reviewTaskDraftBinding;
     }
 
     @Transactional
@@ -32,11 +36,17 @@ public class LabelDraftService {
                 "LABEL.CREATE"
         );
 
-        return repository.createFromCurrentFormula(
+        LabelDraft draft = repository.createFromCurrentFormula(
                 productId,
                 jurisdictionCode,
                 actor.userId()
         );
+        reviewTaskDraftBinding.bindOpenTaskToDraft(
+                productId,
+                jurisdictionCode,
+                draft.labelVersionId()
+        );
+        return draft;
     }
 
     @Transactional(readOnly = true)

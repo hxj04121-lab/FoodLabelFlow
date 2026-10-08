@@ -79,6 +79,24 @@ public class JdbcIdentityRepository implements IdentityRepository {
         ));
     }
 
+    @Override
+    public List<String> findActiveUserIdsWithPermission(String permissionCode) {
+        return jdbcTemplate.queryForList(
+                """
+                SELECT DISTINCT ua.user_id
+                FROM user_account ua
+                JOIN user_role ur ON ur.user_id = ua.user_id
+                JOIN role_permission rp ON rp.role_id = ur.role_id
+                JOIN permission p ON p.permission_id = rp.permission_id
+                WHERE ua.is_active = 'Y'
+                  AND p.permission_code = ?
+                ORDER BY ua.user_id
+                """,
+                String.class,
+                permissionCode
+        );
+    }
+
     private record UserRow(
             String userId,
             String username,
