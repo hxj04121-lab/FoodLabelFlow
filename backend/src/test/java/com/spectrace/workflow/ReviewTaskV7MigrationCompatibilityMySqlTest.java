@@ -113,6 +113,18 @@ class ReviewTaskV7MigrationCompatibilityMySqlTest {
                 JOIN label_version lv ON lv.label_version_id = ?
                 WHERE p.product_id = ?
                 """, labelId, lifecycle, currentLabel, productId);
+        if ("APPROVED".equals(lifecycle)) {
+            jdbc.update("""
+                    INSERT INTO validation_run (
+                        validation_run_id, label_version_id, rule_set_version_id,
+                        status, ran_by_user_id, ran_at, summary, data_provenance_id
+                    )
+                    SELECT ?, label_version_id, rule_set_version_id, 'PASSED',
+                           'user_label_officer', NOW(), 'V6 migration test passed validation',
+                           data_provenance_id
+                    FROM label_version WHERE label_version_id = ?
+                    """, "validation_" + key, labelId);
+        }
         createTaskFixtureForExistingLabel(jdbc, key, labelId, decision, taskStatus);
         return labelId;
     }

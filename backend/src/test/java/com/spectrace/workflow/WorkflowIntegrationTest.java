@@ -65,6 +65,7 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     private static final String COMPETING_TASK_ID = "review_task_scrum82_competing";
     private static final String COMPETING_FINDING_ID = "impact_finding_scrum82_competing";
     private static final String COMPETING_RUN_ID = "impact_run_scrum82_competing";
+    private static final String COMPETING_CHANGE_REQUEST_ID = "change_request_scrum82_competing";
 
     @BeforeEach
     void prepareFixture() {
@@ -206,7 +207,9 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
         );
 
         assertStatus("DRAFT");
-        assertReviewTaskStatus("OPEN");
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM review_task WHERE target_label_version_id=?",
+                Integer.class, LABEL_ID));
         assertEquals(0, auditCountForTarget());
     }
 
@@ -892,20 +895,12 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
         String oldPointer = jdbcTemplate.queryForObject(
                 "SELECT current_published_label_version_id FROM product WHERE product_id = (SELECT product_id FROM label_version WHERE label_version_id = ?)",
                 String.class, LABEL_ID);
-        jdbcTemplate.execute("DROP TRIGGER IF EXISTS test_fail_publication_audit");
-        jdbcTemplate.execute("""
-                CREATE TRIGGER test_fail_publication_audit
-                BEFORE INSERT ON audit_event
-                FOR EACH ROW
-                SIGNAL SQLSTATE '45000'
-                    SET MESSAGE_TEXT = 'forced publication audit failure'
-                """);
-        try {
-            assertThrows(RuntimeException.class, () -> reviewService.publishReviewTask(
-                    REVIEW_TASK_ID, LABEL_ID, reviewApprover("LABEL.PUBLISH")));
-        } finally {
-            jdbcTemplate.execute("DROP TRIGGER IF EXISTS test_fail_publication_audit");
-        }
+        doThrow(new IllegalStateException("forced publication audit failure"))
+                .when(commandRepository).createPublicationAudit(
+                        eq(LABEL_ID), eq(REVIEW_TASK_ID), anyString(), anyString());
+
+        assertThrows(IllegalStateException.class, () -> reviewService.publishReviewTask(
+                REVIEW_TASK_ID, LABEL_ID, reviewApprover("LABEL.PUBLISH")));
 
         assertStatus("APPROVED");
         assertReviewTaskStatus("IN_REVIEW");
@@ -1344,16 +1339,28 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
                 """, COMPETING_LABEL_ID, LABEL_ID);
         createPassedValidation(COMPETING_LABEL_ID);
         jdbcTemplate.update("""
+                INSERT INTO change_request (
+                    change_request_id, change_request_code, change_type, status,
+                    requested_at, requested_by_user_id, description,
+                    from_formula_version_id, to_formula_version_id, data_provenance_id
+                )
+                SELECT ?, 'CR-SCRUM-82-COMPETING', change_type, 'ANALYZED',
+                       NOW(), requested_by_user_id, description,
+                       from_formula_version_id, to_formula_version_id, data_provenance_id
+                FROM change_request WHERE change_request_id=?
+                """, COMPETING_CHANGE_REQUEST_ID, CHANGE_REQUEST_ID);
+        jdbcTemplate.update("""
                 INSERT INTO impact_analysis_run (
                     impact_analysis_run_id, run_code, change_request_id, idempotency_key,
                     rule_set_version_id, status, started_at, completed_at,
                     executed_by_user_id, data_provenance_id
                 )
-                SELECT ?, 'IMPACT-SCRUM-82-COMPETING', change_request_id,
-                       'impact-analysis:scrum82-competing', rule_set_version_id,
+                SELECT ?, 'IMPACT-SCRUM-82-COMPETING', ?,
+                       CONCAT('impact-analysis:', ?), rule_set_version_id,
                        'COMPLETED', NOW(), NOW(), executed_by_user_id, data_provenance_id
                 FROM impact_analysis_run WHERE impact_analysis_run_id=?
-                """, COMPETING_RUN_ID, IMPACT_RUN_ID);
+                """, COMPETING_RUN_ID, COMPETING_CHANGE_REQUEST_ID,
+                COMPETING_CHANGE_REQUEST_ID, IMPACT_RUN_ID);
         jdbcTemplate.update("""
                 INSERT INTO impact_finding (
                     impact_finding_id, impact_analysis_run_id, product_id,
@@ -1397,6 +1404,8 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
         jdbcTemplate.update("DELETE FROM review_task WHERE review_task_id=?", COMPETING_TASK_ID);
         jdbcTemplate.update("DELETE FROM impact_finding WHERE impact_finding_id=?", COMPETING_FINDING_ID);
         jdbcTemplate.update("DELETE FROM impact_analysis_run WHERE impact_analysis_run_id=?", COMPETING_RUN_ID);
+        jdbcTemplate.update("DELETE FROM change_request WHERE change_request_id=?",
+                COMPETING_CHANGE_REQUEST_ID);
         jdbcTemplate.update("DELETE FROM label_version WHERE label_version_id=?", COMPETING_LABEL_ID);
     }
 
