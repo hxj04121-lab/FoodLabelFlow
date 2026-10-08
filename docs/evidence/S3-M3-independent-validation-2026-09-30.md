@@ -16,11 +16,36 @@ the page/panel resets them; this PR does not provide durable idempotency or
 server-correlated command recovery. Historical reads are available for
 inspection, but do not unlock an uncertain write in the mounted component.
 
-## Verified project and baseline
+## 8 Oct 2026 source availability and review cleanup
 
-- Machine: FY-DELL. Repository: `C:/Users/16023/Desktop/SWE5006_Project/FoodLabelFlow`.
-- Identity: SWE5006 / SpecTrace / FoodLabelFlow, TEAM 16. The parent-directory
-  personal handoff, M3 work order and repository README agree on this identity.
+The execution and dependency sections below remain **30 Sep observations**.
+Their references to missing integrated implementations describe that baseline,
+not the current repository. At `main@18136397d696885ae678af4ec5776c5f7fdea321`,
+source inspection confirms the delivered
+[impact trigger/query controller](https://github.com/hxj04121-lab/FoodLabelFlow/blob/18136397d696885ae678af4ec5776c5f7fdea321/backend/src/main/java/com/spectrace/impact/interfaces/web/ImpactAnalysisController.java),
+[replacement-draft binding](https://github.com/hxj04121-lab/FoodLabelFlow/blob/18136397d696885ae678af4ec5776c5f7fdea321/backend/src/main/java/com/spectrace/workflow/infrastructure/JdbcReviewTaskDraftBinding.java),
+[Java submit/decision/publication service](https://github.com/hxj04121-lab/FoodLabelFlow/blob/18136397d696885ae678af4ec5776c5f7fdea321/backend/src/main/java/com/spectrace/workflow/application/LabelReviewService.java)
+and [injected workflow policies](https://github.com/hxj04121-lab/FoodLabelFlow/blob/18136397d696885ae678af4ec5776c5f7fdea321/backend/src/main/java/com/spectrace/workflow/infrastructure/WorkflowInfrastructureConfiguration.java).
+These delivered components supersede the historical missing-source statements;
+they do not establish a complete browser workflow, command reconciliation or
+live publication acceptance. The
+[contract at this revision](https://github.com/hxj04121-lab/FoodLabelFlow/blob/18136397d696885ae678af4ec5776c5f7fdea321/docs/contracts/s3-impact-review-publication-api-v1.yaml)
+still declares `CANDIDATE_PENDING_CROSS_MODULE_ACCEPTANCE`.
+
+M1's six document-cleanup comments on [PR #58](https://github.com/hxj04121-lab/FoodLabelFlow/pull/58)
+are addressed by repository-relative descriptions and public CI references.
+The original PR-head CI evidence is
+[run 37120575734](https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/37120575734),
+including its successful
+[frontend production-build job](https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/37120575734/job/111195716860).
+This is evidence for PR head `563068e6`, not a new main validation run or a
+claim that the historical local test suites were rerun on 8 Oct.
+
+## Verified project and baseline — 30 Sep 2026
+
+- Repository: [hxj04121-lab/FoodLabelFlow](https://github.com/hxj04121-lab/FoodLabelFlow).
+- Identity: SWE5006 / SpecTrace / FoodLabelFlow, TEAM 16, as recorded by the
+  repository README and team work orders.
 - Remote: `https://github.com/hxj04121-lab/FoodLabelFlow.git`.
 - Working branch: `XFY`; HEAD remains `86c67d2cb2408f16c2e1846f3b7fcbaf880ee149`.
 - On this date, `git ls-remote` and `git fetch origin main XFY` verified latest
@@ -66,8 +91,8 @@ that correlates a command with its outcome still needs the owner contract.
 
 ## Validation evidence
 
-An isolated source copy at `C:/Users/16023/Documents/Codex/2026-09-30/task/FoodLabelFlow-verification`
-was tested with the existing repository dependencies and bundled Node 24.19.0.
+An isolated copy of the working tree was tested with the existing repository
+dependencies and bundled Node 24.19.0.
 Vite used localhost port 5187, a local cache and the runner config loader;
 TypeScript build-info files were redirected into the verification copy.
 No existing user dev server was reused.
@@ -93,10 +118,13 @@ npx playwright test tests/validation-ui.spec.ts tests/labels.spec.ts tests/decla
 Local execution used `PLAYWRIGHT_BASE_URL=http://127.0.0.1:5187` and the existing
 Playwright CLI directly. These are explicit HTTP-fixture frontend regressions;
 they are not live S3 API, main CI, independent review or publication acceptance.
-Raw logs are in the local execution workspace as `validation-regression-final.log`
-and `validation-build.log`.
+Publicly reviewable automated build evidence is provided by
+[PR #58 CI run 37120575734](https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/37120575734)
+and its [frontend job](https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/37120575734/job/111195716860).
+The local results above remain dated observations; the frontend CI job verifies
+the production build and does not prove live S3 acceptance.
 
-## Dependencies paused until owner delivery
+## Historical dependencies awaiting owner delivery — 30 Sep 2026
 
 The M2 Day 2 contract in verified main is still marked
 `CANDIDATE_PENDING_CROSS_MODULE_ACCEPTANCE`; merging it did not mark it frozen.

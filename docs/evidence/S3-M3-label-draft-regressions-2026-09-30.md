@@ -27,9 +27,19 @@ Fresh validation on 3 Oct used Node 24.19.0 and a dedicated Vite server at
 - This record predates the new PR's CI results and does not claim live S3 or
   backend acceptance. Backend and CI source were not changed by these fixes.
 
-## Scope and preserved work
+## Review cleanup — 8 Oct 2026
 
-Repository: `C:/Users/16023/Desktop/SWE5006_Project/FoodLabelFlow`.
+Personal machine, backup and log paths have been replaced with repository-relative
+descriptions and public CI evidence for PR head `563068e6`. See the
+[8 Oct source-availability update](S3-M3-independent-validation-2026-09-30.md#8-oct-2026-source-availability-and-review-cleanup)
+for delivered M1/M4/M5 components on `main@18136397`; it supersedes the historical
+missing-source statements below without claiming full browser acceptance or
+contract freeze. No frontend source or historical test result is changed by
+this documentation cleanup.
+
+## Scope and preserved work — 30 Sep 2026
+
+Repository: [hxj04121-lab/FoodLabelFlow](https://github.com/hxj04121-lab/FoodLabelFlow).
 Branch remains `XFY`, HEAD `86c67d2cb2408f16c2e1846f3b7fcbaf880ee149`.
 This round extends the existing frontend fixes without synchronizing/merging,
 committing, pushing, deploying or changing teammate-owned interfaces.
@@ -38,9 +48,8 @@ Before this round, the working tree already contained changes to the label API
 client, validation panel and validation tests, plus the untracked deployment
 document and [previous independent-work record](S3-M3-independent-validation-2026-09-30.md).
 They were preserved. Current files were copied into an isolated verification
-workspace; pre-round copies of all affected and existing changed files/documents
-are under `C:/Users/16023/Documents/Codex/2026-09-30/task/before-label-draft-fixes`.
-No personal memory or parent-directory handoff was changed.
+copy of the working tree. The before state of the tracked files is reviewable
+in the [repository history at `86c67d2`](https://github.com/hxj04121-lab/FoodLabelFlow/commit/86c67d2cb2408f16c2e1846f3b7fcbaf880ee149).
 
 ## Reproduction and implemented behavior
 
@@ -74,7 +83,7 @@ version or switching a product is not evidence that a creation failed.
 ## Validation
 
 Runtime: existing dependencies and bundled Node 24.19.0. Verification source:
-`C:/Users/16023/Documents/Codex/2026-09-30/task/FoodLabelFlow-verification/frontend`.
+the `frontend` directory of an isolated verification copy of the working tree.
 Vite ran on isolated localhost port 5187, using an isolated cache and the
 runner config loader. TypeScript build-info files stayed in the verification
 copy. Source files were refreshed from the actual working tree, including
@@ -105,11 +114,14 @@ two live human-acceptance capture cases are excluded by the existing CI grep
 rule. These fixture tests verify frontend behavior, not backend enforcement,
 real S3 acceptance, main CI or independent human review.
 
-Raw local logs under `C:/Users/16023/Documents/Codex/2026-09-30/task`:
-`draft-baseline-reproduction.log`, `draft-full-frontend-regression-final.log`,
-and `draft-production-build-final.log`.
+Public CI evidence for PR head `563068e6` is available in
+[run 37120575734](https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/37120575734)
+and its successful
+[frontend production-build job](https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/37120575734/job/111195716860).
+The local fixture results above remain the original dated reports; this link
+does not claim a fresh run of those suites or live S3 acceptance.
 
-## Independent completion and dependencies
+## Historical independent completion and dependencies — 30 Sep 2026
 
 The requested independent scope is complete locally: the draft reliability fixes and the
 [local M3 consumer review](S3-M3-contract-consumer-review-2026-09-30.md) form this
