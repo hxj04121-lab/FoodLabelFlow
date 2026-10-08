@@ -170,7 +170,10 @@ test('rejects a validation run for a different label version or rule set', async
   const wrongLabel = { ...passedRun, labelVersionId: 'label_other_version' }
   const wrongRuleSet = { ...passedRun, ruleSetVersionId: 'ruleset_other' }
   await page.route('**/api/v1/validation-runs/*', (route) =>
-    route.fulfill({ json: route.request().url().endsWith('wrong-label') ? wrongLabel : wrongRuleSet }),
+    route.fulfill({ json: {
+      ...(route.request().url().endsWith('wrong-label') ? wrongLabel : wrongRuleSet),
+      validationRunId: new URL(route.request().url()).pathname.split('/').at(-1),
+    } }),
   )
   await openDraft(page)
 
@@ -239,6 +242,69 @@ test('rejects validation responses that do not match the frozen contract', async
   await expect(page.getByRole('alert')).toContainText(
     'INVALID_RESPONSE: The label API returned an invalid validation run.',
   )
+  await expect(page.getByText('The validation write outcome may be unknown.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Run validation' })).toBeDisabled()
+})
+
+test('keeps an invalid-JSON successful validation write uncertain', async ({ page }) => {
+  await page.route('**/api/v1/label-versions/*/validation-runs', (route) =>
+    route.fulfill({ status: 201, contentType: 'text/html', body: '<html>Response lost</html>' }),
+  )
+  await openDraft(page)
+  await page.getByRole('checkbox', {
+    name: 'Enable the local demo label-officer identity to validate this exact version',
+  }).check()
+  await page.getByRole('button', { name: 'Run validation' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('INVALID_RESPONSE')
+  await expect(page.getByText('The validation write outcome may be unknown.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Run validation' })).toBeDisabled()
+  await expect(page.getByRole('region', { name: 'Validation run results' })).toHaveCount(0)
+})
+
+test('reading a historical run does not confirm an uncertain validation write', async ({ page }) => {
+  let writes = 0
+  await page.route('**/api/v1/label-versions/*/validation-runs', (route) => {
+    writes += 1
+    return route.abort('failed')
+  })
+  await page.route(`**/api/v1/validation-runs/${passedRun.validationRunId}`, (route) =>
+    route.fulfill({ json: passedRun }),
+  )
+  await openDraft(page)
+  await page.getByRole('checkbox', {
+    name: 'Enable the local demo label-officer identity to validate this exact version',
+  }).check()
+  await page.getByRole('button', { name: 'Run validation' }).click()
+  await expect(page.getByText('The validation write outcome may be unknown.')).toBeVisible()
+
+  await page.getByLabel('Existing validation run ID').fill(passedRun.validationRunId)
+  await page.getByRole('button', { name: 'Load validation run' }).click()
+  await expect(page.getByRole('region', { name: 'Validation run results' })).toContainText('PASSED')
+  await expect(page.getByText('The earlier validation write is still unconfirmed.')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Run validation' })).toBeDisabled()
+  expect(writes).toBe(1)
+})
+
+test('rejects a read that returns a different validation run ID for the same target', async ({ page }) => {
+  await page.route('**/api/v1/validation-runs/requested-run', (route) =>
+    route.fulfill({ json: passedRun }),
+  )
+  await page.route(`**/api/v1/validation-runs/${passedRun.validationRunId}`, (route) =>
+    route.fulfill({ json: passedRun }),
+  )
+  await openDraft(page)
+  await page.getByLabel('Existing validation run ID').fill('requested-run')
+  await page.getByRole('button', { name: 'Load validation run' }).click()
+
+  await expect(page.getByRole('alert')).toContainText('VALIDATION_RUN_MISMATCH')
+  await expect(page.getByRole('region', { name: 'Validation run results' })).toHaveCount(0)
+  await expect(page.getByText(`Loaded validation run ${passedRun.validationRunId}.`)).toHaveCount(0)
+
+  await page.getByLabel('Existing validation run ID').fill(passedRun.validationRunId)
+  await page.getByRole('button', { name: 'Load validation run' }).click()
+  await expect(page.getByRole('region', { name: 'Validation run results' })).toContainText('PASSED')
+  await expect(page.getByRole('alert')).toHaveCount(0)
 })
 
 test('keeps validation feedback readable without mobile overflow', async ({ page }) => {

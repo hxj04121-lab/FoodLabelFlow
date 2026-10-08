@@ -27,6 +27,8 @@ type AllergenState =
   | { status: 'error'; message: string }
 
 const BASELINE_JURISDICTION = 'US'
+const UNCONFIRMED_DRAFT_MESSAGE =
+  'The earlier draft creation is still unconfirmed. Verify its outcome on the server before creating another draft.'
 
 export function Labels() {
   const [allergenAttempt, setAllergenAttempt] = useState(0)
@@ -91,9 +93,8 @@ export function Labels() {
     setProductId(nextProductId)
     setDraft(null)
     setLookupId('')
-    setMessage('')
+    setMessage(uncertain ? UNCONFIRMED_DRAFT_MESSAGE : '')
     setError('')
-    setUncertain(false)
   }
 
   async function createDraft() {
@@ -124,7 +125,7 @@ export function Labels() {
           requestError instanceof Error ? requestError.message : 'Draft creation failed.'
         }`,
       )
-      if (!apiError || apiError.status >= 500) {
+      if (!apiError || apiError.status >= 500 || apiError.code === 'INVALID_RESPONSE') {
         setUncertain(true)
         setMessage(
           'The write outcome may be unknown. Do not create another draft; load the expected label ID or verify the server before retrying.',
@@ -146,8 +147,11 @@ export function Labels() {
       const loaded = await getLabelDraft(exactId)
       setDraft(loaded)
       setProductId(loaded.productId)
-      setUncertain(false)
-      setMessage(`Loaded ${loaded.labelVersionId} from the server.`)
+      // Reading an existing version does not identify the outcome of that creation command.
+      setMessage(
+        `Loaded ${loaded.labelVersionId} from the server.` +
+        (uncertain ? ` ${UNCONFIRMED_DRAFT_MESSAGE}` : ''),
+      )
     } catch (requestError: unknown) {
       const apiError = requestError instanceof LabelApiError ? requestError : null
       setError(
