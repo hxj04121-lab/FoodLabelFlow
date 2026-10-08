@@ -81,6 +81,6 @@ snapshot must not be misrepresented as database state after it.
 
 The normal fixture coverage suite retains opt-in skips because it has no real
 backend. Its counts remain separate from these explicitly enabled live results.
-Screenshots and raw observations use the supplied evidence directory. Local
-reports and ZIPs stay on the user's computer; no new file destination or ZIP
-publication is introduced.
+Screenshots and raw observations use the supplied evidence directory. The CI
+workflow retains its existing browser-artifact destination. Sharing a separately
+prepared local delivery package follows the user's explicit delivery instructions.

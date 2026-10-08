@@ -12,6 +12,11 @@ not used to infer absence or completion. Existing code is distinguished from
 this continuation's unmerged product-flow work. Passing executions must be
 bound separately to their actual source head and CI run.
 
+This is a team subtask map. Login/staging and another owner's A07/assessment
+rows are not extra gates for Cai Runchen's personal SCRUM-48/57/58 completion.
+The original M2 criteria govern personal closure: applicable frozen-contract
+review/acceptance, golden/adoption tests, M2's own A07 and current-main evidence.
+
 ## M5 persistence and CI — SCRUM-51
 
 | Subtask | Substantive requirement | Actual implementation / test artifact | Boundary after the new flow |

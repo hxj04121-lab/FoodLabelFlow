@@ -118,7 +118,7 @@ class S3ProductFlowBrowserHarness {
                         evidence.resolve(spec + "-results").toString(), "--reporter=list"));
                 if (spec.equals("catalog-live")) {
                     arguments.add("--grep");
-                    arguments.add("^M1 real read-only product and formula integration$");
+                    arguments.add("M1 real read-only product and formula integration");
                 }
                 var browserCommand = new ProcessBuilder(arguments)
                         .directory(frontend.toFile()).redirectErrorStream(true)

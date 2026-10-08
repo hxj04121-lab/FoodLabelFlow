@@ -113,6 +113,12 @@ class CompoundMakerCheckerHttpMySqlTest {
         evidence.put("identityRowsAfterFixture", fixedIdentity);
         evidence.put("sqlScope", List.of("new isolated fixture user and its two existing-role links",
                 "released specification input only", "direct existing procedure self-approval negative; no output seeded"));
+        var installedProcedure = jdbc.queryForMap("SHOW CREATE PROCEDURE sp_record_label_decision");
+        assertThat(installedProcedure.get("Create Procedure")).as("actual installed MySQL decision procedure")
+                .isInstanceOf(String.class);
+        evidence.put("installedDecisionProcedure", installedProcedure);
+        evidence.put("procedureObservationEnvironment", jdbc.queryForMap("SELECT DATABASE() AS database_name,"
+                + "VERSION() AS mysql_version,CONNECTION_ID() AS observer_connection_id"));
         var originalProduct = jdbc.queryForMap("SELECT * FROM product WHERE product_id=?", PRODUCT);
         String oldFormula = (String) originalProduct.get("current_formula_version_id");
         String oldLabel = (String) originalProduct.get("current_published_label_version_id");
@@ -233,9 +239,9 @@ class CompoundMakerCheckerHttpMySqlTest {
                 assertThat(S3CompoundMakerFixture.allRows(jdbc)).as("direct procedure denial also changes no rows")
                         .isEqualTo(before);
                 evidence.put("rowsAfterDirectDatabaseDenial", S3CompoundMakerFixture.allRows(jdbc));
-                // Keep the CALL connection open. QA uses a separate real HTTP
-                // transaction on the same locked product; success proves the
-                // procedure's rollback released its locks before connection close.
+                // Keep the CALL connection open while independent QA succeeds
+                // through a separate real HTTP transaction. Report this observed
+                // behavior and unchanged rows without inferring lock placement.
                 approved = expectJson(request(client, "POST", decisionPath,
                         "{\"decision\":\"APPROVE\",\"comments\":\"Independent existing QA after real denials\"}",
                         "dev-external-qa-approver"), 200);
