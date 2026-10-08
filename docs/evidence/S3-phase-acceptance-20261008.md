@@ -1,5 +1,9 @@
 # Sprint 3 acceptance ledger — 8 October 2026
 
+[Later compound-maker regression and opt-in qualification](S3-compound-maker-negative-20261008.md)
+adds disposable permitted-creator database/HTTP/browser negatives while preserving
+dated records below. It does not adopt login/staging or supply team signoff.
+
 Repository: `hxj04121-lab/FoodLabelFlow`. Scope: Sprint 3 — Change Impact.
 This is an implementation/acceptance checklist, not a team signoff. Jira was read
 on 8 October 2026 using Sprint 37 and SCRUM-48. Source baseline for this
@@ -13,11 +17,30 @@ continuation is `969dfe6b47cddf03746c6117bb1ac8c83b590f77`.
 | SCRUM-48 / 57 / 58 — contracts and adoption | M2 / Cai Runchen | Immutable formula adoption, current pointer, duplicate/concurrent rejection, MySQL golden tests, adoption A07, attributable M1/M3/M4/M5 acceptance of the exact contract revision, and green merged-main full-path evidence. |
 | SCRUM-49 — browser workflow | M3 / Xu Feiyang | Real API specification change → findings → exact ReviewTask target → validation → independent approval → publication; self-approval, missing-permission and missing/failed-validation feedback; main CI browser artifacts; implemented UI A07. |
 | SCRUM-50 — review/publication and identity | M4 / Zhu Wenyu | Java transition/maker-checker policies, exact-version validation gates, APPROVE record requirement, atomic publication/rollback/concurrency, merged login code or an adopted login ADR, review/publication A07. |
-| SCRUM-51 — persistence, CI and staging | M5 / Song Hanjie | Atomic impact persistence/idempotency/rollback/module rules, full SOY browser path in main CI, merged deployment evidence or an adopted local/CI Compose staging ADR, persistence A07. |
+| SCRUM-51 — persistence, CI and staging | M5 / shj040128shj | Atomic impact persistence/idempotency/rollback/module rules, full SOY browser path in main CI, merged deployment evidence or an adopted local/CI Compose staging ADR, persistence A07. |
 
 SCRUM-48, SCRUM-49, SCRUM-50 and SCRUM-51 are In Progress in the queried
 Sprint parent records. SCRUM-48 children 52–56 are Done and 57–58 are In Progress.
 Do not close teammates' issues on the strength of another owner's tests.
+
+## Personal M2 criteria are the original SCRUM-48/57/58 criteria
+
+This ledger also records other Sprint owners' requirements. Those requirements
+are not additional conditions for Cai Runchen's seven M2 subtasks.
+SCRUM-48 requires the frozen contract version's M1/M3/M4/M5 review records,
+MySQL golden/adoption tests and M2's own adoption analysis/design class and
+sequence diagrams plus design problem. SCRUM-57 requires committed, traceable
+SAD/pattern evidence, reviewer comments resolved or truthfully blocked, and
+real acceptance before a contract/golden freeze. SCRUM-58 requires those parent
+criteria, real review and green current-main CI before closing SCRUM-48.
+
+M4 login/demo, M5 staging and teammates' A07 decisions remain their own tasks.
+External grading is not a new personal M2 closure gate. The 19-file evidence
+index makes sources reviewable; it does not require all four owners to sign
+every individual file. Existing attributable ACK, APPROVED and substantive
+COMMENTED reviews retain their real scope and state. A zero-comment Jira
+parent or an unresolved GitHub thread does not erase review elsewhere or prove
+that a correction is absent.
 
 ## Review records actually available
 
@@ -29,6 +52,8 @@ Do not close teammates' issues on the strength of another owner's tests.
 | PR62 reviewed head `2a28088bff4c0b79597da4a3bc3369aa11c94d61` | M1 COMMENTED: material-before-specification locking is correct; 40 real adoption requests improve the golden test. | Actual positive scoped technical review. Draft/base prerequisites were subsequently handled by the integration work; this review is still COMMENTED. |
 | PR63 reviewed head `b7777cd4df409f651cc3393d96f87df23e2bad75` | M1 COMMENTED: corrected missing-allergen wording, adoption diagrams and evidence privacy are good. | Actual positive scoped document review; no invented formal approval of a later head. |
 | SCRUM-49 / 50 / 51 comments | Complete queried comment pages each contain zero comments. | No additional M3/M4/M5 signoff is established in these records. This is not a claim that no conversation exists elsewhere. |
+| M3 consumer review in PR58 | Xu Feiyang's committed S3-M3-contract-consumer-review-2026-09-30.md records positive shapes and C01-C09 feedback against 0755d06/e53f7b0. | Real attributable consumer review; its explicit draft/pending boundary is retained. Current feedback closure needs specific confirmation, not another implementation-from-scratch claim. |
+| M5 SCRUM-59 / 61 comments 10112 / 10113 | The actual owner records the atomic run/findings/task/audit boundary and MySQL rollback/retry implementation. | Real owner implementation evidence; it is not automatically that owner's acceptance of the M2 frozen contract revision. |
 
 PR62 and PR63 were merged earlier in the continuation. The subsequent normal
 merges integrated PR69's replay repair, PR68's documentation repair into PR58,
@@ -100,17 +125,19 @@ receipts, not in this checklist before execution.
    exist. Negative attempts produce no persisted transition.
 4. The merged current main workflow runs the new browser scenario, keeps all five
    jobs green and records its actual SHA/run/artifacts/Sonar result.
-5. Owners accept the exact contract revision and reconcile relevant review comments;
-   the marker remains candidate until that decision is attributable.
-6. M4's login/demo decision and M5's staging decision are adopted and merged.
-   The [reviewable proposals](../architecture/S3-demo-identity-and-staging-proposals.md)
-   do not claim either decision.
-7. A07 diagrams and source/test mappings reflect the final implementation, with
-   assessment acceptance recorded separately from artifact delivery.
+5. The frozen contract/golden revision has attributable M1/M3/M4/M5 review
+   and real acceptance for each owner's relevant contract scope; comments are
+   resolved or truthfully blocked. Existing scoped acceptance is retained.
+   This is not a new requirement for four owners to sign every evidence file.
+6. M2's own adoption A07 analysis/design class and sequence diagrams and design
+   problem are committed and traceable to implementation/tests. External grading
+   and another owner's A07 completion are not personal M2 closure gates.
 
-Only then can the affected Sprint acceptance items and parent stage be reported
-as complete. A missing human decision should identify its exact owner, choice
-and artifact while implementation, tests and review continue independently.
+For Cai Runchen's personal completion, apply the original SCRUM-48/57/58
+criteria above. M4 login/demo and M5 staging adoption remain separate
+owner-specific Sprint requirements; the
+[reviewable proposals](../architecture/S3-demo-identity-and-staging-proposals.md)
+do not claim either decision or make them prerequisites for closing M2.
 
 ## Dated execution and remaining checks
 
@@ -154,8 +181,9 @@ snapshots unchanged. This closes that targeted bypass; the broader final fresh
 verify, post-guard browser and new main results remain pending.
 
 Login/demo actor-switch adoption remains M4's decision; staging/promotion adoption
-remains M5's decision. Exact cross-module acceptance and A07 assessment remain
-attributable human decisions after artifact delivery.
+remains M5's decision, separately from personal M2 closure. Actual acceptance of
+the applicable frozen contract/golden scope remains a personal criterion;
+teammate A07 choices or external assessment are not additional M2 gates.
 
 ## Exact candidate revision and reviewer responsibilities
 
@@ -175,7 +203,7 @@ source/PR/main binding and actual review scope accompany the bundle.
 | M1 — Huang Xiangjia | Current/proposed formula and published-label references, 40 relevant/20 excluded golden rows, one task per review finding, change/analysis replay and no-write preconditions. Earlier positive M1 comments remain scoped evidence. |
 | M3 — Xu Feiyang / Xu fy | Actual page/task/caller DTOs, pagination/nullable targets, exact validation and command status/errors, visible ACL/validation negatives and controlled-switch consumer requirements. |
 | M4 — Zhu Wenyu / zhuwenyu26 | Existing active-identity/read policy, trusted context/ASCII provider boundaries, permission versus maker-checker distinction, Java transitions, exact target/validation and APPROVE-record/publication guards. |
-| M5 — Song Hanjie / shj040128shj | Transaction/rollback/replay/current committed response, duplicate/concurrent publication/creation, run/task/audit references, SQL constraints and complete exact-main evidence. |
+| M5 — shj040128shj | Transaction/rollback/replay/current committed response, duplicate/concurrent publication/creation, run/task/audit references, SQL constraints and complete exact-main evidence. |
 | M2 — Cai Runchen | Own immutable adoption/golden/source/test/A07 traceability and truthful assembly of those records; does not accept another module on its behalf. |
 
 The fresh complete Jira comment pages still contain no M3/M4/M5 acceptance in

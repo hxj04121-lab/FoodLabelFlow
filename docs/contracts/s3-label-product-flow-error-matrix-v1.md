@@ -1,5 +1,10 @@
 # S3 label product-flow error matrix — extension v1.0.0
 
+[Later compound-maker qualification](../evidence/S3-compound-maker-negative-20261008.md)
+separately exercises a creator who has APPROVE through isolated MySQL, HTTP and
+real browser paths. It adds tests without changing the wire contract or the
+earlier officer missing-permission scope. Actual results remain receipt-bound.
+
 State: **candidate; exact cross-module acceptance pending**. The associated
 [OpenAPI extension](s3-label-product-flow-api-v1.yaml) adds the declaration-create
 and workflow adapter boundary, paged task reads and current-caller read. The existing
