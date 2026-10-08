@@ -201,7 +201,7 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
       if (published.size === 0) {
         await page.getByRole('checkbox', { name: 'Use the connected identity for review and publication' }).check()
         // This existing maker lacks LABEL.APPROVE. The browser proves UI and ACL
-        // rejection; the independent maker-checker policy has separate unit/DB tests.
+        // rejection; the independent maker-checker policy has separate unit/service tests.
         await expect(page.getByRole('button', { name: 'Approve label', exact: true })).toBeDisabled()
         const denied = await post(makerContext.request, `/api/labels/${draft.labelVersionId}/review-decisions`, {
           decision: 'APPROVE', comments: 'Existing maker without approval permission must be rejected',
@@ -306,7 +306,7 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
       declarationWrites: 'Only the actual first-creation draft UI/API', validationWrites: 'Only the actual evaluator HTTP API',
       identityCoverage: 'Existing explicit local maker opt-in and isolated preauthenticated QA/publisher fixture browser contexts; production login decision remains separate',
       publisherIdentity, adminIdentity, closedReviewTasks: closedTasks,
-      makerGuardCoverage: 'Existing officer UI self-approval disabled and actual HTTP ACL403 with zero decision writes. Compound CREATE+APPROVE browser identity was not introduced; independent maker-checker policy is covered separately in unit/database tests.',
+      makerGuardCoverage: 'Existing officer UI self-approval disabled and actual HTTP ACL403 with zero decision writes. Compound CREATE+APPROVE browser identity was not introduced; independent maker-checker policy is covered separately in unit/service tests. This browser does not prove a permitted-creator database self-approval negative.',
       counts: { goldenProducts: 60, actualAdoptions: adopted.size, findings: analysis.findings.length,
         noAction: analysis.noActionCount, reviewRequired: analysis.reviewRequiredCount, published: published.size,
         immutableHistoricLabelsChecked: before.size }, observations }

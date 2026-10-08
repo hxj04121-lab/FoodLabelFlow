@@ -208,8 +208,13 @@ history before it permits either operation.
 
 The twenty-target live source now explicitly uses officer/QA/publisher contexts.
 Existing ADMIN supplies formula-adoption maintenance only; it lacks CREATE/APPROVE.
-The interrupted final browser run remains UNKNOWN until a completed result is
-recovered. Earlier passing fixture/UI or HTTP results do not fill that result.
+A completed real browser run for 4066b8cac6447913624bcaf044d9bdbd08d2d7e4
+finished at 06:05:38 UTC with exit 0: legacy live validation 1 passed/4.4s,
+S3 live 1 passed/1.6m, forty adoptions/forty findings/twenty publications,
+twenty CLOSED tasks and sixty historical checks. Its 347 source inputs remained
+byte-bound. This later completed local run qualifies its bound source; older interrupted
+attempts retain their own status. Post-catalog-guard browser and broad/main results remain
+separate pending checks.
 The old impact adapter now shares
 [ExternalActorResolver via RequestImpactIntegration](../../backend/src/main/java/com/spectrace/impact/infrastructure/RequestImpactIntegration.java).
 Its unchanged sixteen-case regression was red with three failures, then green
@@ -218,3 +223,19 @@ with zero failures/errors/skips at 05:55:13 UTC; the three real paths return
 The exact red/green XML, adapter/test hashes and source freeze are retained in
 the runtime receipt. Four enabled-auth fixtures compiled during this focused
 run but were not executed; the final fresh broad verification remains separate.
+
+## Catalog readiness correction awaiting final qualification
+
+Independent review found the declaration selector could be unavailable while
+the maker could still create and permanently bind an empty first snapshot.
+The intended narrow UI guard requires the canonical jurisdiction catalog to be
+ready before first creation; delayed/failed catalog tests must show zero draft
+POSTs. It does not automatically declare allergens, change the server's legacy
+optional-input contract, edit a validated snapshot or rebind the task.
+
+The readiness correction, exact subsequent source/commit and its fresh live
+twenty-target browser evidence must be qualified after implementation. Older
+4066 browser proof remains dated evidence. Broad backend verification's currently
+exposed positive-fixture opt-in errors are corrected in tests, leaving production
+development authentication disabled by default. No green final verify or new
+main CI is prefilled.

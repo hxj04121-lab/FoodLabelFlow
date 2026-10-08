@@ -112,7 +112,7 @@ Only then can the affected Sprint acceptance items and parent stage be reported
 as complete. A missing human decision should identify its exact owner, choice
 and artifact while implementation, tests and review continue independently.
 
-## Execution evidence still to be attached
+## Dated execution and remaining checks
 
 The new command/read-model/flag regressions, strict real Day7 test, all backend
 tests, frontend checks and separate live browser scenarios must be recorded with
@@ -127,14 +127,31 @@ database assertions must retain their separate scope; no compound-grant identity
 is introduced to improve a coverage claim. Missing/failed validation is a
 separate domain gate.
 
-The complete new browser result after the connection interruption is UNKNOWN
-until its own completed process/report is read. The earlier 127 HTTP/MySQL pass
-and 88 fixture-UI passes/3 opt-in skips do not make that browser green. The previously confirmed RequestImpactIntegration development-flag bypass now
+The later completed real browser run is now available for source
+4066b8cac6447913624bcaf044d9bdbd08d2d7e4: command exit 0 at
+8 October 06:05:38 UTC, 347 source inputs bound with no deltas, existing live
+validation 1 passed (4.4s), then S3 live 1 passed (1.6m). Actual observations
+contain forty adoptions, forty findings (twenty NO_ACTION/twenty REVIEW_REQUIRED),
+twenty real publications/twenty CLOSED tasks and sixty historical checks.
+This is a dated local source result, separate from the older interruption and
+fixture/HTTP results. Its officer approval rejection is ACL403, not an exercised
+maker-checker policy; the service/unit policy evidence remains separate.
+
+Independent review subsequently identified a Labels UI defect: draft creation
+could proceed while the canonical allergen catalog was not ready, bind an empty
+immutable declaration snapshot and leave that task unable to be corrected in
+place. A narrow readiness guard plus delayed/failed-catalog zero-POST regressions
+is being finalized. The corrected guard needs a new source-bound twenty-product
+browser run; the 4066 pass cannot qualify later source. Final full backend verify
+is also pending: the in-progress run exposed old positive HTTP fixtures that
+had not explicitly enabled their test-only development identity. Those fixtures
+are being corrected while the production false default/guard remains unchanged.
+The actual running red result is retained; no full-suite pass is inferred. The previously confirmed RequestImpactIntegration development-flag bypass now
 has an actual same-source regression: 16 tests/3 failures before the adapter fix,
 then 16 tests/zero failures/errors/skips at 05:55:13 UTC. The same three HTTP
 paths changed from 200/404/404 to 401/401/401, with thirteen business-table
 snapshots unchanged. This closes that targeted bypass; the broader final fresh
-verify and browser/main results remain pending.
+verify, post-guard browser and new main results remain pending.
 
 Login/demo actor-switch adoption remains M4's decision; staging/promotion adoption
 remains M5's decision. Exact cross-module acceptance and A07 assessment remain

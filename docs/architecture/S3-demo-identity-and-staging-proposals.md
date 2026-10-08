@@ -98,3 +98,13 @@ The user's current scope authorizes local implementation and excludes security
 configuration/grant/credential changes and deployment. A reviewable ADR can be
 prepared within that scope, but cannot be marked adopted or merged on the owners'
 behalf. No implementation permission or elapsed wait supplies either decision.
+
+## Dated test evidence for these proposals
+
+The 4066 local candidate completed real legacy and S3 browser stages at
+06:05:38 UTC, including twenty officer/QA/publisher publications and twenty CLOSED
+tasks. That execution demonstrates the existing fixture context arrangement,
+not an adopted login/switch ADR, a shared deployment, or the staging promotion of
+a new main SHA. A catalog readiness correction and fresh final qualification are
+pending. The named M4/M5 decisions above therefore remain PROPOSED, identified by
+their exact proposal artifact hash in the review bundle.

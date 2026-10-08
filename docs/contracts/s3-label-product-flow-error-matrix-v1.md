@@ -95,3 +95,10 @@ regression reproduced three pre-fix failures, then passed all sixteen cases:
 the three disabled-flag paths changed from 200/404/404 to 401/401/401 before
 resource lookup with zero business-table changes. That targeted closure does
 not substitute for final all-source verification or the completed live browser.
+
+A completed 4066 local live browser run records twenty actual publications and
+the officer's ACL403 with no decision write. Its maker-checker policy reached flag
+is false. Permitted-creator policy/service unit tests remain the actual independent
+negative; no database policy-negative result is asserted. A later catalog-readiness
+UI guard needs fresh browser qualification. It blocks first creation while legal
+input is unavailable and does not revise the server's optional declaration schema.
