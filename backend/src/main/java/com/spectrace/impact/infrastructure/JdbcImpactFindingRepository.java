@@ -87,6 +87,11 @@ public class JdbcImpactFindingRepository implements ImpactFindingRepository {
         return jdbcTemplate.query(SELECT, this::mapImpactFinding, impactAnalysisRunId);
     }
 
+    @Override
+    public List<ImpactFinding> findByRunIdForReplay(String impactAnalysisRunId) {
+        return jdbcTemplate.query(SELECT + " FOR SHARE", this::mapImpactFinding, impactAnalysisRunId);
+    }
+
     private ImpactFinding mapImpactFinding(java.sql.ResultSet resultSet, int rowNumber)
             throws java.sql.SQLException {
         return new ImpactFinding(
