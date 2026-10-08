@@ -89,6 +89,7 @@ public class CatalogService {
         var adapter = integration(); String actor = adapter.requireActor("DATA.MAINTAIN");
         store.get(PRODUCT, value.productId(), true);
         store.get(PROVENANCE, value.provenanceId(), false);
+        lockMaterials(value.items().stream().map(Item::materialId).toList());
         for (var item : value.items().stream().sorted(java.util.Comparator.comparing(Item::specificationId)).toList())
             eligible(item.materialId(), item.specificationId());
         String id = store.formula(value, actor);
@@ -134,6 +135,7 @@ public class CatalogService {
             throw new CatalogFailure(409, "CURRENT_FORMULA_CHANGED", "Refresh the product before adopting a specification");
         var items = store.formulaItems(request.sourceFormulaVersionId());
         if (items.isEmpty()) throw CatalogFailure.invalid("source formula must have items");
+        lockMaterials(items.stream().map(item -> (String) item.get("supplier_material_id")).toList());
 
         // Lock specifications in the same ID order as ordinary create/release flows.
         var specificationIds = new TreeSet<String>();
@@ -184,6 +186,11 @@ public class CatalogService {
             if (failure.status() != 404) throw failure;
             throw new CatalogFailure(422, "INVALID_REFERENCE", "Adoption references an unavailable " + kind.name().toLowerCase(java.util.Locale.ROOT));
         }
+    }
+    private void lockMaterials(List<String> materialIds) {
+        // Item INSERTs take material FK locks. Use the same material-before-specification order
+        // as specification creation, and a shared sorted order for formulas with many materials.
+        for (String materialId : new TreeSet<>(materialIds)) store.get(MATERIAL, materialId, true);
     }
     private void eligible(String materialId, String specificationId) {
         store.get(MATERIAL, materialId, false);
