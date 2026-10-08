@@ -15,6 +15,8 @@ public interface LabelReviewCommandRepository {
             String ruleSetVersionId
     );
 
+    boolean requiresDraftRevision(String labelVersionId);
+
     int markPendingReview(
             String labelVersionId
     );

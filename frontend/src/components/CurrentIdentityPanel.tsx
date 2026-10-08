@@ -1,5 +1,13 @@
-import { getCurrentIdentity, type CurrentIdentity } from '@/api/identity'
-import { useEffect, useState } from 'react'
+import { getCurrentIdentity, getDemoIdentityOptions, type CurrentIdentity } from '@/api/identity'
+import {
+  demoIdentityChoices,
+  getIdentitySessionSnapshot,
+  initializeIdentitySession,
+  refreshIdentity,
+  subscribeIdentitySession,
+  switchDemoIdentity,
+} from '@/api/identity-session'
+import { useEffect, useSyncExternalStore } from 'react'
 import { Button } from './ui/button'
 
 export type CurrentIdentityState =
@@ -8,21 +16,28 @@ export type CurrentIdentityState =
   | { status: 'unavailable'; message: string }
 
 export function useCurrentIdentity() {
-  const [attempt, setAttempt] = useState(0)
-  const [state, setState] = useState<CurrentIdentityState>({ status: 'loading' })
+  const session = useSyncExternalStore(
+    subscribeIdentitySession,
+    getIdentitySessionSnapshot,
+    getIdentitySessionSnapshot,
+  )
+
   useEffect(() => {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 15000)
-    let active = true
-    setState({ status: 'loading' })
-    getCurrentIdentity(controller.signal).then(actor => { if (active) setState({ status: 'ready', actor }) })
-      .catch(cause => { if (active) setState({ status: 'unavailable', message: controller.signal.aborted
-        ? 'The connected identity read timed out.' : cause instanceof Error ? cause.message : 'The connected identity is unavailable.' }) })
-      .finally(() => clearTimeout(timer))
-    return () => { active = false; controller.abort(); clearTimeout(timer) }
-  }, [attempt])
-  return { state, refresh: () => setAttempt(value => value + 1),
-    hasPermission: (permission: string) => state.status === 'ready' && state.actor.permissions.includes(permission) }
+    void initializeIdentitySession(getCurrentIdentity)
+  }, [])
+
+  const state: CurrentIdentityState = session.status === 'ready' && session.actor
+    ? { status: 'ready', actor: session.actor }
+    : session.status === 'unavailable'
+      ? { status: 'unavailable', message: session.error }
+      : { status: 'loading' }
+
+  return {
+    state,
+    session,
+    refresh: () => refreshIdentity(getCurrentIdentity),
+    hasPermission: (permission: string) => state.status === 'ready' && state.actor.permissions.includes(permission),
+  }
 }
 
 export function CurrentIdentityPanel({ state, onRefresh }: { state: CurrentIdentityState; onRefresh: () => void }) {
@@ -36,4 +51,38 @@ export function CurrentIdentityPanel({ state, onRefresh }: { state: CurrentIdent
     {state.status === 'unavailable' && <p>Connected identity unavailable: {state.message} Writes requiring this identity remain disabled.</p>}
     <Button variant="outline" disabled={state.status === 'loading'} onClick={onRefresh}>Refresh connected identity</Button>
   </section>
+}
+
+export function ControlledDemoIdentitySwitcher() {
+  const identity = useCurrentIdentity()
+  const localDemoHost = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname)
+  if (!localDemoHost) return null
+
+  return <label className="identity-switcher">
+    Demo identity
+    <select
+      aria-label="Demo identity"
+      value={identity.session.selection}
+      disabled={identity.session.status === 'switching'}
+      onChange={event => {
+        const choice = demoIdentityChoices.find(item => item.key === event.target.value)
+                if (choice) void switchDemoIdentity(choice.key, async () => {
+                  const options = await getDemoIdentityOptions()
+                  if (!options.some(option => option.key === choice.key && option.subject === choice.subject)) {
+                    throw new Error(`The server does not expose the ${choice.label} demo identity.`)
+                  }
+                  return getCurrentIdentity()
+                })
+      }}
+    >
+      {demoIdentityChoices.map(choice => <option key={choice.key} value={choice.key}>{choice.label}</option>)}
+    </select>
+    <span aria-live="polite">
+      {identity.session.status === 'switching'
+        ? 'Refreshing identity and permissions…'
+        : identity.session.status === 'ready'
+          ? identity.session.actor?.displayName ?? ''
+          : identity.session.error || 'Identity unavailable'}
+    </span>
+  </label>
 }

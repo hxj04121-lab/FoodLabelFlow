@@ -20,7 +20,7 @@ jobs:
           java-version: '21'
           cache: maven
       - name: Verify backend with MySQL Testcontainers
-        run: mvn -B -ntp -f backend/pom.xml verify
+        run: mvn -B -ntp -f backend/pom.xml clean verify
       - name: Upload backend coverage
         uses: actions/upload-artifact@v4
         with:
@@ -50,6 +50,20 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: npm ci && npm run build
+      - name: Install Chromium for SCRUM-84 browser regressions
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Verify SCRUM-84 controlled identity switching and stale response isolation
+        working-directory: frontend
+        run: npx playwright test tests/scrum84-identity-switch.spec.ts tests/scrum84-returned-revision-ui.spec.ts --workers=1
+      - name: Upload SCRUM-84 browser failure evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrum84-identity-browser-evidence
+          path: frontend/test-results/**
+          if-no-files-found: ignore
+          retention-days: 14
 
   containers:
     runs-on: ubuntu-latest
@@ -82,6 +96,12 @@ jobs:
             exit 1
           fi
           docker compose exec -T mysql sh -c 'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD" spectrace' < "$fixture_input"
+      - name: Verify SCRUM-84 real demo identity switching against isolated stack
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:5173
+          LIVE_SCRUM84_IDENTITY: '1'
+        run: npx playwright test tests/scrum84-identity-live.spec.ts --output=test-results/scrum84-live-identity
       - name: Verify the real read-only catalog and formula trace
         working-directory: frontend
         env:

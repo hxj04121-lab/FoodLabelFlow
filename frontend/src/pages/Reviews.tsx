@@ -22,6 +22,20 @@ export function Reviews() {
   const [detailBusy, setDetailBusy] = useState(false)
   const [detailError, setDetailError] = useState('')
   const detailRequest = useRef(0)
+  const identityGeneration = identity.session.generation
+  // A stale request retains its render closure; compare against a ref updated on every render.
+  const activeGeneration = useRef(identityGeneration)
+  activeGeneration.current = identityGeneration
+
+  useEffect(() => {
+    detailRequest.current++
+    setTasks([])
+    setDetail(null)
+    setDetailError('')
+    setTaskId('')
+    setOffset(0)
+    setAttempt(value => value + 1)
+  }, [identityGeneration])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -31,25 +45,26 @@ export function Reviews() {
       .catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Review tasks could not be read.') })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [status, offset, attempt])
+  }, [status, offset, attempt, identityGeneration])
 
   async function loadDetail(exactId: string) {
     if (!exactId.trim()) return
     const request = ++detailRequest.current
+    const generation = identityGeneration
     setTaskId(exactId); setDetail(null); setDetailBusy(true); setDetailError('')
     try {
       const read = await getReviewTask(exactId.trim())
-      if (request === detailRequest.current) setDetail(read)
+      if (request === detailRequest.current && generation === activeGeneration.current) setDetail(read)
     } catch (cause: unknown) {
-      if (request === detailRequest.current) setDetailError(cause instanceof Error ? cause.message : 'Review task could not be read.')
-    } finally { if (request === detailRequest.current) setDetailBusy(false) }
+      if (request === detailRequest.current && generation === activeGeneration.current) setDetailError(cause instanceof Error ? cause.message : 'Review task could not be read.')
+    } finally { if (request === detailRequest.current && generation === activeGeneration.current) setDetailBusy(false) }
   }
 
   useEffect(() => {
     const id = searchParams.get('reviewTaskId')?.trim()
-    if (id) void loadDetail(id)
+    if (id && identity.state.status === 'ready') void loadDetail(id)
     return () => { detailRequest.current++ }
-  }, [searchParams])
+  }, [searchParams, identityGeneration, identity.state.status])
 
   return <div className="review-workspace">
     <div className="page-title"><div><h1>Review workspace</h1><p>Read actual tasks, inspect their version bindings and continue the guarded label workflow.</p></div>
