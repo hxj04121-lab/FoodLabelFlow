@@ -1,0 +1,45 @@
+sequenceDiagram
+    actor Maker
+    actor Checker
+    actor Publisher
+    participant DraftHTTP as LabelDraftController
+    participant AuthContext as ExternalActorResolver
+    participant Draft as LabelDraftService
+    participant Bind as JdbcReviewTaskDraftBinding
+    participant Labels as JdbcLabelDraftRepository
+    participant Validator as ValidationApplicationService
+    participant HTTP as LabelWorkflowController
+    participant Review as LabelReviewService
+    participant JDBC as JdbcLabelReviewCommandRepository
+    Maker->>DraftHTTP: POST /api/labels/drafts with declarations/task
+    DraftHTTP->>AuthContext: resolve existing active context and DEV flag
+    AuthContext-->>DraftHTTP: AuthenticatedActor
+    DraftHTTP->>Draft: createDraft(product, jurisdiction, entries, task, actor)
+    Note over Draft,Labels: Spring transaction owns begin/commit/rollback
+    Draft->>Bind: requireFirstDraftAvailable()
+    Bind->>Bind: Product lock and current-label/task guards
+    Draft->>Labels: createFromCurrentFormula(entries)
+    Labels->>Labels: Insert label and USER_ENTERED declarations
+    Draft->>Bind: bindOpenTaskToDraft()
+    Draft-->>DraftHTTP: Exact LabelDraft
+    DraftHTTP-->>Maker: 201 plus Location
+    Maker->>Validator: Actual exact-label validation API
+    Maker->>HTTP: review-submissions {}
+    HTTP->>AuthContext: Resolve existing active context
+    HTTP->>Review: submitForReview(labelId, actor)
+    Review->>JDBC: lockForReview(), hasPassingValidation()
+    Review->>JDBC: pending/task/audit writes
+    HTTP-->>Maker: 200 exact LabelDraft
+    Checker->>HTTP: review-decisions APPROVE
+    HTTP->>AuthContext: Resolve connected checker context
+    HTTP->>Review: recordDecision(labelId, decision, comments, actor)
+    Review->>Review: Permission, transition and MakerCheckerPolicy
+    Review->>JDBC: Label/task/ApprovalRecord/audit writes
+    HTTP-->>Checker: 200 APPROVED exact LabelDraft
+    Publisher->>HTTP: task publications with exact labelId
+    HTTP->>AuthContext: Resolve connected publisher context
+    HTTP->>Review: publishReviewTask(taskId, labelId, actor)
+    Review->>JDBC: lockForPublication() with current committed guards
+    Review->>JDBC: Supersede/publish/pointer/records/task resolution
+    HTTP-->>Publisher: 200 PUBLISHED exact LabelDraft
+    Note over Maker,JDBC: On guard failure: no later writes. On write failure: rollback.

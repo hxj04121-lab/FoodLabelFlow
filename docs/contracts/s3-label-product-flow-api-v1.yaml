@@ -1,0 +1,648 @@
+openapi: 3.1.0
+info:
+  title: S3 Label Creation, Review, Publication and Caller Read API
+  version: 1.0.0
+  description: Explicit product-flow extension candidate prepared on 8 October 2026. Declarations are entered
+    only while creating a fresh label snapshot. Existing declaration GET and frozen S2 validation contracts
+    are unchanged. Java application services remain responsible for permissions, lifecycle, maker-checker and
+    transaction guards. Exact cross-module acceptance is pending.
+x-spec-trace-contract-state: CANDIDATE_PENDING_CROSS_MODULE_ACCEPTANCE
+x-spec-trace-revision-scope: Optional explicit declarations and expected ReviewTask binding on draft creation;
+  strict command JSON; separate review submission, decision and publication HTTP adapters; paged task collection
+  and current caller reads. Existing contracts remain unchanged.
+security:
+- ExternalAuthProvider: []
+  ExternalSubject: []
+paths:
+  /api/labels/drafts:
+    post:
+      operationId: createLabelDraftWithDeclarations
+      summary: Create a new immutable label/declaration snapshot and bind its first task.
+      x-required-permission: LABEL.CREATE
+      description: Omitted declarations preserve the existing empty-declaration behavior; [] explicitly creates
+        no declarations and does not imply allergen-free. The caller supplies catalog allergen IDs and CONTAINS,
+        never a declaration source, actor, formula, rule-set, validation status or lifecycle status. The server
+        pins the current released formula and active jurisdiction rule set and stores supplied declarations
+        as USER_ENTERED. Catalog and jurisdiction membership are checked. Case-insensitive repeated allergen
+        IDs are rejected. A product lock precedes task/label writes. A matching unresolved task must be OPEN
+        with both draft and target unbound. Optional reviewTaskId asserts that exact task. Creation, declaration
+        inserts and first binding are atomic. An existing binding or conflicting task returns 409 with no new
+        draft and never redirects an existing task. Earlier labels/declarations remain unchanged. There is
+        no declaration UPDATE/PATCH operation. The response is LabelDraft only; read exact declarations through
+        the existing declarations GET. When binding an impact task, its finding's proposed formula must equal
+        the product's current released formula; an older N+1 finding cannot bind a newer N+2 draft.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDraft'
+            example:
+              productId: product_soy_review_example
+              jurisdictionCode: US
+              reviewTaskId: review_task_example
+              declarations:
+              - allergenId: all_soy
+                declarationType: CONTAINS
+                displayText: 'Contains: Soy'
+              - allergenId: all_wheat
+                declarationType: CONTAINS
+                displayText: 'Contains: Wheat'
+      responses:
+        '201':
+          description: Fresh DRAFT label; exact declarations and task binding committed.
+          headers:
+            Location:
+              description: /api/labels/{labelVersionId} for the generated snapshot.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabelDraft'
+        '400':
+          $ref: '#/components/responses/InvalidDraft'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/AuthorizationDenied'
+        '409':
+          $ref: '#/components/responses/WorkflowConflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '415':
+          $ref: '#/components/responses/UnsupportedContentType'
+  /api/labels/{labelVersionId}:
+    get:
+      operationId: getExactWorkflowLabel
+      summary: Read the exact label version, including historical snapshots.
+      parameters:
+      - $ref: '#/components/parameters/LabelVersionId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Label'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '404':
+          $ref: '#/components/responses/LabelNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/labels/{labelVersionId}/declarations:
+    get:
+      operationId: getExactWorkflowLabelDeclarations
+      summary: Read the immutable declarations and exact version bindings.
+      description: Existing read behavior is unchanged. No declarations is 200 with an empty list, not proof
+        of allergen-free or PASSED. Read by exact label ID; do not replace it with whichever label is current
+        later.
+      parameters:
+      - $ref: '#/components/parameters/LabelVersionId'
+      responses:
+        '200':
+          description: Exact version-bound stored declarations.
+          content:
+            application/json:
+              schema:
+                $ref: ./label-declarations-api-v1.yaml#/components/schemas/LabelDeclarationFacts
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '404':
+          $ref: '#/components/responses/LabelNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/labels/{labelVersionId}/review-submissions:
+    post:
+      operationId: submitExactLabelForReview
+      summary: Submit the exact current draft after a real passing validation.
+      x-required-permission: LABEL.SUBMIT_REVIEW
+      description: Body must be exactly {}. The existing transactional service checks current label/current
+        formula, DRAFT transition and latest passing validation for this exact LabelVersion and RuleSetVersion.
+        A passing run for another label or rule set cannot satisfy the gate. Success changes the label to PENDING_REVIEW,
+        changes its task to IN_REVIEW and writes its submit audit. Missing/failed validation or an invalid
+        transition creates no successful state or audit. Do not automatically repeat a command after a lost
+        response; reconcile the exact label/task through reads.
+      parameters:
+      - $ref: '#/components/parameters/LabelVersionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              maxProperties: 0
+            example: {}
+      responses:
+        '200':
+          $ref: '#/components/responses/Label'
+        '400':
+          $ref: '#/components/responses/InvalidCommand'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/AuthorizationDenied'
+        '404':
+          $ref: '#/components/responses/LabelNotFound'
+        '409':
+          $ref: '#/components/responses/WorkflowConflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '415':
+          $ref: '#/components/responses/UnsupportedContentType'
+  /api/labels/{labelVersionId}/review-decisions:
+    post:
+      operationId: decideExactLabelReview
+      summary: Record APPROVE, REQUEST_CHANGES or REJECT for a pending task target.
+      description: APPROVE requires LABEL.APPROVE and a checker distinct from the label creator. REQUEST_CHANGES
+        requires LABEL.REQUEST_CHANGES and returns the same snapshot to DRAFT with an OPEN task; REJECT requires
+        LABEL.REJECT and produces REJECTED with a CLOSED/resolved task. A pending matching ReviewTask and current
+        label/formula guards are enforced by the existing Java service. The decision, ApprovalRecord, task
+        state and audit are atomic. APPROVE produces APPROVED, not PUBLISHED; publication is a separate authorized
+        command. REQUEST_CHANGES does not expose declaration editing or silently rebind a replacement.
+      x-required-permission-by-decision:
+        APPROVE: LABEL.APPROVE
+        REQUEST_CHANGES: LABEL.REQUEST_CHANGES
+        REJECT: LABEL.REJECT
+      parameters:
+      - $ref: '#/components/parameters/LabelVersionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewDecision'
+      responses:
+        '200':
+          $ref: '#/components/responses/Label'
+        '400':
+          $ref: '#/components/responses/InvalidCommand'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/AuthorizationDenied'
+        '404':
+          $ref: '#/components/responses/LabelNotFound'
+        '409':
+          $ref: '#/components/responses/WorkflowConflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '415':
+          $ref: '#/components/responses/UnsupportedContentType'
+  /api/review-tasks/{reviewTaskId}:
+    get:
+      operationId: getExactReviewTaskBinding
+      summary: Read the exact persisted task binding and outcome.
+      description: Requires an active identity. This is a direct task resource, not a task collection, permission
+        grant, allowed-actions DTO or publication evidence envelope. Nullable draft/target fields are not substituted
+        with the latest label. Read it again after a command or uncertain outcome.
+      parameters:
+      - $ref: '#/components/parameters/ReviewTaskId'
+      responses:
+        '200':
+          description: Persisted task binding.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewTask'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '404':
+          $ref: '#/components/responses/TaskNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/review-tasks/{reviewTaskId}/publications:
+    post:
+      operationId: publishApprovedReviewTaskLabel
+      summary: Atomically publish the approved exact task target.
+      x-required-permission: LABEL.PUBLISH
+      description: Body labelVersionId must equal the task's exact target. Require unresolved task with final
+        APPROVE decision, target APPROVED, current formula/latest label and a matching APPROVE record. The
+        transaction supersedes the previous published label, publishes the approved snapshot, updates the product
+        current published pointer, resolves the task and records publication/audit evidence. Any failure rolls
+        back all writes. No formula adoption is performed as a publication side effect. Repeated or stale publication
+        is a conflict; no idempotency-key or blind write-retry behavior is promised.
+      parameters:
+      - $ref: '#/components/parameters/ReviewTaskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - labelVersionId
+              properties:
+                labelVersionId:
+                  type: string
+                  minLength: 1
+                  maxLength: 120
+                  description: Nonblank exact snapshot ID without surrounding whitespace.
+      responses:
+        '200':
+          $ref: '#/components/responses/Label'
+        '400':
+          $ref: '#/components/responses/InvalidCommand'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/AuthorizationDenied'
+        '404':
+          $ref: '#/components/responses/TaskNotFound'
+        '409':
+          $ref: '#/components/responses/WorkflowConflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '415':
+          $ref: '#/components/responses/UnsupportedContentType'
+  /api/review-tasks:
+    get:
+      operationId: listPersistedReviewTasks
+      summary: Read one ordered page of real review tasks.
+      description: Requires an active identity and returns a direct array of the existing ReviewTaskView. Optional
+        exact status filtering occurs before pagination. Order is created_at DESC, review_task_id ASC. Empty
+        or valid out-of-range pages return 200 []. There is no envelope, total count, cursor or global snapshot
+        guarantee; rows can change between reads. A short page ends the observed traversal; a full page requires
+        the next read. Do not assert a complete global list if the offset cap stops traversal.
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - OPEN
+          - IN_REVIEW
+          - CLOSED
+        description: Omit for all statuses. Blank, lowercase and unknown values are invalid.
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 20
+          minimum: 1
+          maximum: 100
+        description: Integer page size; malformed or out-of-range values return REVIEW_TASK_QUERY_INVALID.
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 0
+          minimum: 0
+          maximum: 100000
+        description: Integer row offset within the bounded read interface.
+      responses:
+        '200':
+          description: One direct page, possibly empty.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewTaskList'
+        '400':
+          $ref: '#/components/responses/InvalidTaskQuery'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/identity/current:
+    get:
+      operationId: getCurrentConnectedIdentity
+      summary: Read the actual active caller and existing permissions.
+      description: Resolves the existing provider/subject context through ExternalActorResolver and returns
+        userId, username, displayName, roles and permissions. Roles and permissions are sorted lists of existing
+        mappings. This read creates no user, grants no permission, selects no actor and exposes no credential
+        or external subject. DEV_EXTERNAL is rejected with 401 when the existing development-auth flag is false;
+        provider matching for that opt-out is case-insensitive. No login, session or production authentication
+        decision is introduced. Provider namespaces must be ASCII machine identifiers; non-ASCII aliases return
+        401 before lookup.
+      responses:
+        '200':
+          description: The resolved active caller; sorted roles and permissions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentIdentity'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  securitySchemes:
+    ExternalAuthProvider:
+      type: apiKey
+      in: header
+      name: X-Auth-Provider
+      description: Existing external-identity seam. DEV_EXTERNAL obeys the existing development-auth flag;
+        no production login is established. Provider namespaces are ASCII.
+    ExternalSubject:
+      type: apiKey
+      in: header
+      name: X-External-Subject
+      description: Existing mapped active subject; no new actor or grant is created by this API.
+  parameters:
+    LabelVersionId:
+      name: labelVersionId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    ReviewTaskId:
+      name: reviewTaskId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+  schemas:
+    CreateDraft:
+      type: object
+      additionalProperties: false
+      required:
+      - productId
+      - jurisdictionCode
+      properties:
+        productId:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Catalog product ID; nonblank, with no surrounding whitespace.
+        jurisdictionCode:
+          type: string
+          minLength: 1
+          maxLength: 40
+          description: Jurisdiction of the active rule set and legal allergen catalog.
+        reviewTaskId:
+          type: string
+          minLength: 1
+          maxLength: 140
+          description: Optional exact expected first unbound task. Null is invalid; omit when unused.
+        declarations:
+          type: array
+          minItems: 0
+          maxItems: 100
+          uniqueItems: true
+          description: Explicit first-snapshot entries, also distinct by case-insensitive allergenId. Null
+            is invalid. Omission and [] mean no declarations; no facts are auto-declared.
+          items:
+            $ref: '#/components/schemas/DeclarationInput'
+    DeclarationInput:
+      type: object
+      additionalProperties: false
+      required:
+      - allergenId
+      - declarationType
+      properties:
+        allergenId:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Existing canonical jurisdiction catalog ID, such as all_soy; not SOY or a case alias.
+        declarationType:
+          type: string
+          const: CONTAINS
+        displayText:
+          type: string
+          minLength: 1
+          maxLength: 300
+          description: Optional nonblank stored text, without surrounding whitespace. Omit for null.
+    ReviewDecision:
+      type: object
+      additionalProperties: false
+      required:
+      - decision
+      properties:
+        decision:
+          type: string
+          enum:
+          - APPROVE
+          - REQUEST_CHANGES
+          - REJECT
+        comments:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Optional nonblank comment, without surrounding whitespace. Null is invalid.
+    LabelDraft:
+      type: object
+      additionalProperties: false
+      required:
+      - labelVersionId
+      - productId
+      - formulaVersionId
+      - ruleSetVersionId
+      - jurisdictionCode
+      - versionNumber
+      - rawIngredientText
+      - lifecycleStatus
+      - isCurrentPublished
+      - createdByUserId
+      - createdAt
+      - dataProvenanceId
+      properties:
+        labelVersionId:
+          type: string
+        productId:
+          type: string
+        formulaVersionId:
+          type: string
+        ruleSetVersionId:
+          type: string
+        jurisdictionCode:
+          type: string
+        versionNumber:
+          type: integer
+          minimum: 1
+        rawIngredientText:
+          type:
+          - string
+          - 'null'
+        lifecycleStatus:
+          type: string
+          enum:
+          - DRAFT
+          - PENDING_REVIEW
+          - APPROVED
+          - REJECTED
+          - PUBLISHED
+          - SUPERSEDED
+        isCurrentPublished:
+          type: string
+          enum:
+          - Y
+          - N
+        createdByUserId:
+          type: string
+        createdAt:
+          type: string
+          description: Existing LocalDateTime serialization; no timezone offset is added by this revision.
+        dataProvenanceId:
+          type: string
+    ReviewTask:
+      type: object
+      additionalProperties: false
+      required:
+      - reviewTaskId
+      - productId
+      - currentLabelVersionId
+      - draftLabelVersionId
+      - targetLabelVersionId
+      - status
+      - decision
+      - resolvedAt
+      properties:
+        reviewTaskId:
+          type: string
+        productId:
+          type: string
+        currentLabelVersionId:
+          type: string
+        draftLabelVersionId:
+          type:
+          - string
+          - 'null'
+        targetLabelVersionId:
+          type:
+          - string
+          - 'null'
+        status:
+          type: string
+          enum:
+          - OPEN
+          - IN_REVIEW
+          - CLOSED
+        decision:
+          type:
+          - string
+          - 'null'
+          enum:
+          - APPROVE
+          - REQUEST_CHANGES
+          - REJECT
+          - null
+        resolvedAt:
+          type:
+          - string
+          - 'null'
+          description: Existing LocalDateTime serialization; null until resolution.
+    ApiError:
+      $ref: ./allergen-validation-api-v1.yaml#/components/schemas/ApiError
+    ReviewTaskList:
+      type: array
+      maxItems: 100
+      items:
+        $ref: '#/components/schemas/ReviewTask'
+    CurrentIdentity:
+      type: object
+      additionalProperties: false
+      required:
+      - userId
+      - username
+      - displayName
+      - roles
+      - permissions
+      properties:
+        userId:
+          type: string
+        username:
+          type: string
+        displayName:
+          type: string
+        roles:
+          type: array
+          uniqueItems: true
+          description: Sorted existing role codes.
+          items:
+            type: string
+        permissions:
+          type: array
+          uniqueItems: true
+          description: Sorted existing permission codes; not action grants.
+          items:
+            type: string
+  responses:
+    Label:
+      description: Exact label resource after the authoritative read or successful command.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/LabelDraft'
+    InvalidDraft:
+      description: 400 LABEL_DRAFT_INVALID or LABEL_COMMAND_INVALID; correct the input.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    InvalidCommand:
+      description: 400 LABEL_COMMAND_INVALID; malformed/duplicate/trailing/unknown fields or invalid decision.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    AuthenticationRequired:
+      description: 401 AUTHENTICATION_REQUIRED; no mapped active caller, or DEV_EXTERNAL with the existing
+        development-auth flag disabled (case-insensitive provider match). Non-ASCII provider namespaces are
+        unsupported and rejected before accent-insensitive database lookup.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    AuthorizationDenied:
+      description: 403 AUTHORIZATION_DENIED; missing permission or independent-checker rejection.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    LabelNotFound:
+      description: 404 LABEL_NOT_FOUND; the exact path label does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    TaskNotFound:
+      description: 404 REVIEW_TASK_NOT_FOUND; the exact path task does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    VersionConflict:
+      description: 409 LABEL_VERSION_CONFLICT; stale version, ambiguous/mismatched/already-bound task.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    WorkflowConflict:
+      description: 409 LABEL_VERSION_CONFLICT or LABEL_WORKFLOW_CONFLICT; current/state/validation/approval
+        guards fail.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    InternalError:
+      description: 500 INTERNAL_ERROR with a redacted message. Unexpected read failures return no false success;
+        all writes roll back on command persistence/audit failure.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    MethodNotAllowed:
+      description: 405 for an unsupported method. Spring can reject before handler lookup; this revision does
+        not promise a four-field ApiError or stable code for framework method errors.
+    UnsupportedContentType:
+      description: 415 for unsupported media type. Commands require application/json. Spring can reject before
+        handler lookup; no canonical ApiError/code is promised for this framework response.
+    InvalidTaskQuery:
+      description: 400 REVIEW_TASK_QUERY_INVALID; invalid status or malformed/out-of-range limit/offset.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'

@@ -1,0 +1,48 @@
+classDiagram
+    direction LR
+    class Product {
+        currentFormula
+        currentPublishedLabel
+    }
+    class FormulaSnapshot {
+        immutableItems
+        specificationBindings
+    }
+    class LabelSnapshot {
+        formulaBinding
+        ruleSetBinding
+        jurisdiction
+        creator
+        lifecycle
+    }
+    class Declaration {
+        catalogAllergen
+        declarationType
+        explicitText
+    }
+    class ReviewTask {
+        currentLabel
+        replacementTarget
+        state
+        finalDecision
+    }
+    class ValidationEvidence {
+        exactLabel
+        exactRuleSet
+        blockingErrors
+    }
+    class ApprovalRecord {
+        decision
+        checker
+    }
+    class PublicationRecord
+    class AuditEvent
+    Product --> FormulaSnapshot : current selection
+    Product --> LabelSnapshot : published selection
+    LabelSnapshot --> FormulaSnapshot : immutable binding
+    LabelSnapshot "1" --> "0..*" Declaration : creation snapshot
+    ReviewTask --> LabelSnapshot : exact old/new references
+    ValidationEvidence --> LabelSnapshot : validates exact snapshot
+    ApprovalRecord --> ReviewTask : records independent decision
+    PublicationRecord --> LabelSnapshot : published snapshot
+    AuditEvent --> ReviewTask : durable transitions

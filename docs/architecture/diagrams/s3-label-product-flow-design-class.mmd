@@ -1,0 +1,56 @@
+classDiagram
+    direction LR
+    class LabelDraftController {
+        createDraft()
+        getById()
+        getDeclarations()
+    }
+    class LabelDraftService {
+        createDraft()
+    }
+    class LabelDeclarationInput
+    class LabelDraftRepository
+    class JdbcLabelDraftRepository {
+        createFromCurrentFormula()
+    }
+    class ReviewTaskDraftBinding
+    class JdbcReviewTaskDraftBinding {
+        requireFirstDraftAvailable()
+        bindOpenTaskToDraft()
+    }
+    class LabelWorkflowController {
+        submit()
+        decide()
+        publish()
+        getTask()
+    }
+    class LabelReviewService {
+        submitForReview()
+        recordDecision()
+        publishReviewTask()
+        getReviewTask()
+    }
+    class LabelReviewCommandRepository
+    class JdbcLabelReviewCommandRepository
+    class ExternalActorResolver
+    class IdentityService
+    class AuthorizationService
+    class LabelTransitionPolicy
+    class MakerCheckerPolicy
+    LabelDraftController --> LabelDraftService
+    LabelDraftController --> ExternalActorResolver
+    ExternalActorResolver --> IdentityService
+    LabelDraftService --> AuthorizationService
+    LabelDraftService --> LabelDeclarationInput
+    LabelDraftService --> LabelDraftRepository
+    LabelDraftService --> ReviewTaskDraftBinding
+    LabelDraftRepository <|.. JdbcLabelDraftRepository
+    ReviewTaskDraftBinding <|.. JdbcReviewTaskDraftBinding
+    LabelWorkflowController --> ExternalActorResolver
+    LabelWorkflowController --> LabelReviewService
+    LabelWorkflowController --> LabelDraftService : read exact result
+    LabelReviewService --> AuthorizationService
+    LabelReviewService --> LabelTransitionPolicy
+    LabelReviewService --> MakerCheckerPolicy
+    LabelReviewService --> LabelReviewCommandRepository
+    LabelReviewCommandRepository <|.. JdbcLabelReviewCommandRepository
