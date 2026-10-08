@@ -34,7 +34,7 @@ import static org.mockito.Mockito.doThrow;
 
 /** No test transaction, no preseeded validation output and no LABEL.VALIDATE grant. */
 @Testcontainers
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "spring.flyway.target=2")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {"spring.flyway.target=2", "spectrace.dev-external-auth.enabled=true"})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Sql(scripts = PositiveGoldenFixtures.SQL_RESOURCE, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
 class LabelAllergenApiMySqlTest extends ValidationHttpTestSupport {
