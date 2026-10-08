@@ -9,7 +9,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 const PAGE_SIZE = 20
 
 export function Reviews() {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const identity = useCurrentIdentity()
   const [tasks, setTasks] = useState<ReviewTask[]>([])
   const [status, setStatus] = useState('OPEN')
@@ -22,6 +22,7 @@ export function Reviews() {
   const [detailBusy, setDetailBusy] = useState(false)
   const [detailError, setDetailError] = useState('')
   const detailRequest = useRef(0)
+  const detailController = useRef<AbortController | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -36,19 +37,35 @@ export function Reviews() {
   async function loadDetail(exactId: string) {
     if (!exactId.trim()) return
     const request = ++detailRequest.current
+    detailController.current?.abort()
+    const controller = new AbortController()
+    detailController.current = controller
+    const timer = setTimeout(() => controller.abort(), 15000)
     setTaskId(exactId); setDetail(null); setDetailBusy(true); setDetailError('')
     try {
-      const read = await getReviewTask(exactId.trim())
+      const read = await getReviewTask(exactId.trim(), controller.signal)
       if (request === detailRequest.current) setDetail(read)
     } catch (cause: unknown) {
-      if (request === detailRequest.current) setDetailError(cause instanceof Error ? cause.message : 'Review task could not be read.')
-    } finally { if (request === detailRequest.current) setDetailBusy(false) }
+      if (request === detailRequest.current) setDetailError(controller.signal.aborted ? 'The exact task read timed out. Load this review task to try again.' : cause instanceof Error ? cause.message : 'Review task could not be read.')
+    } finally { clearTimeout(timer); if (request === detailRequest.current) setDetailBusy(false) }
+  }
+
+  function selectTask(exactId: string) {
+    const id = exactId.trim()
+    if (!id) return
+    detailRequest.current++
+    setTaskId(id); setDetail(null); setDetailError('')
+    if (searchParams.get('reviewTaskId') === id) { void loadDetail(id); return }
+    const next = new URLSearchParams(searchParams)
+    next.set('reviewTaskId', id)
+    setSearchParams(next)
   }
 
   useEffect(() => {
     const id = searchParams.get('reviewTaskId')?.trim()
     if (id) void loadDetail(id)
-    return () => { detailRequest.current++ }
+    else { setTaskId(''); setDetail(null); setDetailError(''); setDetailBusy(false) }
+    return () => { detailRequest.current++; detailController.current?.abort() }
   }, [searchParams])
 
   return <div className="review-workspace">
@@ -66,7 +83,7 @@ export function Reviews() {
         {!loading && !error && tasks.length === 0 && <p>No tasks were returned for this page and status.</p>}
         <div className="review-task-list">{tasks.map(task => <article key={task.reviewTaskId}>
           <h2>{task.productId}</h2><Badge variant="outline">{task.status}</Badge><p>{task.reviewTaskId}</p>
-          <Button variant="outline" onClick={() => loadDetail(task.reviewTaskId)}>View task details</Button>
+          <Button variant="outline" onClick={() => selectTask(task.reviewTaskId)}>View task details</Button>
         </article>)}</div>
         <p>{tasks.length} rows on this page · Offset {offset}</p>
         <div className="workflow-actions"><Button variant="outline" disabled={loading || offset === 0} onClick={() => setOffset(value => Math.max(0, value - PAGE_SIZE))}>Previous tasks</Button>
@@ -77,7 +94,7 @@ export function Reviews() {
         <section className="review-content" aria-label="Review task details">
           <label htmlFor="review-task-lookup">Existing review task ID</label><input id="review-task-lookup" value={taskId}
             onChange={event => setTaskId(event.target.value)} />
-          <Button variant="outline" disabled={detailBusy || !taskId.trim()} onClick={() => loadDetail(taskId)}>Load review task</Button>
+          <Button variant="outline" disabled={detailBusy || !taskId.trim()} onClick={() => selectTask(taskId)}>Load review task</Button>
           {detailBusy && <p role="status">Loading the exact review task…</p>}
           {detailError && <p className="error-notice" role="alert">{detailError}</p>}
           {detail && <><h2>{detail.reviewTaskId}</h2><dl className="workflow-binding">

@@ -14,6 +14,7 @@ const run = { impactAnalysisId: 'analysis_ui', changeRequestId: change.changeReq
   relevantProductCount: 1, noActionCount: 0, reviewRequiredCount: 1, findings: [finding] }
 
 test.beforeEach(async ({ page }) => {
+  await page.route('**/api/v1/change-requests/' + change.changeRequestId, route => route.fulfill({ json: change }))
   await page.setExtraHTTPHeaders({ 'X-Auth-Provider': 'DEV_EXTERNAL', 'X-External-Subject': 'dev-external-change-manager' })
   await page.route('**/api/identity/current', route => route.fulfill({ json: {
     userId: 'user_change_manager', username: 'change.manager', displayName: 'Demo Change Manager',

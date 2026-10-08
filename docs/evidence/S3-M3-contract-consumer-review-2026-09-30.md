@@ -3,6 +3,36 @@
 Date: 30 Sep 2026. Author: Xu Feiyang / M3. Related: SCRUM-49/71–74.
 Status: **local review draft; candidate and owner decisions remain pending**.
 
+## Current consumer qualification — 8 Oct 2026
+
+This update supersedes the earlier API-availability assessment below. Main
+`73600b8` now includes actual impact trigger/query, task list/detail, immutable
+first declaration input, review commands, publication and current-caller reads.
+The current impact and product-flow/error contracts were checked against their
+actual frontend clients and pages, with the following M3 consumption conclusions:
+
+- Direct resources and four-field errors fit the existing clients; collection
+  page limits/status filters and nullable task targets remain explicit.
+- Exact task/product/label/formula/rule-set/jurisdiction bindings are checked;
+  optional first declarations do not introduce an editing or rebind contract.
+- Separate APPROVE and publication responses remain exact LabelDraft resources;
+  current identity/permissions are reads, not an actor-selection interface.
+- Local M3 repairs affect URL selection/restoration, read cancellation/timeouts,
+  stale completion handling and tests. They add no backend contract, stored grant,
+  identity switch or publication policy.
+- [Current M3 verification](S3-M3-test-design.md) and
+  [implementation A07](S3-M3-A07-draft.md) bind the actual local results separately
+  from the merged-main receipt. The earlier waiting statements are historical.
+
+This is prepared technical consumer feedback for Xu Feiyang's assessment. It is
+not a recorded human signoff or a declaration that every module accepted the
+exact candidate bundle. M4's login/demo/switch choice remains pending. PR73's
+merged [staging ADR](../architecture/ADR-SCRUM-68-staging-ci-local-compose.md)
+selects CI/local Compose and requires its exact Jira decision record; it does
+not adopt login or user switching. PR72 and its successful exact-main
+workflow now supply the isolated permitted-creator runtime negative; it is
+distinct from the older ACL-only browser attempt and does not adopt login policy.
+
 ## Integration update — 3 Oct 2026
 
 The review below is a dated snapshot of `0755d06`, not a statement of current
