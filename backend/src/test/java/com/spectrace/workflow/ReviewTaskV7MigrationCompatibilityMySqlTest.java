@@ -40,6 +40,18 @@ class ReviewTaskV7MigrationCompatibilityMySqlTest {
 
         String approvedLabel = createTaskFixture(
                 jdbc, "v7_approved", "APPROVED", "APPROVE", "CLOSED", true);
+        // A genuine approved legacy label also needs persisted validation evidence.
+        // Insert before the upgrade so V10 must recover the unique current run.
+        assertEquals(1, jdbc.update("""
+                INSERT INTO validation_run (
+                    validation_run_id, label_version_id, rule_set_version_id, status,
+                    ran_by_user_id, ran_at, summary, data_provenance_id
+                )
+                SELECT 'validation_v7_approved', label_version_id, rule_set_version_id,
+                       'PASSED', 'user_label_officer', NOW(),
+                       'Legacy approval migration prerequisite', data_provenance_id
+                FROM label_version WHERE label_version_id = ?
+                """, approvedLabel));
         String rejectedLabel = createTaskFixture(
                 jdbc, "v7_rejected", "REJECTED", "REJECT", "CLOSED", false);
         String publishedLabel = currentPublishedLabel(jdbc, "prod_usda_1107123");
@@ -55,6 +67,9 @@ class ReviewTaskV7MigrationCompatibilityMySqlTest {
         assertEquals("CLOSED", taskStatus(jdbc, "task_v7_rejected"));
         assertEquals("APPROVE", decision(jdbc, "task_v7_published"));
         assertEquals("CLOSED", taskStatus(jdbc, "task_v7_published"));
+        assertEquals("validation_v7_approved", jdbc.queryForObject(
+                "SELECT validation_run_id FROM validation_current_run WHERE label_version_id = ?",
+                String.class, approvedLabel));
 
         LabelReviewService service = new LabelReviewService(
                 new AuthorizationService(),

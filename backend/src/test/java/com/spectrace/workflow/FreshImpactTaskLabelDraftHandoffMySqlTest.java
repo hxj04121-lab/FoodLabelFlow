@@ -2,6 +2,9 @@ package com.spectrace.workflow;
 
 import com.spectrace.identity.domain.AuthenticatedActor;
 import com.spectrace.support.MySqlIntegrationTestSupport;
+import com.spectrace.validation.application.port.ValidationRunRepository;
+import com.spectrace.validation.domain.ValidationRun;
+import com.spectrace.validation.domain.ValidationStatus;
 import com.spectrace.workflow.application.LabelReviewService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -14,6 +17,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Instant;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -37,6 +41,9 @@ class FreshImpactTaskLabelDraftHandoffMySqlTest
 
     @Autowired
     private LabelReviewService reviewService;
+
+    @Autowired
+    private ValidationRunRepository validationRuns;
 
     @LocalServerPort
     private int serverPort;
@@ -77,15 +84,14 @@ class FreshImpactTaskLabelDraftHandoffMySqlTest
                 "SELECT target_label_version_id FROM review_task WHERE review_task_id = ?",
                 String.class, TASK_ID));
 
-        jdbc.update("""
-                INSERT INTO validation_run (
-                    validation_run_id, label_version_id, rule_set_version_id,
-                    status, ran_by_user_id, ran_at, summary, data_provenance_id
-                )
-                SELECT ?, label_version_id, rule_set_version_id, 'PASSED',
-                       'user_label_officer', NOW(), 'Fresh M1 handoff', data_provenance_id
+        ValidationRun validation = jdbc.queryForObject("""
+                SELECT label_version_id, rule_set_version_id, data_provenance_id
                 FROM label_version WHERE label_version_id = ?
-                """, "validation_scrum82_" + labelId, labelId);
+                """, (rs, row) -> new ValidationRun("validation_scrum82_" + labelId,
+                        rs.getString("label_version_id"), rs.getString("rule_set_version_id"),
+                        ValidationStatus.PASSED, "user_label_officer", Instant.now(),
+                        "Fresh M1 handoff", rs.getString("data_provenance_id")), labelId);
+        validationRuns.save(validation);
 
         reviewService.submitForReview(labelId, actor("user_label_officer", "LABEL.SUBMIT_REVIEW"));
         assertEquals("PENDING_REVIEW", labelStatus(labelId));

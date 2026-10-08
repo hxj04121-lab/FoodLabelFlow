@@ -4,17 +4,20 @@ import com.spectrace.allergen.infrastructure.JdbcAllergenFactsAdapter;
 import com.spectrace.audit.application.AuditApplicationService;
 import com.spectrace.support.fixture.PositiveGoldenFixtures;
 import com.spectrace.support.fixture.PositiveGoldenFixtures.Fixture;
+import com.spectrace.support.fixture.ValidationCurrentRunFixture;
 import com.spectrace.validation.domain.ValidationFinding;
 import com.spectrace.validation.domain.ValidationResult;
 import com.spectrace.validation.infrastructure.JdbcValidationResultRepository;
 import com.spectrace.validation.infrastructure.JdbcValidationRunRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -67,6 +70,12 @@ class ValidationApiMySqlTest extends ValidationHttpTestSupport {
         registry.add("spring.datasource.username", MYSQL::getUsername);
         registry.add("spring.datasource.password", MYSQL::getPassword);
         registry.add("spring.flyway.enabled", () -> true);
+    }
+
+    @BeforeAll
+    static void installActualValidationPersistence() {
+        ValidationCurrentRunFixture.install(new DriverManagerDataSource(
+                MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword()));
     }
 
     @MockitoSpyBean

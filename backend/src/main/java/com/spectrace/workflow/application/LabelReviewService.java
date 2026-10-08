@@ -191,6 +191,7 @@ public class LabelReviewService {
                     target.creatorUserId(),
                     actor.userId()
             );
+            requirePassingCurrentValidation(labelVersionId);
         }
 
         int updated = repository.updateDecisionState(
@@ -302,6 +303,8 @@ public class LabelReviewService {
             );
         }
 
+        requirePassingCurrentValidation(labelVersionId);
+
         repository.supersedePublishedVersion(labelVersionId);
 
         if (repository.publishApprovedVersion(labelVersionId) != 1) {
@@ -337,6 +340,13 @@ public class LabelReviewService {
             throw new IllegalStateException(
                     "ReviewTask resolution failed after publication"
             );
+        }
+    }
+
+    private void requirePassingCurrentValidation(String labelVersionId) {
+        if (!repository.hasPassingValidationForBoundRuleSet(labelVersionId)) {
+            throw new IllegalStateException(
+                    "Current validation for the label and bound rule set must pass before approval or publication");
         }
     }
 }
