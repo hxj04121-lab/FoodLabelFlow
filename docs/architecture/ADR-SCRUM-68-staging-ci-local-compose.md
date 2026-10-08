@@ -1,6 +1,6 @@
 # ADR: SCRUM-68 staging with CI Compose and local Compose
 
-Status: **reviewable decision draft; not yet merged or adopted**. Prepared 8 October 2026.
+Status: **reviewable ADR; adoption follows normal merge and the linked Jira decision record below**. Prepared 8 October 2026.
 Issue: [SCRUM-68](https://hxj04121.atlassian.net/browse/SCRUM-68).
 Accountable module: M5, Jira handle shj040128shj, account
 712020:a7a06357-9441-48b2-8d6c-c6f888fcb99e, GitHub SHJ-SHJ0128.
@@ -79,9 +79,10 @@ Current verified baseline:
   20 independent approvals/publications, 20 CLOSED tasks and 60 historical label
   content checks. Containers actually ran validation PASS/blocking FAIL and S3
   publication. Frontend fixture 91 PASS / 3 opt-in SKIP remains separately scoped.
-- Current local candidate 20d2d76dffb857b39549e8391aa7890ffdd7dc26 passed 619 tests
-  and four genuine browser stages locally, but has no remote branch/PR/main CI
-  because publication is blocked. It is **not promoted by main0dc's result**.
+- At preparation, candidate 20d2d76dffb857b39549e8391aa7890ffdd7dc26 had passed
+  619 tests and four genuine browser stages locally but was not remotely qualified.
+  Later PR and main results require their own source-bound receipts. The local
+  result is **not promoted by main0dc's result**.
 
 When a later SHA changes the required live stages, use that SHA's actual workflow
 definition and receipts. New catalog/compound/formula qualification must not be
