@@ -91,9 +91,11 @@ formula and the adopted product formula N+1 as the proposed formula. The publish
 label's `isCurrent()` may become false after adoption; it remains a valid published
 snapshot and must retain its declarations for comparison.
 
-Day 5 will replace the classification integration test's hand-built N+1 with real
-adoption and cover duplicate requests, synchronized concurrency, retry after
-failure, historical equivalence and deterministic golden outcomes on MySQL.
+The [Day5 follow-up](S3-M2-day5-mysql-adoption-guards.md) replaces the classification
+integration test's hand-built N+1 with real adoption and covers duplicate requests,
+synchronized concurrency, retry after failure, historical equivalence and
+deterministic golden outcomes on MySQL. It also fixes the material/specification
+lock cycle reproduced by concurrent specification creation and formula item writes.
 A RELEASED Spec V2 created by a test is a fixture, not evidence that the business
 specification has been released.
 
