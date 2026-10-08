@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 import java.util.UUID;
+import com.spectrace.workflow.application.ReviewTaskView;
 
 @Repository
 public class JdbcLabelReviewCommandRepository
@@ -20,9 +21,24 @@ public class JdbcLabelReviewCommandRepository
     }
 
     @Override
+    public Optional<ReviewTaskView> findReviewTaskById(String taskId) {
+        return jdbc.query("""
+                SELECT review_task_id, product_id, current_label_version_id,
+                       draft_label_version_id, target_label_version_id, status, decision, resolved_at
+                FROM review_task WHERE review_task_id = ?
+                """, rs -> rs.next() ? Optional.of(new ReviewTaskView(
+                rs.getString("review_task_id"), rs.getString("product_id"),
+                rs.getString("current_label_version_id"), rs.getString("draft_label_version_id"),
+                rs.getString("target_label_version_id"), rs.getString("status"), rs.getString("decision"),
+                rs.getTimestamp("resolved_at") == null ? null : rs.getTimestamp("resolved_at").toLocalDateTime()))
+                : Optional.empty(), taskId);
+    }
+
+    @Override
     public Optional<ReviewTarget> lockForReview(
             String labelVersionId
     ) {
+        lockProductForLabel(labelVersionId);
         return jdbc.query(
                 """
                 SELECT
@@ -50,6 +66,7 @@ public class JdbcLabelReviewCommandRepository
                                   lv.jurisdiction_code
                               AND newer.version_number >
                                   lv.version_number
+                            FOR SHARE
                         ) THEN 0
                         ELSE 1
                     END AS is_current
@@ -140,26 +157,27 @@ public class JdbcLabelReviewCommandRepository
     }
 
     @Override
-    public void markReviewTaskInReview(
+    public int markReviewTaskInReview(
             String labelVersionId
     ) {
-        jdbc.update(
+        return jdbc.update(
                 """
-                UPDATE review_task
-                SET status = 'IN_REVIEW',
-                    target_label_version_id = ?
-                WHERE (draft_label_version_id = ?
-                       OR target_label_version_id = ?)
-                  AND status = 'OPEN'
-                  AND resolved_at IS NULL
-                  AND (target_label_version_id IS NULL
-                       OR target_label_version_id = ?)
-                """,
-                labelVersionId,
-                labelVersionId,
-                labelVersionId,
-                labelVersionId
-        );
+                UPDATE review_task rt
+                JOIN label_version lv ON lv.label_version_id = ?
+                JOIN product p ON p.product_id = lv.product_id
+                JOIN label_version current_label
+                  ON current_label.label_version_id = rt.current_label_version_id
+                 AND current_label.product_id = lv.product_id
+                 AND current_label.jurisdiction_code = lv.jurisdiction_code
+                SET rt.status = 'IN_REVIEW', rt.target_label_version_id = lv.label_version_id
+                WHERE rt.product_id = lv.product_id
+                  AND rt.current_label_version_id = p.current_published_label_version_id
+                  AND (rt.draft_label_version_id = lv.label_version_id
+                       OR rt.target_label_version_id = lv.label_version_id)
+                  AND (rt.draft_label_version_id IS NULL OR rt.draft_label_version_id = lv.label_version_id)
+                  AND rt.status = 'OPEN' AND rt.resolved_at IS NULL
+                  AND (rt.target_label_version_id IS NULL OR rt.target_label_version_id = lv.label_version_id)
+                """, labelVersionId);
     }
 
     @Override
@@ -259,6 +277,7 @@ public class JdbcLabelReviewCommandRepository
                               lv.jurisdiction_code
                           AND newer.version_number >
                               lv.version_number
+                        FOR SHARE
                     ) THEN 0
                     ELSE 1
                 END AS is_current
@@ -268,6 +287,8 @@ public class JdbcLabelReviewCommandRepository
             LEFT JOIN review_task rt
               ON rt.target_label_version_id =
                  lv.label_version_id
+             AND rt.product_id = lv.product_id
+             AND (rt.draft_label_version_id IS NULL OR rt.draft_label_version_id = lv.label_version_id)
              AND rt.status = 'IN_REVIEW'
              AND rt.resolved_at IS NULL
             WHERE lv.label_version_id = ?
@@ -362,6 +383,8 @@ public class JdbcLabelReviewCommandRepository
                 FROM review_task rt
                 JOIN label_version lv
                   ON lv.label_version_id = rt.target_label_version_id
+                 AND lv.product_id = rt.product_id
+                 AND (rt.draft_label_version_id IS NULL OR rt.draft_label_version_id = lv.label_version_id)
                 WHERE rt.review_task_id = ?
                 """,
                 rs -> rs.next() ? rs.getString("product_id") : null,
@@ -418,6 +441,8 @@ public class JdbcLabelReviewCommandRepository
                 FROM review_task rt
                 JOIN label_version lv
                   ON lv.label_version_id = rt.target_label_version_id
+                 AND lv.product_id = rt.product_id
+                 AND (rt.draft_label_version_id IS NULL OR rt.draft_label_version_id = lv.label_version_id)
                 JOIN product p
                   ON p.product_id = lv.product_id
                 JOIN formula_version fv
@@ -586,6 +611,14 @@ public class JdbcLabelReviewCommandRepository
                 reviewTaskId,
                 labelVersionId
         );
+    }
+
+    private void lockProductForLabel(String labelVersionId) {
+        jdbc.query("""
+                SELECT p.product_id FROM product p
+                JOIN label_version lv ON lv.product_id = p.product_id
+                WHERE lv.label_version_id = ? FOR UPDATE
+                """, rs -> rs.next() ? rs.getString("product_id") : null, labelVersionId);
     }
 
     @Override

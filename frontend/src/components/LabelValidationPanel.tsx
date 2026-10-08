@@ -9,7 +9,8 @@ import { Panel, SectionHead } from '@/components/catalog-shared'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { AlertTriangle, CheckCircle2, CircleSlash2 } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { CurrentIdentityState } from './CurrentIdentityPanel'
 
 function requireCurrentTarget(run: ValidationRun, draft: LabelDraft): ValidationRun {
   if (
@@ -25,7 +26,11 @@ function requireCurrentTarget(run: ValidationRun, draft: LabelDraft): Validation
   return run
 }
 
-export function LabelValidationPanel({ draft }: { draft: LabelDraft | null }) {
+export function LabelValidationPanel({ draft, onRunChange, identityState }: {
+  draft: LabelDraft | null
+  onRunChange?: (run: ValidationRun | null) => void
+  identityState?: CurrentIdentityState
+}) {
   const [enabled, setEnabled] = useState(false)
   const [busy, setBusy] = useState(false)
   const [run, setRun] = useState<ValidationRun | null>(null)
@@ -35,9 +40,13 @@ export function LabelValidationPanel({ draft }: { draft: LabelDraft | null }) {
   const [uncertain, setUncertain] = useState(false)
   const writeLock = useRef(false)
   const local = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname)
+  const connected = identityState?.status === 'ready'
+  const canValidate = connected && identityState?.status === 'ready' && identityState.actor.permissions.includes('LABEL.VALIDATE')
+
+  useEffect(() => { onRunChange?.(run) }, [run, onRunChange])
 
   async function validate() {
-    if (!draft || !enabled || !local || busy || uncertain || writeLock.current) return
+    if (!draft || !enabled || !local || !canValidate || busy || uncertain || writeLock.current) return
     writeLock.current = true
     setBusy(true)
     setRun(null)
@@ -45,7 +54,7 @@ export function LabelValidationPanel({ draft }: { draft: LabelDraft | null }) {
     setMessage('')
     try {
       const created = requireCurrentTarget(
-        await runValidation(draft.labelVersionId, draft.ruleSetVersionId),
+        await runValidation(draft.labelVersionId, draft.ruleSetVersionId, undefined, true),
         draft,
       )
       setRun(created)
@@ -135,10 +144,10 @@ export function LabelValidationPanel({ draft }: { draft: LabelDraft | null }) {
             <input
               type="checkbox"
               checked={enabled}
-              disabled={!local || busy}
+              disabled={!local || busy || !canValidate}
               onChange={(event) => setEnabled(event.target.checked)}
             />
-            Enable the local demo label-officer identity to validate this exact version
+            Use the connected identity to validate this exact version
           </label>
           {!local && (
             <p role="alert">
@@ -155,7 +164,7 @@ export function LabelValidationPanel({ draft }: { draft: LabelDraft | null }) {
           </p>
           <div className="validation-actions">
             <Button
-              disabled={!enabled || !local || busy || uncertain}
+              disabled={!enabled || !local || !canValidate || busy || uncertain}
               onClick={validate}
             >
               {busy ? 'Working…' : 'Run validation'}

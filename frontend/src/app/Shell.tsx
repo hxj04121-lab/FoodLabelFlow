@@ -11,6 +11,7 @@ import { Catalog } from '@/pages/Catalog'
 import { HealthPage } from '@/pages/HealthPage'
 import { Impact } from '@/pages/Impact'
 import { Labels } from '@/pages/Labels'
+import { Reviews } from '@/pages/Reviews'
 import { Materials } from '@/pages/Materials'
 import { Overview } from '@/pages/Overview'
 import { Upcoming } from '@/pages/Upcoming'
@@ -186,8 +187,8 @@ export function Shell() {
             <Route path="/suppliers" element={<CatalogConnection><Materials suppliers /></CatalogConnection>} />
             <Route path="/materials" element={<CatalogConnection><Materials /></CatalogConnection>} />
             <Route path="/labels" element={<CatalogConnection><Labels /></CatalogConnection>} />
-            <Route path="/impact" element={<Impact />} />
-            <Route path="/reviews" element={<Upcoming kind="reviews" />} />
+            <Route path="/impact" element={<CatalogConnection><Impact /></CatalogConnection>} />
+            <Route path="/reviews" element={<Reviews />} />
             <Route path="/health" element={<HealthPage />} />
             <Route
               path="*"

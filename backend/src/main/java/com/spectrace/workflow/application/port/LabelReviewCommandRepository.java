@@ -3,6 +3,8 @@ package com.spectrace.workflow.application.port;
 import java.util.Optional;
 
 public interface LabelReviewCommandRepository {
+    Optional<com.spectrace.workflow.application.ReviewTaskView> findReviewTaskById(String reviewTaskId);
+
 
     Optional<ReviewTarget> lockForReview(
             String labelVersionId
@@ -17,7 +19,7 @@ public interface LabelReviewCommandRepository {
             String labelVersionId
     );
 
-    void markReviewTaskInReview(
+    int markReviewTaskInReview(
             String labelVersionId
     );
 

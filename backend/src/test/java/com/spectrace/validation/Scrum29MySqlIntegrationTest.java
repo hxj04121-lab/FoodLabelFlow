@@ -187,6 +187,7 @@ class Scrum29MySqlIntegrationTest extends MySqlIntegrationTestSupport {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader(RequestAuthorizationAdapter.AUTH_PROVIDER_HEADER, "DEV_EXTERNAL");
         request.addHeader(RequestAuthorizationAdapter.AUTH_SUBJECT_HEADER, externalSubject);
-        return new RequestAuthorizationAdapter(request, identityService, authorizationService, audit);
+        return new RequestAuthorizationAdapter(request, identityService, authorizationService, audit,
+                new com.spectrace.identity.application.ExternalActorResolver(identityService, true));
     }
 }

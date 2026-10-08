@@ -1,11 +1,12 @@
 package com.spectrace.label.application.port;
 
-/** Binds a newly created label draft to its matching open impact review task. */
+/** First-draft binding only; existing task targets and declaration snapshots are immutable. */
 public interface ReviewTaskDraftBinding {
+    void requireFirstDraftAvailable(String productId, String jurisdictionCode, String expectedReviewTaskId);
 
-    void bindOpenTaskToDraft(
-            String productId,
-            String jurisdictionCode,
-            String labelVersionId
-    );
+    default void bindOpenTaskToDraft(String productId, String jurisdictionCode, String labelVersionId) {
+        bindOpenTaskToDraft(productId, jurisdictionCode, labelVersionId, null);
+    }
+
+    void bindOpenTaskToDraft(String productId, String jurisdictionCode, String labelVersionId, String expectedReviewTaskId);
 }

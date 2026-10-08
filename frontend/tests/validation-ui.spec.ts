@@ -98,7 +98,7 @@ test('runs exact-version validation and renders attributable PASS and blocking F
 
   await page
     .getByRole('checkbox', {
-      name: 'Enable the local demo label-officer identity to validate this exact version',
+      name: 'Use the connected identity to validate this exact version',
     })
     .check()
   await page.getByRole('button', { name: 'Run validation' }).click()
@@ -192,7 +192,7 @@ test('rejects a validation write response for a different target', async ({ page
   await openDraft(page)
   await page
     .getByRole('checkbox', {
-      name: 'Enable the local demo label-officer identity to validate this exact version',
+      name: 'Use the connected identity to validate this exact version',
     })
     .check()
   await page.getByRole('button', { name: 'Run validation' }).click()
@@ -218,7 +218,7 @@ test('shows stable validation errors without inventing results', async ({ page }
   await openDraft(page)
   await page
     .getByRole('checkbox', {
-      name: 'Enable the local demo label-officer identity to validate this exact version',
+      name: 'Use the connected identity to validate this exact version',
     })
     .check()
   await page.getByRole('button', { name: 'Run validation' }).click()
@@ -234,7 +234,7 @@ test('rejects validation responses that do not match the frozen contract', async
   await openDraft(page)
   await page
     .getByRole('checkbox', {
-      name: 'Enable the local demo label-officer identity to validate this exact version',
+      name: 'Use the connected identity to validate this exact version',
     })
     .check()
   await page.getByRole('button', { name: 'Run validation' }).click()
@@ -252,7 +252,7 @@ test('keeps an invalid-JSON successful validation write uncertain', async ({ pag
   )
   await openDraft(page)
   await page.getByRole('checkbox', {
-    name: 'Enable the local demo label-officer identity to validate this exact version',
+    name: 'Use the connected identity to validate this exact version',
   }).check()
   await page.getByRole('button', { name: 'Run validation' }).click()
 
@@ -273,7 +273,7 @@ test('reading a historical run does not confirm an uncertain validation write', 
   )
   await openDraft(page)
   await page.getByRole('checkbox', {
-    name: 'Enable the local demo label-officer identity to validate this exact version',
+    name: 'Use the connected identity to validate this exact version',
   }).check()
   await page.getByRole('button', { name: 'Run validation' }).click()
   await expect(page.getByText('The validation write outcome may be unknown.')).toBeVisible()

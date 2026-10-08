@@ -3,6 +3,8 @@ package com.spectrace.validation.infrastructure;
 import com.spectrace.audit.application.port.AuditEventPort;
 import com.spectrace.identity.application.AuthorizationService;
 import com.spectrace.identity.application.IdentityService;
+import com.spectrace.identity.application.ExternalActorResolver;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.spectrace.validation.application.port.ValidationIntegration;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Component;
@@ -16,7 +18,7 @@ public class RequestAuthorizationAdapter implements ValidationIntegration {
     public static final String VALIDATE_LABEL_PERMISSION = "LABEL.VALIDATE";
 
     private final HttpServletRequest request;
-    private final IdentityService identityService;
+    private final ExternalActorResolver actors;
     private final AuthorizationService authorizationService;
     private final AuditEventPort auditEvents;
 
@@ -26,8 +28,16 @@ public class RequestAuthorizationAdapter implements ValidationIntegration {
             AuthorizationService authorizationService,
             AuditEventPort auditEvents
     ) {
+        this(request, identityService, authorizationService, auditEvents, new ExternalActorResolver(identityService, false));
+    }
+
+    @Autowired
+    public RequestAuthorizationAdapter(
+            HttpServletRequest request, IdentityService identityService,
+            AuthorizationService authorizationService, AuditEventPort auditEvents, ExternalActorResolver actors
+    ) {
         this.request = request;
-        this.identityService = identityService;
+        this.actors = actors;
         this.authorizationService = authorizationService;
         this.auditEvents = auditEvents;
     }
@@ -41,7 +51,7 @@ public class RequestAuthorizationAdapter implements ValidationIntegration {
                     "Authenticated identity headers are required");
         }
 
-        var actor = identityService.authenticate(provider, subject);
+        var actor = actors.resolve(provider, subject);
         authorizationService.requirePermission(actor, permission);
         return actor.userId();
     }

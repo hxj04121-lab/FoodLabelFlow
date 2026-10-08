@@ -51,7 +51,8 @@ import static org.mockito.Mockito.doAnswer;
  */
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {"spring.datasource.hikari.transaction-isolation=TRANSACTION_REPEATABLE_READ",
+        properties = {"spectrace.dev-external-auth.enabled=true",
+                "spring.datasource.hikari.transaction-isolation=TRANSACTION_REPEATABLE_READ",
                 "spring.jdbc.template.query-timeout=30s"})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Sql(scripts = "/fixtures/s3-soy-spec-v2-adoption.sql", executionPhase = Sql.ExecutionPhase.BEFORE_TEST_CLASS)
