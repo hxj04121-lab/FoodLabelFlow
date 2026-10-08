@@ -104,6 +104,7 @@ public final class InMemoryImpactPorts {
 
     public static final class Runs implements ImpactAnalysisRunRepository {
         private final Map<String, ImpactAnalysisRun> byId = new LinkedHashMap<>();
+        private final List<String> replayReads = new ArrayList<>();
 
         @Override
         public void save(ImpactAnalysisRun run) {
@@ -136,6 +137,16 @@ public final class InMemoryImpactPorts {
                             .thenComparing(ImpactAnalysisRun::impactAnalysisRunId))
                     .toList();
         }
+
+        @Override
+        public List<ImpactAnalysisRun> findByChangeRequestIdForReplay(String changeRequestId) {
+            replayReads.add(changeRequestId);
+            return findByChangeRequestId(changeRequestId);
+        }
+
+        public List<String> replayReads() {
+            return List.copyOf(replayReads);
+        }
     }
 
     public static final class Findings implements ImpactFindingRepository {
@@ -163,6 +174,11 @@ public final class InMemoryImpactPorts {
                     .filter(finding -> finding.impactAnalysisRunId().equals(impactAnalysisRunId))
                     .sorted(Comparator.comparing(ImpactFinding::productId))
                     .toList();
+        }
+
+        @Override
+        public List<ImpactFinding> findByRunIdForReplay(String impactAnalysisRunId) {
+            return findByRunId(impactAnalysisRunId);
         }
     }
 
@@ -196,6 +212,11 @@ public final class InMemoryImpactPorts {
         @Override
         public Optional<ReviewTaskLinkage> findByFindingId(String impactFindingId) {
             return Optional.ofNullable(byFindingId.get(impactFindingId));
+        }
+
+        @Override
+        public Optional<ReviewTaskLinkage> findByFindingIdForReplay(String impactFindingId) {
+            return findByFindingId(impactFindingId);
         }
 
         public List<ReviewTaskLinkage> saved() {
