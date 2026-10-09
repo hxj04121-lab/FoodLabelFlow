@@ -27,7 +27,7 @@ export function Impact() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
-  const [uncertainCreate, setUncertainCreate] = useState(false)
+  const [uncertainCreate, setUncertainCreate] = useState<Parameters<typeof createChangeRequest>[0] | null>(null)
   const [uncertainRun, setUncertainRun] = useState<{ changeId: string; ruleSetId: string } | null>(null)
   const [readAttempt, setReadAttempt] = useState(0)
   const [specificationAttempt, setSpecificationAttempt] = useState(0)
@@ -134,25 +134,28 @@ export function Impact() {
   }, [readAttempt])
 
   function displayError(cause: unknown, write: 'create' | 'run' | null = null,
-    runTarget?: { changeId: string; ruleSetId: string }) {
+    runTarget?: { changeId: string; ruleSetId: string }, createTarget?: Parameters<typeof createChangeRequest>[0]) {
     const apiError = cause instanceof LabelApiError ? cause : null
     setError((apiError?.code ?? 'NETWORK_ERROR') + ': ' + (cause instanceof Error ? cause.message : 'The impact request failed.'))
     if (write && (!apiError || apiError.status >= 500 || ['INVALID_RESPONSE', 'CHANGE_TARGET_MISMATCH', 'IMPACT_TARGET_MISMATCH'].includes(apiError.code))) {
-      if (write === 'create') setUncertainCreate(true)
+      if (write === 'create') setUncertainCreate(createTarget ?? uncertainCreate)
       else setUncertainRun(runTarget ?? uncertainRun ?? { changeId, ruleSetId: ruleSetId.trim() })
       setMessage(write === 'create'
-        ? 'Change creation is unconfirmed. Verify the server before creating another change; reading an unrelated change does not clear this guard.'
+        ? 'Change creation is unconfirmed. Retry only the same captured request, or verify the recorded change on the server. Reading another change does not confirm this command.'
         : 'Analysis outcome is unconfirmed. Load its exact run ID, or repeat the same idempotent change and rule-set request.')
     }
   }
 
   async function create() {
-    if (lock.current || restoring || !local || !identityEnabled || !identity.hasPermission('CHANGE_REQUEST.CREATE') || uncertainCreate || uncertainRun || specificationsLoading || !previousId || !targetId || !description.trim()) return
+    if (lock.current || restoring || !local || !identityEnabled || !identity.hasPermission('CHANGE_REQUEST.CREATE') || uncertainRun) return
+    if (!uncertainCreate && (specificationsLoading || !previousId || !targetId || previousId === targetId || !description.trim())) return
+    const input = uncertainCreate ?? { changeType: 'INGREDIENT_SPEC' as const, supplierMaterialId: materialId,
+      previousSpecificationVersionId: previousId, targetSpecificationVersionId: targetId, description: description.trim() }
     const current = captureContext()
     lock.current = true; setBusy(true); setError(''); setMessage('')
     try {
-      const created = await createChangeRequest({ changeType: 'INGREDIENT_SPEC', supplierMaterialId: materialId,
-        previousSpecificationVersionId: previousId, targetSpecificationVersionId: targetId, description: description.trim() })
+      const created = await createChangeRequest(input)
+      setUncertainCreate(null)
       setChanges(changes => [created, ...changes])
       if (!current()) {
         setMessage('Created change request ' + created.changeRequestId + ' for the earlier selection. The current context was retained.')
@@ -163,7 +166,12 @@ export function Impact() {
       saveContext(created.changeRequestId)
       setMessage('Created change request ' + created.changeRequestId + '.')
       setIdentityEnabled(false)
-    } catch (cause: unknown) { displayError(cause, 'create') }
+    } catch (cause: unknown) {
+      displayError(cause, 'create', undefined, input)
+      if (uncertainCreate && cause instanceof LabelApiError && cause.status === 409) {
+        setMessage('The same specification change conflicts with an existing record. Refresh change requests and inspect its exact ID; this does not confirm who created it or clear the unconfirmed command.')
+      }
+    }
     finally { lock.current = false; setBusy(false) }
   }
 
@@ -235,19 +243,20 @@ export function Impact() {
           disabled={busy} onChange={event => setRunId(event.target.value)} />
         <Button variant="outline" disabled={busy || restoring || !runId.trim()} onClick={load}>Load impact analysis</Button>
         <details><summary>Create a specification change request</summary><div className="impact-create">
-          <label htmlFor="impact-material">Supplier material</label><select id="impact-material" value={materialId} disabled={busy || !!uncertainRun}
+          <label htmlFor="impact-material">Supplier material</label><select id="impact-material" value={materialId} disabled={busy || !!uncertainRun || !!uncertainCreate}
             onChange={event => { setMaterialId(event.target.value); setPreviousId(''); setTargetId('') }}>
             {data.supplier_material.map(material => <option key={material.supplier_material_id} value={material.supplier_material_id}>{material.supplier_material_id}</option>)}
           </select>
-          <Button variant="outline" disabled={busy || specificationsLoading} onClick={() => { setPreviousId(''); setTargetId(''); setSpecificationAttempt(value => value + 1) }}>Refresh specification versions</Button>
-          <label htmlFor="impact-before">Previous specification</label><select id="impact-before" value={previousId} disabled={busy || specificationsLoading || !!uncertainRun} onChange={event => setPreviousId(event.target.value)}>
+          <Button variant="outline" disabled={busy || specificationsLoading || !!uncertainCreate} onClick={() => { setPreviousId(''); setTargetId(''); setSpecificationAttempt(value => value + 1) }}>Refresh specification versions</Button>
+          <label htmlFor="impact-before">Previous specification</label><select id="impact-before" value={previousId} disabled={busy || specificationsLoading || !!uncertainRun || !!uncertainCreate} onChange={event => setPreviousId(event.target.value)}>
             <option value="">Select the previous version</option>{specifications.map(spec => <option key={spec.specification_version_id} value={spec.specification_version_id}>{spec.specification_version_id}</option>)}
           </select>
-          <label htmlFor="impact-after">Target specification</label><select id="impact-after" value={targetId} disabled={busy || specificationsLoading || !!uncertainRun} onChange={event => setTargetId(event.target.value)}>
+          <label htmlFor="impact-after">Target specification</label><select id="impact-after" value={targetId} disabled={busy || specificationsLoading || !!uncertainRun || !!uncertainCreate} onChange={event => setTargetId(event.target.value)}>
             <option value="">Select the target version</option>{specifications.map(spec => <option key={spec.specification_version_id} value={spec.specification_version_id}>{spec.specification_version_id}</option>)}
           </select>
-          <label htmlFor="impact-description">Change description</label><textarea id="impact-description" value={description} maxLength={1000} disabled={busy} onChange={event => setDescription(event.target.value)} />
-          <Button disabled={!local || !identityEnabled || !identity.hasPermission('CHANGE_REQUEST.CREATE') || busy || restoring || uncertainCreate || !!uncertainRun || specificationsLoading || !previousId || !targetId || previousId === targetId || !description.trim()} onClick={create}>Create change request</Button>
+          <label htmlFor="impact-description">Change description</label><textarea id="impact-description" value={description} maxLength={1000} disabled={busy || !!uncertainCreate} onChange={event => setDescription(event.target.value)} />
+          <Button disabled={!local || !identityEnabled || !identity.hasPermission('CHANGE_REQUEST.CREATE') || busy || restoring || !!uncertainCreate || !!uncertainRun || specificationsLoading || !previousId || !targetId || previousId === targetId || !description.trim()} onClick={create}>Create change request</Button>
+          {uncertainCreate && <Button variant="outline" disabled={!local || !identityEnabled || !identity.hasPermission('CHANGE_REQUEST.CREATE') || busy || restoring || !!uncertainRun} onClick={create}>Retry the same change request</Button>}
         </div></details>
         {!local && <p role="alert">Impact writes are disabled outside localhost until approved authentication is connected.</p>}
         {error && <p className="error-notice" role="alert">{error}</p>}

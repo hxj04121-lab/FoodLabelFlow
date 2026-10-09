@@ -1,8 +1,8 @@
 # A07 — M3 impact, review and publication UI
 
-Owner: Xu Feiyang / M3. Updated: 8 October 2026. Tasks: SCRUM-49/71–74.
+Owner: Xu Feiyang / M3. Updated: 9 October 2026. Tasks: SCRUM-49/71–74.
 Status: implementation-bound delivery; final acceptance and owner decisions pending.
-Latest baseline: main `73600b8`, integrated safely into XFY. It preserves the
+Latest baseline: main `36f52bf`, integrated safely into XFY. It preserves the
 production sources of `0dc1737` on which the local state repairs were qualified.
 
 ## Scope and actual implementation
@@ -152,3 +152,35 @@ M3 assesses this A07 and accepts its exact consumer contract scope. M4 owns
 login/demo switching; M5 owns staging. Tests and artifacts do not adopt those
 choices. REQUEST_CHANGES returns the same immutable draft; declaration editing
 or task rebinding is not invented as a correction flow.
+
+## PR76 review follow-up — 9 October
+
+[M1's review](https://github.com/hxj04121-lab/FoodLabelFlow/pull/76#issuecomment-6072749690)
+accepts the impact versions, classification, task links, replay and GET-only
+restoration. The client now also rejects NO_ACTION with missing codes and
+REVIEW_REQUIRED without missing codes. An unknown create retains the complete
+original request and offers an explicit retry of those same inputs. Form changes
+and new creates remain disabled. A duplicate 409 is visible and keeps the
+unknown-command guard: an existing record does not prove this caller created it.
+Reads and retries do not silently report creation success. This guard is still
+component-local and resets on reload; no durable command-result log is claimed.
+
+[M2's handoff](https://github.com/hxj04121-lab/FoodLabelFlow/pull/76#issuecomment-6059466596)
+defines a correction as a new immutable label on the same task, followed by that
+new ID's validation, independent approval and separate publication. The draft
+uses its own server-selected rule set, which need not equal the impact run's
+rule set. A new revision must clear the old displayed PASS. Later FAILED results
+must be checked by the server at submit, APPROVE and publish; timestamp/UUID
+ordering cannot establish the current validation.
+
+As checked on 9 October, [PR86](https://github.com/hxj04121-lab/FoodLabelFlow/pull/86)
+provides switching and revision UI/API, and draft
+[PR87](https://github.com/hxj04121-lab/FoodLabelFlow/pull/87) integrates current-run
+guards and captured revision recovery. Neither is merged into main or XFY.
+Their login ADR still says proposed; their full revision-browser acceptance
+document says NOT RUN, and the current containers workflow does not execute that
+new full revision test. Successful PR checks are not final main acceptance.
+These are available integration inputs, not missing features to independently
+reimplement in PR76. Preserve PR76's task URL/restoration/timeouts alongside their
+identity-generation guards, then update this sequence to the actually integrated
+implementation and record the full browser/main-CI proof.

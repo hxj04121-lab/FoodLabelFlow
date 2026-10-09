@@ -5,6 +5,21 @@ Status: **local review draft; candidate and owner decisions remain pending**.
 
 ## Current consumer qualification — 8 Oct 2026
 
+9 October supplement: M1's [PR76 review](https://github.com/hxj04121-lab/FoodLabelFlow/pull/76#issuecomment-6072749690)
+confirms impact semantics and real restore/replay behavior without a blocking
+change. Its defensive finding-code check and explicit same-create retry are now
+addressed in XFY. The latter preserves captured inputs and treats 409 as a
+conflict requiring inspection, not proof of this command's success.
+
+M2's [revision handoff](https://github.com/hxj04121-lab/FoodLabelFlow/pull/76#issuecomment-6059466596)
+is acknowledged: same task, new immutable label, its own server-selected rule
+set and fresh validation, independent checker, separate publication; never
+reuse an old PASS or silently update an expected ID for a repeated POST. Draft
+and impact rule-set IDs need not match. PR86/87 already supply owner-side
+implementation candidates, but are unmerged and not yet XFY/main delivery.
+PR76 retains its existing source-bound behavior; final correction/switch
+integration and new full-path main-CI evidence remain follow-up work.
+
 This update supersedes the earlier API-availability assessment below. Main
 `73600b8` now includes actual impact trigger/query, task list/detail, immutable
 first declaration input, review commands, publication and current-caller reads.

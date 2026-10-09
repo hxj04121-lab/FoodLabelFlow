@@ -56,8 +56,9 @@ function isFinding(value: unknown): value is ImpactFinding {
   if (!record(value) || !texts(value, ['impactFindingId', 'productId', 'currentFormulaVersionId',
     'proposedFormulaVersionId', 'currentLabelVersionId', 'explanation']) ||
     !Array.isArray(value.missingAllergenCodes) || !value.missingAllergenCodes.every(code => typeof code === 'string')) return false
-  if (value.outcome === 'NO_ACTION') return value.reviewTask === undefined || value.reviewTask === null
-  if (value.outcome !== 'REVIEW_REQUIRED' || !record(value.reviewTask)) return false
+  if (value.outcome === 'NO_ACTION') return value.missingAllergenCodes.length === 0 &&
+    (value.reviewTask === undefined || value.reviewTask === null)
+  if (value.outcome !== 'REVIEW_REQUIRED' || value.missingAllergenCodes.length === 0 || !record(value.reviewTask)) return false
   const task = value.reviewTask
   return texts(task, ['reviewTaskId', 'impactFindingId', 'productId', 'currentFormulaVersionId', 'currentLabelVersionId']) &&
     task.impactFindingId === value.impactFindingId && task.productId === value.productId &&

@@ -1,7 +1,7 @@
 # M3 Sprint 3 implementation, verification and assistance — 8 October 2026
 
 Owner: Xu Feiyang / M3. Tasks: SCRUM-49/71–74.
-Latest baseline: main `73600b8`, safely integrated into XFY. Local production
+Latest baseline: main `36f52bf`, safely integrated into XFY. Local production
 repairs were qualified against its production-identical predecessor `0dc1737`.
 Final owner/new-main acceptance pending.
 
@@ -17,6 +17,23 @@ Original evidence remains recoverable; it does not qualify this later source.
 The pre-existing deployment document and personal handoff remain outside commits.
 
 ## Completion map
+
+9 October review follow-up: M1 accepts the existing impact integration. PR76 now
+adds defensive classification validation and captured same-create retries.
+Main's PR81 A07 and PR82 failure-trace/persisted-FAIL assertions were integrated;
+the corresponding revert PR84/85 were closed without merging. Historical
+execution receipts below remain scoped to their original sources.
+
+PR86's identity/revision implementation and PR87's recovery/current-validation
+integration are available but unmerged. PR86's exact-head CI failed Sonar;
+PR87 `417133e` has successful [PR CI37872081151](https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/37872081151),
+including real identity switching and existing live flows. Its workflow still
+does not run `scrum84-returned-revision-live.spec.ts`, and its acceptance document
+still records the full browser correction path as NOT RUN. Do not mark 73/74
+complete from those checks or copy the new revision implementation independently.
+Integrate owner changes while retaining PR76's exact task URL and timeout guards;
+verify identity switching, new ID/old PASS reset, fresh validation, independent
+approval/publication and 409/unknown-result recovery on that combined source.
 
 | Task | Actual implementation | Remaining acceptance |
 | --- | --- | --- |
@@ -176,4 +193,26 @@ and a newly initialized qualification database, not a replay over published data
 
 These results qualify the current local source. A new merged-main CI receipt,
 owner decisions, exact consumer acceptance and A07 assessment remain separate.
-No task is marked Done, no teammate is messaged and no push is implied.
+No task was marked Done and no teammate was messaged by that verification.
+
+## PR76 comment-fix execution receipt — 9 October
+
+Verified on XFY after integrating documentation/test-only main `36f52bf` and
+applying M1's feedback, before the follow-up commit:
+
+- Node 24 production TypeScript/Vite build: passed; existing 609 kB bundle
+  advisory remains. No dependency or build-policy change.
+- Focused impact/task/state suites: **28 passed**, including seven new cases
+  for contradictory classifications on POST/GET, valid NO_ACTION and captured
+  create retries with successful or conflicting responses.
+- Complete fixture suite with `--grep-invert 'captures.*live'`:
+  **113 passed, 3 explicit live opt-ins skipped**, no failures (3.4 minutes).
+- Desktop 1440px and emulated mobile 390px retry/conflict states were captured
+  and inspected; no page-wide overflow. These use HTTP fixtures, not a physical
+  mobile device or new live-backend workflow qualification.
+- Documentation links and diff checks passed.
+
+No new live business execution is claimed for these comment fixes. Keep the
+earlier Docker receipts separately scoped. New PR/main checks are required for
+the committed follow-up. The identity/revision integration and complete new
+browser correction path remain outside PR76 until owner changes are integrated.
