@@ -52,11 +52,13 @@ const navigation = [
   { path: '/reviews', label: 'Review workspace', icon: ClipboardCheck },
 ]
 import { CatalogConnection } from '@/components/CatalogConnection'
+import { ControlledDemoIdentitySwitcher, useCurrentIdentity } from '@/components/CurrentIdentityPanel'
 export function Shell() {
   const [mobile, setMobile] = useState(false)
   const [help, setHelp] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
+  const identity = useCurrentIdentity()
   useEffect(() => {
     setMobile(false)
   }, [location.pathname])
@@ -82,7 +84,12 @@ export function Shell() {
             <CircleHelp size={19} />
           </button>
           <span className="topbar-divider" />
-          <span className="avatar">XF</span>
+          <ControlledDemoIdentitySwitcher showStatus={false} />
+          <span className="identity-status" aria-live="polite">
+            {identity.session.status === 'switching' ? 'Refreshing permissions…'
+              : identity.session.actor?.displayName || identity.session.error || 'Identity unavailable'}
+          </span>
+          <span className="avatar">{identity.session.actor?.displayName?.slice(0, 2).toUpperCase() ?? '—'}</span>
         </div>
       </header>
       {mobile && (
@@ -146,10 +153,10 @@ export function Shell() {
             <span>User guide</span>
           </button>
           <div className="user-card">
-            <span className="avatar">XF</span>
+            <span className="avatar">{identity.session.actor?.displayName?.slice(0, 2).toUpperCase() ?? '—'}</span>
             <div>
-              <strong>Xu Feiyang</strong>
-              <small>M3 · Preview profile</small>
+              <strong>{identity.session.actor?.displayName ?? 'Identity unavailable'}</strong>
+              <small>{identity.session.actor?.roles.join(', ') ?? 'No verified role'}</small>
             </div>
           </div>
         </div>
@@ -180,7 +187,7 @@ export function Shell() {
           </button>
         </div>
         <main id="main">
-          <Routes>
+          <Routes key={`${identity.session.generation}:${identity.session.status}`}>
             <Route path="/" element={<CatalogConnection><Overview /></CatalogConnection>} />
             <Route path="/products" element={<CatalogConnection><Catalog /></CatalogConnection>} />
             <Route path="/formulas" element={<CatalogConnection><Catalog formulas /></CatalogConnection>} />

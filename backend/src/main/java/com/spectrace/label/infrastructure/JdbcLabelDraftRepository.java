@@ -97,6 +97,7 @@ public class JdbcLabelDraftRepository implements LabelDraftRepository {
                   AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)
                 ORDER BY version_number DESC
                 LIMIT 1
+                FOR SHARE
                 """,
                 rs -> rs.next()
                         ? rs.getString("rule_set_version_id")
@@ -111,14 +112,17 @@ public class JdbcLabelDraftRepository implements LabelDraftRepository {
             );
         }
 
-        Integer versionNumber = jdbcTemplate.queryForObject(
+        Integer versionNumber = jdbcTemplate.query(
                 """
-                SELECT COALESCE(MAX(version_number), 0) + 1
+                SELECT version_number
                 FROM label_version
                 WHERE product_id = ?
                   AND jurisdiction_code = ?
+                ORDER BY version_number DESC
+                LIMIT 1
+                FOR SHARE
                 """,
-                Integer.class,
+                rs -> rs.next() ? rs.getInt("version_number") + 1 : 1,
                 productId,
                 jurisdictionCode
         );

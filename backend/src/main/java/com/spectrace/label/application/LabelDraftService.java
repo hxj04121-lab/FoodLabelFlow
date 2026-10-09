@@ -36,6 +36,31 @@ public class LabelDraftService {
         required(productId, "productId", 100);
         required(jurisdictionCode, "jurisdictionCode", 40);
         if (reviewTaskId != null) required(reviewTaskId, "reviewTaskId", 140);
+        var immutableDeclarations = validatedDeclarations(declarations);
+        // Product lock precedes all task and label reads, serializing first creation and publication.
+        reviewTaskDraftBinding.requireFirstDraftAvailable(productId, jurisdictionCode, reviewTaskId);
+        LabelDraft draft = repository.createFromCurrentFormula(productId, jurisdictionCode, actor.userId(), immutableDeclarations);
+        reviewTaskDraftBinding.bindOpenTaskToDraft(productId, jurisdictionCode, draft.labelVersionId(), reviewTaskId);
+        return draft;
+    }
+
+    /** A correction creates a new immutable version, never editing the returned snapshot. */
+    @Transactional
+    public LabelDraft reviseReturnedDraft(String reviewTaskId, String expectedLabelVersionId,
+                                          List<LabelDeclarationInput> declarations, AuthenticatedActor actor) {
+        authorizationService.requirePermission(actor, "LABEL.CREATE");
+        required(reviewTaskId, "reviewTaskId", 140);
+        required(expectedLabelVersionId, "expectedLabelVersionId", 120);
+        var immutableDeclarations = validatedDeclarations(declarations);
+        var target = reviewTaskDraftBinding.requireReturnedDraftAvailable(reviewTaskId, expectedLabelVersionId);
+        LabelDraft revision = repository.createFromCurrentFormula(target.productId(), target.jurisdictionCode(),
+                actor.userId(), immutableDeclarations);
+        reviewTaskDraftBinding.bindReturnedTaskToRevision(reviewTaskId, expectedLabelVersionId,
+                revision.labelVersionId(), actor.userId(), revision.dataProvenanceId());
+        return revision;
+    }
+
+    private static List<LabelDeclarationInput> validatedDeclarations(List<LabelDeclarationInput> declarations) {
         if (declarations == null || declarations.size() > 100 || declarations.stream().anyMatch(row -> row == null)) {
             throw new InvalidLabelDraftRequestException("declarations must be a non-null list with at most 100 entries");
         }
@@ -46,12 +71,7 @@ public class LabelDraftService {
                 throw new InvalidLabelDraftRequestException("Duplicate allergen declaration: " + row.allergenId());
             }
         }
-        var immutableDeclarations = List.copyOf(declarations);
-        // Product lock precedes all task and label reads, serializing first creation and publication.
-        reviewTaskDraftBinding.requireFirstDraftAvailable(productId, jurisdictionCode, reviewTaskId);
-        LabelDraft draft = repository.createFromCurrentFormula(productId, jurisdictionCode, actor.userId(), immutableDeclarations);
-        reviewTaskDraftBinding.bindOpenTaskToDraft(productId, jurisdictionCode, draft.labelVersionId(), reviewTaskId);
-        return draft;
+        return List.copyOf(declarations);
     }
 
     @Transactional(readOnly = true)

@@ -4,6 +4,7 @@ import com.spectrace.audit.application.AuditApplicationService;
 import com.spectrace.identity.application.AuthorizationDeniedException;
 import com.spectrace.identity.application.UnknownIdentityException;
 import com.spectrace.support.fixture.PositiveGoldenFixtures;
+import com.spectrace.support.fixture.ValidationCurrentRunFixture;
 import com.spectrace.validation.application.ValidationApplicationService;
 import com.spectrace.validation.application.ValidationFailure;
 import com.spectrace.validation.application.port.ValidationRunRepository;
@@ -14,6 +15,7 @@ import com.spectrace.validation.domain.ValidationStatus;
 import com.spectrace.validation.infrastructure.JdbcValidationResultRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -22,6 +24,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -86,6 +89,12 @@ class ValidationApplicationServiceMySqlTest {
         registry.add("spring.datasource.username", MYSQL::getUsername);
         registry.add("spring.datasource.password", MYSQL::getPassword);
         registry.add("spring.flyway.enabled", () -> true);
+    }
+
+    @BeforeAll
+    static void installActualValidationPersistence() {
+        ValidationCurrentRunFixture.install(new DriverManagerDataSource(
+                MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword()));
     }
 
     @Autowired

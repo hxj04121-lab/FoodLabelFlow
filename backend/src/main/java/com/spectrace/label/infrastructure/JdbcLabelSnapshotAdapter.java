@@ -24,6 +24,20 @@ public class JdbcLabelSnapshotAdapter implements LabelSnapshotPort {
 
     @Override
     public Optional<LabelValidationSnapshot> findById(String labelVersionId) {
+        // Resolve the immutable product identity without taking a label lock,
+        // then share the product-first lock order used by review/publication.
+        String productId = jdbcTemplate.query(
+                "SELECT product_id FROM label_version WHERE label_version_id = ?",
+                rs -> rs.next() ? rs.getString("product_id") : null,
+                labelVersionId);
+        if (productId == null) {
+            return Optional.empty();
+        }
+        jdbcTemplate.query(
+                "SELECT product_id FROM product WHERE product_id = ? FOR UPDATE",
+                rs -> rs.next() ? rs.getString("product_id") : null,
+                productId);
+
         List<LabelRow> labels = jdbcTemplate.query(
                 """
                 SELECT label_version_id, product_id, formula_version_id, rule_set_version_id,

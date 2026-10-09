@@ -13,8 +13,8 @@ export type ReviewTask = {
   resolvedAt: string | null
 }
 
-export async function getReviewTask(reviewTaskId: string): Promise<ReviewTask> {
-  const value = await requestLabelJson(`/api/review-tasks/${encodeURIComponent(reviewTaskId)}`)
+export async function getReviewTask(reviewTaskId: string, signal?: AbortSignal): Promise<ReviewTask> {
+  const value = await requestLabelJson(`/api/review-tasks/${encodeURIComponent(reviewTaskId)}`, { signal })
   return requireReviewTask(value, reviewTaskId)
 }
 

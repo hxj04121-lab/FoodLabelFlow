@@ -108,7 +108,7 @@ test('keeps bound-task creation disabled after the declaration catalog fails', a
   })
   await page.goto('/labels?productId=' + draft.productId + '&reviewTaskId=task_catalog_failed')
   await page.getByRole('checkbox', { name: 'Use the connected identity to create this draft' }).check()
-  await expect(page.getByRole('alert')).toHaveText('Declaration catalog unavailable.')
+ await expect(page.getByRole('alert').filter({ hasText: 'Declaration catalog unavailable.' })).toHaveText('Declaration catalog unavailable.')
   await expect(page.getByRole('button', { name: 'Create label draft' })).toBeDisabled()
   await expect(page.getByRole('checkbox', { name: 'Declare Soy (SOY)' })).toHaveCount(0)
   expect(creates).toBe(0)

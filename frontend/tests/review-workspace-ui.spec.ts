@@ -1,5 +1,23 @@
 import { test, expect } from './catalog-fixture'
 
+for (const [path, emptyText] of [['/reviews', 'No tasks were returned for this page and status.'],
+  ['/impact', 'No recorded change requests are available.']]) {
+  test(`${path} does not claim an empty server result when identity verification fails`, async ({ page }) => {
+    let reads = 0
+    await page.route('**/api/identity/current', route => route.fulfill({ status: 401, json: {
+      code: 'AUTHENTICATION_REQUIRED', message: 'Identity unavailable',
+    } }))
+    await page.route(/\/api\/(review-tasks|v1\/change-requests)\?/, route => {
+      reads++
+      return route.fulfill({ json: [] })
+    })
+    await page.goto(path)
+    await expect(page.getByRole('region', { name: 'Connected identity' })).toContainText('Connected identity unavailable')
+    await expect(page.getByText(emptyText, { exact: true })).toHaveCount(0)
+    expect(reads).toBe(0)
+  })
+}
+
 // Read-model and affordance fixtures only; live S3 tests prove actual identity
 // permissions, self-review denial and publication in separate actor contexts.
 const task = { reviewTaskId: 'task_read_ui', productId: 'prod_usda_1106285',

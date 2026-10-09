@@ -7,7 +7,7 @@ export type ChangeRequest = {
   previousSpecificationVersionId: string
   targetSpecificationVersionId: string
   description: string
-  status: string
+  status: 'SUBMITTED' | 'ANALYZED' | 'COMPLETED'
   createdAt: string
 }
 export type ImpactFinding = {
@@ -49,14 +49,16 @@ function isChange(value: unknown): value is ChangeRequest {
   return record(value) && value.changeType === 'INGREDIENT_SPEC' && texts(value, [
     'changeRequestId', 'supplierMaterialId', 'previousSpecificationVersionId',
     'targetSpecificationVersionId', 'description', 'status', 'createdAt',
-  ])
+  ]) && ['SUBMITTED', 'ANALYZED', 'COMPLETED'].includes(value.status as string) &&
+    [...(value.description as string)].length <= 1000 && Number.isFinite(Date.parse(value.createdAt as string))
 }
 function isFinding(value: unknown): value is ImpactFinding {
   if (!record(value) || !texts(value, ['impactFindingId', 'productId', 'currentFormulaVersionId',
     'proposedFormulaVersionId', 'currentLabelVersionId', 'explanation']) ||
     !Array.isArray(value.missingAllergenCodes) || !value.missingAllergenCodes.every(code => typeof code === 'string')) return false
-  if (value.outcome === 'NO_ACTION') return value.reviewTask === undefined || value.reviewTask === null
-  if (value.outcome !== 'REVIEW_REQUIRED' || !record(value.reviewTask)) return false
+  if (value.outcome === 'NO_ACTION') return value.missingAllergenCodes.length === 0 &&
+    (value.reviewTask === undefined || value.reviewTask === null)
+  if (value.outcome !== 'REVIEW_REQUIRED' || value.missingAllergenCodes.length === 0 || !record(value.reviewTask)) return false
   const task = value.reviewTask
   return texts(task, ['reviewTaskId', 'impactFindingId', 'productId', 'currentFormulaVersionId', 'currentLabelVersionId']) &&
     task.impactFindingId === value.impactFindingId && task.productId === value.productId &&
@@ -77,14 +79,20 @@ function requireAnalysis(value: unknown): ImpactAnalysis {
   return value as ImpactAnalysis
 }
 export async function listChangeRequests(signal?: AbortSignal): Promise<ChangeRequest[]> {
-  const requests: ChangeRequest[] = []
+  const requests = new Map<string, ChangeRequest>()
   for (let offset = 0; offset < 10000; offset += 100) {
     const value = await requestLabelJson(`/api/v1/change-requests?limit=100&offset=${offset}`, { signal })
-    if (!Array.isArray(value) || !value.every(isChange)) throw new LabelApiError('INVALID_RESPONSE', 'The impact API returned an invalid change request list.', 200)
-    requests.push(...value)
-    if (value.length < 100) return requests
+    if (!Array.isArray(value) || value.length > 100 || !value.every(isChange)) throw new LabelApiError('INVALID_RESPONSE', 'The impact API returned an invalid change request list.', 200)
+    for (const change of value) requests.set(change.changeRequestId, change)
+    if (value.length < 100) return [...requests.values()]
   }
   throw new LabelApiError('LIST_LIMIT', 'The change request list exceeds the client limit. Partial results cannot be displayed.', 200)
+}
+export async function getChangeRequest(changeRequestId: string, signal?: AbortSignal): Promise<ChangeRequest> {
+  const value = await requestLabelJson(`/api/v1/change-requests/${encodeURIComponent(changeRequestId)}`, { signal })
+  if (!isChange(value)) throw new LabelApiError('INVALID_RESPONSE', 'The impact API returned an invalid change request.', 200)
+  if (value.changeRequestId !== changeRequestId) throw new LabelApiError('CHANGE_TARGET_MISMATCH', 'The API returned a different change request.', 200)
+  return value
 }
 export async function createChangeRequest(input: Omit<ChangeRequest, 'changeRequestId' | 'status' | 'createdAt'>): Promise<ChangeRequest> {
   const value = await requestLabelJson('/api/v1/change-requests', {
@@ -107,8 +115,8 @@ export async function runImpactAnalysis(changeRequestId: string, ruleSetVersionI
   }
   return value
 }
-export async function getImpactAnalysis(impactAnalysisId: string): Promise<ImpactAnalysis> {
-  const value = requireAnalysis(await requestLabelJson(`/api/v1/impact-analyses/${encodeURIComponent(impactAnalysisId)}`))
+export async function getImpactAnalysis(impactAnalysisId: string, signal?: AbortSignal): Promise<ImpactAnalysis> {
+  const value = requireAnalysis(await requestLabelJson(`/api/v1/impact-analyses/${encodeURIComponent(impactAnalysisId)}`, { signal }))
   if (value.impactAnalysisId !== impactAnalysisId) throw new LabelApiError('IMPACT_TARGET_MISMATCH', 'The API returned a different impact analysis.', 200)
   return value
 }

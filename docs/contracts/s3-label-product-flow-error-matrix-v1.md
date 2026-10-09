@@ -1,4 +1,4 @@
-# S3 label product-flow error matrix — extension v1.0.0
+# S3 label product-flow error matrix — extension v1.1.0 revision proposal
 
 [Later compound-maker qualification](../evidence/S3-compound-maker-negative-20261008.md)
 separately exercises a creator who has APPROVE through isolated MySQL, HTTP and
@@ -36,9 +36,10 @@ identity advice has higher precedence, preserving 401 and 403.
 | Operation | Request | Required permission | Success |
 | --- | --- | --- | --- |
 | `POST /api/labels/drafts` | Product/jurisdiction, optional declarations and exact expected ReviewTask | `LABEL.CREATE` | 201 LabelDraft plus Location. Declarations and first binding committed atomically. |
-| `POST /api/labels/{id}/review-submissions` | Exactly `{}` | `LABEL.SUBMIT_REVIEW` | 200 same-label resource in PENDING_REVIEW. |
+| `POST /api/labels/{id}/review-submissions` | Exactly `{}` | `LABEL.SUBMIT_REVIEW` | 200 same-label resource in PENDING_REVIEW. A returned REQUEST_CHANGES version is 409 `LABEL_WORKFLOW_CONFLICT`; create a fresh revision first. |
 | `POST /api/labels/{id}/review-decisions` | APPROVE with optional comment | `LABEL.APPROVE` plus independent maker-checker | 200 same-label APPROVED; task still unresolved IN_REVIEW. |
 | Same decision route | REQUEST_CHANGES with optional comment | `LABEL.REQUEST_CHANGES` | 200 same-label DRAFT; task OPEN, unresolved. |
+| `POST /api/review-tasks/{id}/draft-revisions` | Exact `expectedLabelVersionId` plus complete `declarations` | `LABEL.CREATE` | 201 new LabelDraft plus Location; both task references atomically advance, decision/resolver summary clears. Local proposal pending actual M4 workflow adoption. |
 | Same decision route | REJECT with optional comment | `LABEL.REJECT` | 200 same-label REJECTED; task CLOSED/resolved. |
 | `POST /api/review-tasks/{id}/publications` | Exact `labelVersionId` | `LABEL.PUBLISH` | 200 same-label PUBLISHED/current; task CLOSED/resolved and durable publication/audit. |
 | `GET /api/review-tasks` | Optional exact status, limit default 20 (1–100), offset default 0 (0–100000) | Active resolved identity; no added operation permission | 200 direct ReviewTaskView array ordered created_at DESC/task ID ASC, possibly empty. |
@@ -58,9 +59,15 @@ resource rereads.
   automatically converted into a declaration. The server fixes source to
   USER_ENTERED and rejects a caller-supplied source.
 - There is no declaration PATCH/PUT. REQUEST_CHANGES returns the same immutable
-  target to DRAFT; it does not introduce editing or a replacement/rebind policy.
-  A future edit design must invalidate or revision-bind validation and explicitly
-  define task history before it can be accepted.
+  target to DRAFT. The explicit revision proposal creates a new label version and
+  advances the same returned task under an expected-target check; it never changes
+  the old snapshot or copies its PASS. The new version requires its own validation.
+  Old-target/replayed/concurrent revisions return 409 `LABEL_VERSION_CONFLICT`;
+  wrong task stage returns 409 `LABEL_WORKFLOW_CONFLICT`; an absent task is 404
+  `REVIEW_TASK_NOT_FOUND`. Strict revision JSON errors use 400 `LABEL_COMMAND_INVALID`;
+  application declaration errors retain 400 `LABEL_DRAFT_INVALID` through the existing
+  global label advice. All failed revision writes roll back.
+  This proposal is not an attributed M4 approval or a replacement of earlier acceptance.
 - The separate APPROVE response is not publication. An unresolved approved task
   can only be published by the guarded publication command.
 - Write timeouts/cancellation do not undo a committed operation. Read the exact

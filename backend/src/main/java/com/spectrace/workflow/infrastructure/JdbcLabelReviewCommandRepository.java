@@ -109,36 +109,53 @@ public class JdbcLabelReviewCommandRepository
             String labelVersionId,
             String ruleSetVersionId
     ) {
-        Integer count = jdbc.queryForObject(
+        // Lock the exact target range and observe its current contents, including
+        // an unsupported raw INSERT which must invalidate an older association.
+        int observedRunCount = jdbc.queryForList(
                 """
-                SELECT COUNT(*)
-                FROM validation_run vr
-                WHERE vr.label_version_id = ?
-                  AND vr.rule_set_version_id = ?
+                SELECT validation_run_id
+                FROM validation_run FORCE INDEX (idx_validation_run_target_v10)
+                WHERE label_version_id = ? AND rule_set_version_id = ?
+                ORDER BY validation_run_id
+                FOR SHARE
+                """, labelVersionId, ruleSetVersionId).size();
+        return !jdbc.queryForList(
+                """
+                SELECT vr.validation_run_id
+                FROM validation_current_run current_run
+                JOIN validation_run vr
+                  ON vr.validation_run_id = current_run.validation_run_id
+                 AND vr.label_version_id = current_run.label_version_id
+                 AND vr.rule_set_version_id = current_run.rule_set_version_id
+                JOIN label_version lv
+                  ON lv.label_version_id = current_run.label_version_id
+                 AND lv.rule_set_version_id = current_run.rule_set_version_id
+                JOIN validation_run_registration registration
+                  ON registration.validation_run_id = vr.validation_run_id
+                 AND registration.label_version_id = vr.label_version_id
+                 AND registration.rule_set_version_id = vr.rule_set_version_id
+                WHERE current_run.label_version_id = ?
+                  AND current_run.rule_set_version_id = ?
+                  AND current_run.observed_run_count = ?
+                  AND ((current_run.origin = 'LEGACY_UNIQUE' AND registration.origin = 'LEGACY')
+                    OR (current_run.origin = 'RECORDED' AND registration.origin = 'RECORDED'
+                      AND registration.registration_sequence = current_run.current_sequence))
                   AND vr.status = 'PASSED'
-                  AND NOT EXISTS (
-                      SELECT 1
-                      FROM validation_run newer
-                      WHERE newer.label_version_id =
-                            vr.label_version_id
-                        AND newer.rule_set_version_id =
-                            vr.rule_set_version_id
-                        AND (
-                            newer.ran_at > vr.ran_at
-                            OR (
-                                newer.ran_at = vr.ran_at
-                                AND newer.validation_run_id >
-                                    vr.validation_run_id
-                            )
-                        )
-                  )
+                FOR SHARE
                 """,
-                Integer.class,
                 labelVersionId,
-                ruleSetVersionId
-        );
+                ruleSetVersionId,
+                observedRunCount
+        ).isEmpty();
+    }
 
-        return count != null && count > 0;
+    @Override
+    public boolean hasPassingValidationForBoundRuleSet(String labelVersionId) {
+        String ruleSetVersionId = jdbc.query(
+                "SELECT rule_set_version_id FROM label_version WHERE label_version_id = ? FOR SHARE",
+                rs -> rs.next() ? rs.getString("rule_set_version_id") : null,
+                labelVersionId);
+        return ruleSetVersionId != null && hasPassingValidation(labelVersionId, ruleSetVersionId);
     }
 
     @Override
@@ -154,6 +171,23 @@ public class JdbcLabelReviewCommandRepository
                 """,
                 labelVersionId
         );
+    }
+
+    @Override
+    public boolean requiresDraftRevision(String labelVersionId) {
+        return !jdbc.query("""
+                SELECT rt.review_task_id FROM review_task rt
+                WHERE rt.target_label_version_id = ?
+                  AND (rt.draft_label_version_id = ? OR rt.draft_label_version_id IS NULL)
+                  AND rt.status = 'OPEN' AND rt.resolved_at IS NULL
+                  AND (rt.decision = 'REQUEST_CHANGES' OR EXISTS (
+                      SELECT 1 FROM approval_record ar
+                      WHERE ar.review_task_id = rt.review_task_id
+                        AND ar.label_version_id = rt.target_label_version_id
+                        AND ar.decision = 'REQUEST_CHANGES' FOR SHARE
+                  ))
+                FOR UPDATE
+                """, (rs, row) -> rs.getString("review_task_id"), labelVersionId, labelVersionId).isEmpty();
     }
 
     @Override
@@ -239,20 +273,7 @@ public class JdbcLabelReviewCommandRepository
     public Optional<DecisionTarget> lockForDecision(
             String labelVersionId
     ) {
-        jdbc.query(
-            """
-            SELECT p.product_id
-            FROM product p
-            JOIN label_version lv
-              ON lv.product_id = p.product_id
-            WHERE lv.label_version_id = ?
-            FOR UPDATE
-            """,
-            rs -> rs.next()
-                    ? rs.getString("product_id")
-                    : null,
-            labelVersionId
-        );
+        lockProductForLabel(labelVersionId);
 
         return jdbc.query(
             """
@@ -614,11 +635,16 @@ public class JdbcLabelReviewCommandRepository
     }
 
     private void lockProductForLabel(String labelVersionId) {
-        jdbc.query("""
-                SELECT p.product_id FROM product p
-                JOIN label_version lv ON lv.product_id = p.product_id
-                WHERE lv.label_version_id = ? FOR UPDATE
-                """, rs -> rs.next() ? rs.getString("product_id") : null, labelVersionId);
+        String productId = jdbc.query(
+                "SELECT product_id FROM label_version WHERE label_version_id = ?",
+                rs -> rs.next() ? rs.getString("product_id") : null,
+                labelVersionId);
+        if (productId != null) {
+            jdbc.query(
+                    "SELECT product_id FROM product WHERE product_id = ? FOR UPDATE",
+                    rs -> rs.next() ? rs.getString("product_id") : null,
+                    productId);
+        }
     }
 
     @Override

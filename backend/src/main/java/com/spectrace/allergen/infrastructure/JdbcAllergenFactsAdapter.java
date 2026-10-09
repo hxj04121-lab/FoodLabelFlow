@@ -112,6 +112,7 @@ public class JdbcAllergenFactsAdapter implements AllergenFactsPort {
                   AND a.jurisdiction_code = ?
                   AND ia.ingredient_id IN (%s)
                 ORDER BY ia.ingredient_id, a.allergen_code, a.allergen_id, ia.ingredient_allergen_id
+                FOR SHARE
                 """.formatted(placeholders);
         return jdbc.queryForList(sql, arguments).stream()
                 .map(row -> new IngredientAllergenMapping(

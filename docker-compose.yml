@@ -18,6 +18,8 @@ services:
     build:
       context: ./backend
     environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-demo}
+      SPECTRACE_RUNTIME_ENVIRONMENT: ${SPECTRACE_RUNTIME_ENVIRONMENT:-development}
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/spectrace?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: ${MYSQL_ROOT_PASSWORD:-stage0-local-only}

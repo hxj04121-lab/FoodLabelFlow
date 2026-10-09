@@ -1,15 +1,16 @@
 openapi: 3.1.0
 info:
-  title: S3 Label Creation, Review, Publication and Caller Read API
-  version: 1.0.0
+  title: S3 Label Creation, Returned-Task Revision, Review, Publication and Caller Read API
+  version: 1.1.0
   description: Explicit product-flow extension candidate prepared on 8 October 2026. Declarations are entered
-    only while creating a fresh label snapshot. Existing declaration GET and frozen S2 validation contracts
+    only while creating a fresh first or returned-task revision snapshot. Existing declaration GET and frozen S2 validation contracts
     are unchanged. Java application services remain responsible for permissions, lifecycle, maker-checker and
     transaction guards. Exact cross-module acceptance is pending.
 x-spec-trace-contract-state: CANDIDATE_PENDING_CROSS_MODULE_ACCEPTANCE
 x-spec-trace-revision-scope: Optional explicit declarations and expected ReviewTask binding on draft creation;
   strict command JSON; separate review submission, decision and publication HTTP adapters; paged task collection
-  and current caller reads. Existing contracts remain unchanged.
+  and current caller reads. The local revision proposal adds an explicit returned-task correction command and
+  rejects unchanged returned-version resubmission; M4 adoption is pending, not inferred from technical tests.
 security:
 - ExternalAuthProvider: []
   ExternalSubject: []
@@ -161,7 +162,8 @@ paths:
         LABEL.REJECT and produces REJECTED with a CLOSED/resolved task. A pending matching ReviewTask and current
         label/formula guards are enforced by the existing Java service. The decision, ApprovalRecord, task
         state and audit are atomic. APPROVE produces APPROVED, not PUBLISHED; publication is a separate authorized
-        command. REQUEST_CHANGES does not expose declaration editing or silently rebind a replacement.
+        command. REQUEST_CHANGES preserves the returned snapshot. Resubmitting that same returned version
+        is rejected; use the explicit draft-revisions command to create a correction with fresh validation.
       x-required-permission-by-decision:
         APPROVE: LABEL.APPROVE
         REQUEST_CHANGES: LABEL.REQUEST_CHANGES
@@ -185,6 +187,63 @@ paths:
           $ref: '#/components/responses/AuthorizationDenied'
         '404':
           $ref: '#/components/responses/LabelNotFound'
+        '409':
+          $ref: '#/components/responses/WorkflowConflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowed'
+        '415':
+          $ref: '#/components/responses/UnsupportedContentType'
+  /api/review-tasks/{reviewTaskId}/draft-revisions:
+    post:
+      operationId: reviseReturnedReviewTaskDraft
+      summary: Create a new immutable correction for an exact returned task target.
+      x-required-permission: LABEL.CREATE
+      x-adoption-status: Local tested proposal; M4 workflow adoption and M3 consumer acceptance must be recorded separately.
+      description: Only an OPEN unresolved task with a returned DRAFT target may be revised. REQUEST_CHANGES
+        must be the decision summary, or a null summary must have an attributed REQUEST_CHANGES approval record
+        for that exact task/label as produced by legacy direct helpers. expectedLabelVersionId must equal the
+        target and the draft reference when non-null; a legacy target-only binding is supported. Product,
+        current published label, impact finding, current released formula and latest label guards are locked
+        before creation. The new snapshot uses the same product/jurisdiction, the current released formula
+        and the existing active effective jurisdiction rule-set selection. The rule-set need not equal the
+        earlier impact-run rule set. Supplied declarations are a complete new USER_ENTERED snapshot, never
+        an edit of old rows. One transaction creates the new label/declarations, advances both task references,
+        clears the mutable decision/resolver summary and records old/new/task/actor in an audit. The old label,
+        declarations, validation runs, approval history, task identity/finding and published pointer stay intact.
+        The new label requires its own latest PASSED validation before submission and an independent checker
+        before publication. A replay or concurrent loser with the old expected ID returns 409 and creates no
+        second revision. No automatic write retry or generic idempotency journal is introduced. Read the exact
+        task and new label after an uncertain response; observed state alone does not prove actor causation.
+      parameters:
+      - $ref: '#/components/parameters/ReviewTaskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReturnedDraftRevision'
+      responses:
+        '201':
+          description: New DRAFT LabelDraft; task draft and target references now equal the new label ID.
+          headers:
+            Location:
+              description: /api/labels/{labelVersionId} for the new immutable correction.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LabelDraft'
+        '400':
+          $ref: '#/components/responses/InvalidDraft'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/AuthorizationDenied'
+        '404':
+          $ref: '#/components/responses/TaskNotFound'
         '409':
           $ref: '#/components/responses/WorkflowConflict'
         '500':
@@ -393,6 +452,26 @@ components:
           uniqueItems: true
           description: Explicit first-snapshot entries, also distinct by case-insensitive allergenId. Null
             is invalid. Omission and [] mean no declarations; no facts are auto-declared.
+          items:
+            $ref: '#/components/schemas/DeclarationInput'
+    ReturnedDraftRevision:
+      type: object
+      additionalProperties: false
+      required:
+      - expectedLabelVersionId
+      - declarations
+      properties:
+        expectedLabelVersionId:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Exact returned task draft and target ID, without surrounding whitespace.
+        declarations:
+          type: array
+          minItems: 0
+          maxItems: 100
+          uniqueItems: true
+          description: Complete new declaration snapshot; [] explicitly declares nothing. Distinct canonical allergen IDs required.
           items:
             $ref: '#/components/schemas/DeclarationInput'
     DeclarationInput:
