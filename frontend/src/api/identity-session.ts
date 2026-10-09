@@ -150,6 +150,26 @@ export async function initializeIdentitySession(
   }
 }
 
+async function settleIdentityTransition(
+  generation: number,
+  readCurrentIdentity: () => Promise<CurrentIdentity>,
+  validationErrorForActor: (actor: CurrentIdentity) => string | null,
+  fallbackMessage: string,
+) {
+  try {
+    const actor = await readCurrentIdentity()
+    if (!isIdentityGenerationCurrent(generation)) return
+    const validationError = validationErrorForActor(actor)
+    publish(validationError
+      ? { ...snapshot, status: 'unavailable', actor: null, error: validationError }
+      : { ...snapshot, status: 'ready', actor, error: '' })
+  } catch (cause: unknown) {
+    if (!isIdentityGenerationCurrent(generation)) return
+    publish({ ...snapshot, status: 'unavailable', actor: null,
+      error: cause instanceof Error ? cause.message : fallbackMessage })
+  }
+}
+
 export async function switchDemoIdentity(
   selection: DemoIdentityKey,
   readCurrentIdentity: () => Promise<CurrentIdentity>,
@@ -158,38 +178,15 @@ export async function switchDemoIdentity(
     throw new Error('Unsupported demo identity.')
   }
   const generation = startTransition(selection, 'switching')
-  try {
-    const actor = await readCurrentIdentity()
-    if (!isIdentityGenerationCurrent(generation)) return
-    const validationError = validateActor(selection, actor)
-    if (validationError) {
-      publish({ ...snapshot, status: 'unavailable', actor: null, error: validationError })
-      return
-    }
-    publish({ ...snapshot, status: 'ready', actor, error: '' })
-  } catch (cause: unknown) {
-    if (!isIdentityGenerationCurrent(generation)) return
-    publish({ ...snapshot, status: 'unavailable', actor: null,
-      error: cause instanceof Error ? cause.message : 'The selected identity could not be verified.' })
-  }
+  return settleIdentityTransition(generation, readCurrentIdentity,
+    actor => validateActor(selection, actor), 'The selected identity could not be verified.')
 }
 
 export async function refreshIdentity(readCurrentIdentity: () => Promise<CurrentIdentity>) {
   const generation = startTransition(snapshot.selection, 'switching')
-  try {
-    const actor = await readCurrentIdentity()
-    if (!isIdentityGenerationCurrent(generation)) return
-    const validationError = subjectOverrideEnabled ? validateActor(snapshot.selection, actor) : null
-    if (validationError) {
-      publish({ ...snapshot, status: 'unavailable', actor: null, error: validationError })
-    } else {
-      publish({ ...snapshot, status: 'ready', actor, error: '' })
-    }
-  } catch (cause: unknown) {
-    if (!isIdentityGenerationCurrent(generation)) return
-    publish({ ...snapshot, status: 'unavailable', actor: null,
-      error: cause instanceof Error ? cause.message : 'The current identity could not be refreshed.' })
-  }
+  return settleIdentityTransition(generation, readCurrentIdentity,
+    actor => subjectOverrideEnabled ? validateActor(snapshot.selection, actor) : null,
+    'The current identity could not be refreshed.')
 }
 
 export function beginIdentityRequest(path: string): { controller: AbortController; generation: number } {

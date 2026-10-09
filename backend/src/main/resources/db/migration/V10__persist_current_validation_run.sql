@@ -158,6 +158,7 @@ DROP PROCEDURE IF EXISTS sp_record_label_validation_pass;
 DROP PROCEDURE IF EXISTS sp_record_label_validation_fail;
 DROP PROCEDURE IF EXISTS sp_assert_label_actor_permission;
 DROP PROCEDURE IF EXISTS sp_record_label_validation_fixture;
+DROP PROCEDURE IF EXISTS sp_insert_label_fixture_audit;
 
 DELIMITER $$
 
@@ -279,6 +280,27 @@ BEGIN
   END IF;
 END$$
 
+-- Shared label audit INSERT participates in the caller's existing transaction.
+-- Callers supply their original identity, event and JSON metadata at the same point.
+CREATE PROCEDURE sp_insert_label_fixture_audit(
+  IN p_audit_event_id VARCHAR(160),
+  IN p_event_type VARCHAR(100),
+  IN p_label_version_id VARCHAR(120),
+  IN p_actor_user_id VARCHAR(80),
+  IN p_before_value JSON,
+  IN p_after_value JSON,
+  IN p_event_payload JSON
+)
+BEGIN
+  INSERT INTO audit_event (
+    audit_event_id, event_type, entity_type, entity_id, event_at, actor_user_id,
+    before_value, after_value, event_payload, correlation_id, data_provenance_id
+  ) VALUES (
+    p_audit_event_id, p_event_type, 'LABEL_VERSION', p_label_version_id, NOW(), p_actor_user_id,
+    p_before_value, p_after_value, p_event_payload, p_label_version_id, 'prov_validation_fixture'
+  );
+END$$
+
 CREATE PROCEDURE sp_submit_label_for_review(
   IN p_label_version_id VARCHAR(120),
   IN p_actor_user_id VARCHAR(80)
@@ -343,42 +365,12 @@ BEGIN
   WHERE draft_label_version_id = p_label_version_id
     AND status = 'OPEN';
 
-  INSERT INTO audit_event (
-    audit_event_id,
-    event_type,
-    entity_type,
-    entity_id,
-    event_at,
-    actor_user_id,
-    before_value,
-    after_value,
-    event_payload,
-    correlation_id,
-    data_provenance_id
-  ) VALUES (
-    CONCAT(
-      'audit_label_submit_',
-      REPLACE(UUID(), '-', '')
-    ),
-    'LABEL_PENDING_REVIEW',
-    'LABEL_VERSION',
-    p_label_version_id,
-    NOW(),
-    p_actor_user_id,
-    JSON_OBJECT(
-      'lifecycle_status',
-      'DRAFT'
-    ),
-    JSON_OBJECT(
-      'lifecycle_status',
-      'PENDING_REVIEW'
-    ),
-    JSON_OBJECT(
-      'helper',
-      'sp_submit_label_for_review'
-    ),
-    p_label_version_id,
-    'prov_validation_fixture'
+  CALL sp_insert_label_fixture_audit(
+    CONCAT('audit_label_submit_', REPLACE(UUID(), '-', '')),
+    'LABEL_PENDING_REVIEW', p_label_version_id, p_actor_user_id,
+    JSON_OBJECT('lifecycle_status', 'DRAFT'),
+    JSON_OBJECT('lifecycle_status', 'PENDING_REVIEW'),
+    JSON_OBJECT('helper', 'sp_submit_label_for_review')
   );
 
   COMMIT;
@@ -508,44 +500,12 @@ BEGIN
     'prov_validation_fixture'
   );
 
-  INSERT INTO audit_event (
-    audit_event_id,
-    event_type,
-    entity_type,
-    entity_id,
-    event_at,
-    actor_user_id,
-    before_value,
-    after_value,
-    event_payload,
-    correlation_id,
-    data_provenance_id
-  ) VALUES (
-    CONCAT(
-      'audit_label_decision_',
-      REPLACE(UUID(), '-', '')
-    ),
-    'LABEL_DECISION_RECORDED',
-    'LABEL_VERSION',
-    p_label_version_id,
-    NOW(),
-    p_actor_user_id,
-    JSON_OBJECT(
-      'lifecycle_status',
-      'PENDING_REVIEW'
-    ),
-    JSON_OBJECT(
-      'lifecycle_status',
-      v_new_status
-    ),
-    JSON_OBJECT(
-      'decision',
-      p_decision,
-      'helper',
-      'sp_record_label_decision'
-    ),
-    p_label_version_id,
-    'prov_validation_fixture'
+  CALL sp_insert_label_fixture_audit(
+    CONCAT('audit_label_decision_', REPLACE(UUID(), '-', '')),
+    'LABEL_DECISION_RECORDED', p_label_version_id, p_actor_user_id,
+    JSON_OBJECT('lifecycle_status', 'PENDING_REVIEW'),
+    JSON_OBJECT('lifecycle_status', v_new_status),
+    JSON_OBJECT('decision', p_decision, 'helper', 'sp_record_label_decision')
   );
 
   COMMIT;
@@ -615,15 +575,11 @@ BEGIN
     CONCAT('valres_', v_suffix, '_', p_label_version_id), v_validation_run_id, NULL,
     v_result_code, v_severity, v_passed, v_blocking, v_result_message
   );
-  INSERT INTO audit_event (
-    audit_event_id, event_type, entity_type, entity_id, event_at, actor_user_id,
-    before_value, after_value, event_payload, correlation_id, data_provenance_id
-  ) VALUES (
+  CALL sp_insert_label_fixture_audit(
     CONCAT('audit_val_', v_suffix, '_', p_label_version_id), CONCAT('LABEL_VALIDATION_', v_status),
-    'LABEL_VERSION', p_label_version_id, NOW(), p_actor_user_id,
-    NULL, JSON_OBJECT('validation_status', v_status),
-    JSON_OBJECT('helper', CONCAT('sp_record_label_validation_', v_suffix)),
-    p_label_version_id, 'prov_validation_fixture'
+    p_label_version_id, p_actor_user_id, NULL,
+    JSON_OBJECT('validation_status', v_status),
+    JSON_OBJECT('helper', CONCAT('sp_record_label_validation_', v_suffix))
   );
   COMMIT;
 END$$

@@ -275,8 +275,40 @@ class ValidationRunOrderingIntegrationTest {
         jdbc.update("CALL sp_submit_label_for_review(?,?)", label, S3CompoundMakerFixture.USER_ID);
         assertThat(jdbc.queryForObject("SELECT lifecycle_status FROM label_version WHERE label_version_id=?", String.class, label)).isEqualTo("PENDING_REVIEW");
         assertThat(jdbc.queryForList("SELECT * FROM validation_run WHERE label_version_id=? ORDER BY 1", label)).isEqualTo(history);
+        assertSqlWorkflowAudit(label, S3CompoundMakerFixture.USER_ID, "LABEL_PENDING_REVIEW", "audit_label_submit_",
+                "DRAFT", "PENDING_REVIEW", "sp_submit_label_for_review", null);
+        jdbc.update("CALL sp_record_label_decision(?,?,?,?)", label, "user_approver", "APPROVE", "Private SQL approval audit input");
+        assertThat(jdbc.queryForObject("SELECT lifecycle_status FROM label_version WHERE label_version_id=?", String.class, label)).isEqualTo("APPROVED");
+        assertSqlWorkflowAudit(label, "user_approver", "LABEL_DECISION_RECORDED", "audit_label_decision_",
+                "PENDING_REVIEW", "APPROVED", "sp_record_label_decision", "APPROVE");
+        assertThat(jdbc.queryForList("SELECT * FROM validation_run WHERE label_version_id=? ORDER BY 1", label)).isEqualTo(history);
         observe("directSqlLatestRunGuard", Map.of("labelVersionId", label, "failureSqlState", error.getSQLState(),
-                "laterPassAccepted", true, "current", current(label, rule), "historyUnchanged", true));
+                "laterPassAccepted", true, "current", current(label, rule), "historyUnchanged", true,
+                "sqlSubmitAuditMetadataPreserved", true, "sqlDecisionAuditMetadataPreserved", true));
+    }
+
+    private void assertSqlWorkflowAudit(String label, String actor, String event, String idPrefix,
+                                        String beforeStatus, String afterStatus, String helper, String decision) {
+        var audit = jdbc.queryForMap("""
+                SELECT audit_event_id,event_type,entity_type,entity_id,event_at,actor_user_id,correlation_id,data_provenance_id,
+                    JSON_UNQUOTE(JSON_EXTRACT(before_value,'$.lifecycle_status')) AS before_status,
+                    JSON_UNQUOTE(JSON_EXTRACT(after_value,'$.lifecycle_status')) AS after_status,
+                    JSON_UNQUOTE(JSON_EXTRACT(event_payload,'$.helper')) AS helper,
+                    JSON_UNQUOTE(JSON_EXTRACT(event_payload,'$.decision')) AS decision,
+                    JSON_LENGTH(before_value) AS before_fields,JSON_LENGTH(after_value) AS after_fields,
+                    JSON_LENGTH(event_payload) AS payload_fields
+                FROM audit_event WHERE entity_id=? AND event_type=?
+                """, label, event);
+        assertThat(audit).containsEntry("event_type", event).containsEntry("entity_type", "LABEL_VERSION")
+                .containsEntry("entity_id", label).containsEntry("actor_user_id", actor)
+                .containsEntry("correlation_id", label).containsEntry("data_provenance_id", "prov_validation_fixture")
+                .containsEntry("before_status", beforeStatus).containsEntry("after_status", afterStatus)
+                .containsEntry("helper", helper).containsEntry("decision", decision);
+        assertThat((String) audit.get("audit_event_id")).matches(idPrefix + "[0-9a-f]{32}");
+        assertThat(audit.get("event_at")).isNotNull();
+        assertThat(((Number) audit.get("before_fields")).intValue()).isEqualTo(1);
+        assertThat(((Number) audit.get("after_fields")).intValue()).isEqualTo(1);
+        assertThat(((Number) audit.get("payload_fields")).intValue()).isEqualTo(decision == null ? 1 : 2);
     }
 
     @Test @Timeout(120)
