@@ -2,6 +2,7 @@ package com.spectrace.validation;
 
 import com.spectrace.support.fixture.NegativeGoldenFixtures;
 import com.spectrace.support.fixture.NegativeGoldenFixtures.Fixture;
+import com.spectrace.support.fixture.ValidationCurrentRunFixture;
 import com.spectrace.validation.application.ValidationApplicationService;
 import com.spectrace.validation.application.ValidationFailure;
 import com.spectrace.validation.application.port.ValidationResultRepository;
@@ -10,11 +11,13 @@ import com.spectrace.validation.domain.ValidationFinding;
 import com.spectrace.validation.domain.ValidationSeverity;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -57,6 +60,12 @@ class NegativeGoldenValidationPersistenceMySqlTest {
         registry.add("spring.datasource.username", MYSQL::getUsername);
         registry.add("spring.datasource.password", MYSQL::getPassword);
         registry.add("spring.flyway.enabled", () -> true);
+    }
+
+    @BeforeAll
+    static void installActualValidationPersistence() {
+        ValidationCurrentRunFixture.install(new DriverManagerDataSource(
+                MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword()));
     }
 
     @Autowired

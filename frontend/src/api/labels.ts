@@ -205,39 +205,61 @@ export function isLabelDraft(value: unknown): value is LabelDraft {
 }
 
 export async function requestLabelJson(path: string, init?: RequestInit): Promise<unknown> {
-  const response = await fetch(path, init)
-  let body: unknown
+  const { controller, generation } = beginIdentityRequest(path)
+  const externalSignal = init?.signal
+  const abortFromCaller = () => controller.abort()
+  if (externalSignal?.aborted) controller.abort()
+  else externalSignal?.addEventListener('abort', abortFromCaller, { once: true })
   try {
-    body = await response.json()
-  } catch {
-    throw new LabelApiError(
-      'INVALID_RESPONSE',
-      `The label API returned invalid JSON (${response.status}).`,
-      response.status,
-    )
-  }
+    const response = await fetch(path, {
+      ...init,
+      headers: identityHeaders(init?.headers),
+      signal: controller.signal,
+    })
+    if (!isIdentityGenerationCurrent(generation)) {
+      throw new LabelApiError('IDENTITY_CONTEXT_CHANGED', 'The identity changed while this request was running.', 409)
+    }
+    let body: unknown
+    try {
+      body = await response.json()
+    } catch {
+      throw new LabelApiError(
+        'INVALID_RESPONSE',
+        `The label API returned invalid JSON (${response.status}).`,
+        response.status,
+      )
+    }
 
-  if (!response.ok) {
-    const error = isRecord(body) ? body : {}
-    throw new LabelApiError(
-      typeof error.code === 'string' ? error.code : 'HTTP_ERROR',
-      typeof error.message === 'string'
-        ? error.message
-        : `Label API request failed with status ${response.status}.`,
-      response.status,
-      typeof error.traceId === 'string' ? error.traceId : null,
-      typeof error.evidenceId === 'string' ? error.evidenceId : null,
-    )
-  }
+    if (!isIdentityGenerationCurrent(generation)) {
+      throw new LabelApiError('IDENTITY_CONTEXT_CHANGED', 'The identity changed while this request was running.', 409)
+    }
 
-  return body
+    if (!response.ok) {
+      const error = isRecord(body) ? body : {}
+      throw new LabelApiError(
+        typeof error.code === 'string' ? error.code : 'HTTP_ERROR',
+        typeof error.message === 'string'
+          ? error.message
+          : `Label API request failed with status ${response.status}.`,
+        response.status,
+        typeof error.traceId === 'string' ? error.traceId : null,
+        typeof error.evidenceId === 'string' ? error.evidenceId : null,
+      )
+    }
+
+    return body
+  } catch (cause: unknown) {
+    if (!isIdentityGenerationCurrent(generation)) {
+      throw new LabelApiError('IDENTITY_CONTEXT_CHANGED', 'The identity changed while this request was running.', 409)
+    }
+    throw cause
+  } finally {
+    externalSignal?.removeEventListener('abort', abortFromCaller)
+    finishIdentityRequest(controller)
+  }
 }
 
-const labelOfficerHeaders = {
-  'Content-Type': 'application/json',
-  'X-Auth-Provider': 'DEV_EXTERNAL',
-  'X-External-Subject': 'dev-external-label-officer',
-}
+const labelOfficerHeaders = { 'Content-Type': 'application/json' }
 
 export async function createLabelDraft(
   productId: string,
@@ -261,6 +283,25 @@ export async function createLabelDraft(
       'The label API returned an invalid draft.',
       200,
     )
+  }
+  return result
+}
+
+export async function createReturnedLabelRevision(
+  reviewTaskId: string,
+  expectedLabelVersionId: string,
+  declarations: Array<{ allergenId: string; declarationType: 'CONTAINS'; displayText?: string }>,
+): Promise<LabelDraft> {
+  const result = await requestLabelJson(
+    `/api/review-tasks/${encodeURIComponent(reviewTaskId)}/draft-revisions`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedLabelVersionId, declarations }),
+    },
+  )
+  if (!isLabelDraft(result) || result.lifecycleStatus !== 'DRAFT' || result.labelVersionId === expectedLabelVersionId) {
+    throw new LabelApiError('INVALID_RESPONSE', 'The workflow API returned an invalid draft revision.', 200)
   }
   return result
 }
@@ -409,3 +450,9 @@ export async function getValidationRun(
   }
   return result
 }
+import {
+  beginIdentityRequest,
+  finishIdentityRequest,
+  identityHeaders,
+  isIdentityGenerationCurrent,
+} from './identity-session'

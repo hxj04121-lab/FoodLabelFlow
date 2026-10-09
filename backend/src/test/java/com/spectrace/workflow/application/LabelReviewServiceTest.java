@@ -235,6 +235,7 @@ class LabelReviewServiceTest {
                         any(),
                         anyString()
                 );
+        verify(repository, never()).hasPassingValidationForBoundRuleSet(anyString());
     }
 
     @Test
@@ -338,6 +339,116 @@ class LabelReviewServiceTest {
                 "user_reviewer",
                 "prov_1"
         );
+        verify(repository, never()).hasPassingValidationForBoundRuleSet(anyString());
+    }
+
+    @Test
+    void rejectsIndependentApprovalWithoutCurrentPassingValidationBeforeAnyMutation() {
+        when(repository.lockForDecision("label_v1"))
+                .thenReturn(Optional.of(decisionTarget()));
+        when(repository.hasPassingValidationForBoundRuleSet("label_v1")).thenReturn(false);
+
+        assertThrows(IllegalStateException.class, () -> service.recordDecision(
+                "label_v1", "APPROVE", "Independent approval", reviewer("LABEL.APPROVE")));
+
+        verify(repository).lockForDecision("label_v1");
+        verify(repository).hasPassingValidationForBoundRuleSet("label_v1");
+        verifyNoMoreInteractions(repository);
+    }
+
+    @Test
+    void allowsIndependentApprovalWithCurrentPassingValidation() {
+        when(repository.lockForDecision("label_v1"))
+                .thenReturn(Optional.of(decisionTarget()));
+        when(repository.hasPassingValidationForBoundRuleSet("label_v1")).thenReturn(true);
+        when(repository.updateDecisionState("label_v1", "APPROVED")).thenReturn(1);
+        when(repository.updateReviewTaskStatus("review_1", "label_v1", "IN_REVIEW",
+                "APPROVE", "user_reviewer", false)).thenReturn(1);
+
+        service.recordDecision("label_v1", "APPROVE", "Independent approval", reviewer("LABEL.APPROVE"));
+
+        var order = inOrder(repository);
+        order.verify(repository).hasPassingValidationForBoundRuleSet("label_v1");
+        order.verify(repository).updateDecisionState("label_v1", "APPROVED");
+        verify(repository).updateReviewTaskStatus("review_1", "label_v1", "IN_REVIEW",
+                "APPROVE", "user_reviewer", false);
+        verify(repository).createApprovalRecord("label_v1", "review_1", "APPROVE",
+                "user_reviewer", "Independent approval", "prov_1");
+        verify(repository).createDecisionAudit("label_v1", "APPROVE", "PENDING_REVIEW",
+                "APPROVED", "user_reviewer", "prov_1");
+    }
+
+    @Test
+    void requestsChangesWithoutRequiringPassingValidation() {
+        when(repository.lockForDecision("label_v1"))
+                .thenReturn(Optional.of(decisionTarget()));
+        when(repository.updateDecisionState("label_v1", "DRAFT")).thenReturn(1);
+        when(repository.updateReviewTaskStatus("review_1", "label_v1", "OPEN",
+                "REQUEST_CHANGES", "user_reviewer", false)).thenReturn(1);
+
+        service.recordDecision("label_v1", "REQUEST_CHANGES", "Correct failed validation",
+                reviewer("LABEL.REQUEST_CHANGES"));
+
+        verify(repository, never()).hasPassingValidationForBoundRuleSet(anyString());
+        verify(repository).updateDecisionState("label_v1", "DRAFT");
+        verify(repository).updateReviewTaskStatus("review_1", "label_v1", "OPEN",
+                "REQUEST_CHANGES", "user_reviewer", false);
+        verify(repository).createApprovalRecord("label_v1", "review_1", "REQUEST_CHANGES",
+                "user_reviewer", "Correct failed validation", "prov_1");
+        verify(repository).createDecisionAudit("label_v1", "REQUEST_CHANGES", "PENDING_REVIEW",
+                "DRAFT", "user_reviewer", "prov_1");
+    }
+
+    @Test
+    void rejectsPublicationWithoutCurrentPassingValidationBeforeAnyMutation() {
+        when(repository.lockForPublication("review_1"))
+                .thenReturn(Optional.of(publicationTarget()));
+        when(repository.hasPassingValidationForBoundRuleSet("label_v1")).thenReturn(false);
+
+        assertThrows(IllegalStateException.class, () -> service.publishReviewTask(
+                "review_1", "label_v1", reviewer("LABEL.PUBLISH")));
+
+        verify(repository).lockForPublication("review_1");
+        verify(repository).hasPassingValidationForBoundRuleSet("label_v1");
+        verifyNoMoreInteractions(repository);
+    }
+
+    @Test
+    void publishesApprovedTargetWithCurrentPassingValidation() {
+        when(repository.lockForPublication("review_1"))
+                .thenReturn(Optional.of(publicationTarget()));
+        when(repository.hasPassingValidationForBoundRuleSet("label_v1")).thenReturn(true);
+        when(repository.publishApprovedVersion("label_v1")).thenReturn(1);
+        when(repository.updateCurrentPublishedVersion("product_1", "label_v1")).thenReturn(1);
+        when(repository.resolvePublishedReviewTask("review_1", "label_v1", "user_reviewer"))
+                .thenReturn(1);
+
+        service.publishReviewTask("review_1", "label_v1", reviewer("LABEL.PUBLISH"));
+
+        var order = inOrder(repository);
+        order.verify(repository).hasPassingValidationForBoundRuleSet("label_v1");
+        order.verify(repository).supersedePublishedVersion("label_v1");
+        order.verify(repository).publishApprovedVersion("label_v1");
+        order.verify(repository).updateCurrentPublishedVersion("product_1", "label_v1");
+        order.verify(repository).createPublicationRecord("label_v1", "user_reviewer", "prov_1");
+        order.verify(repository).createPublicationAudit("label_v1", "review_1", "user_reviewer", "prov_1");
+        order.verify(repository).resolvePublishedReviewTask("review_1", "label_v1", "user_reviewer");
+    }
+
+    private LabelReviewCommandRepository.DecisionTarget decisionTarget() {
+        return new LabelReviewCommandRepository.DecisionTarget(
+                "label_v1", "PENDING_REVIEW", "user_creator", "review_1", true, true, "prov_1");
+    }
+
+    private LabelReviewCommandRepository.PublicationTarget publicationTarget() {
+        return new LabelReviewCommandRepository.PublicationTarget(
+                "review_1", "label_v1", "APPROVE", "IN_REVIEW", null, "APPROVED",
+                "product_1", "prov_1", true, true, true);
+    }
+
+    private AuthenticatedActor reviewer(String permission) {
+        return new AuthenticatedActor(
+                "user_reviewer", "reviewer", "Reviewer", Set.of(), Set.of(permission));
     }
 
     @Test

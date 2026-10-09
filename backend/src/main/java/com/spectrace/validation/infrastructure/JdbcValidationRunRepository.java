@@ -5,6 +5,7 @@ import com.spectrace.validation.domain.ValidationRun;
 import com.spectrace.validation.domain.ValidationStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -12,12 +13,7 @@ import java.util.Optional;
 @Repository
 public class JdbcValidationRunRepository implements ValidationRunRepository {
 
-    private static final String INSERT = """
-            INSERT INTO validation_run(
-              validation_run_id, label_version_id, rule_set_version_id, status,
-              ran_by_user_id, ran_at, summary, data_provenance_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """;
+    private static final String INSERT = "CALL sp_insert_validation_run(?, ?, ?, ?, ?, ?, ?, ?)";
 
     private static final String SELECT = """
             SELECT validation_run_id, label_version_id, rule_set_version_id, status,
@@ -33,8 +29,11 @@ public class JdbcValidationRunRepository implements ValidationRunRepository {
     }
 
     @Override
+    @Transactional
     public void save(ValidationRun validationRun) {
-        int updated = jdbcTemplate.update(
+        // The V10 routine inserts a fresh identity and its current association;
+        // it never commits independently of the surrounding results/audit flow.
+        jdbcTemplate.update(
                 INSERT,
                 validationRun.validationRunId(),
                 validationRun.labelVersionId(),
@@ -45,9 +44,6 @@ public class JdbcValidationRunRepository implements ValidationRunRepository {
                 validationRun.summary(),
                 validationRun.dataProvenanceId()
         );
-        if (updated != 1) {
-            throw new IllegalStateException("Expected one validation run row to be inserted");
-        }
     }
 
     @Override
