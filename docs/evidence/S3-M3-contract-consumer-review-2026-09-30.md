@@ -3,6 +3,62 @@
 Date: 30 Sep 2026. Author: Xu Feiyang / M3. Related: SCRUM-49/71–74.
 Status: **local review draft; candidate and owner decisions remain pending**.
 
+## Current consumer qualification — 8 Oct 2026
+
+Current local completion — 9 October: XFY now integrates owner PR87 `417133e`
+with PR76 `6d5d897` against main `36f52bf`. The existing revision/identity APIs
+were reused, retaining exact task URLs and read deadlines alongside actor
+generation guards. A new label adopts its own returned rule set, clears old
+PASS, and requires fresh validation before independent approval/publication.
+Unknown revisions reconcile captured task/old ID/declarations through reads;
+no automatic expected-ID replacement or repeated POST is added. The local
+correction browser test now checks API/DB history and denied writes and is wired
+to its own disposable CI stack. These changes still need team review and
+matching merged-main CI; no personal Jira closure or owner signoff is asserted.
+
+Earlier 9 October supplement: M1's [PR76 review](https://github.com/hxj04121-lab/FoodLabelFlow/pull/76#issuecomment-6072749690)
+confirms impact semantics and real restore/replay behavior without a blocking
+change. Its defensive finding-code check and explicit same-create retry are now
+addressed in XFY. The latter preserves captured inputs and treats 409 as a
+conflict requiring inspection, not proof of this command's success.
+
+M2's [revision handoff](https://github.com/hxj04121-lab/FoodLabelFlow/pull/76#issuecomment-6059466596)
+is acknowledged: same task, new immutable label, its own server-selected rule
+set and fresh validation, independent checker, separate publication; never
+reuse an old PASS or silently update an expected ID for a repeated POST. Draft
+and impact rule-set IDs need not match. PR86/87 already supply owner-side
+implementation candidates, but are unmerged and not yet XFY/main delivery.
+PR76 retains its existing source-bound behavior; final correction/switch
+integration and new full-path main-CI evidence remain follow-up work.
+
+This update supersedes the earlier API-availability assessment below. Main
+`73600b8` now includes actual impact trigger/query, task list/detail, immutable
+first declaration input, review commands, publication and current-caller reads.
+The current impact and product-flow/error contracts were checked against their
+actual frontend clients and pages, with the following M3 consumption conclusions:
+
+- Direct resources and four-field errors fit the existing clients; collection
+  page limits/status filters and nullable task targets remain explicit.
+- Exact task/product/label/formula/rule-set/jurisdiction bindings are checked;
+  optional first declarations do not introduce an editing or rebind contract.
+- Separate APPROVE and publication responses remain exact LabelDraft resources;
+  current identity/permissions are reads, not an actor-selection interface.
+- Local M3 repairs affect URL selection/restoration, read cancellation/timeouts,
+  stale completion handling and tests. They add no backend contract, stored grant,
+  identity switch or publication policy.
+- [Current M3 verification](S3-M3-test-design.md) and
+  [implementation A07](S3-M3-A07-draft.md) bind the actual local results separately
+  from the merged-main receipt. The earlier waiting statements are historical.
+
+This is prepared technical consumer feedback for Xu Feiyang's assessment. It is
+not a recorded human signoff or a declaration that every module accepted the
+exact candidate bundle. M4's login/demo/switch choice remains pending. PR73's
+merged [staging ADR](../architecture/ADR-SCRUM-68-staging-ci-local-compose.md)
+selects CI/local Compose and requires its exact Jira decision record; it does
+not adopt login or user switching. PR72 and its successful exact-main
+workflow now supply the isolated permitted-creator runtime negative; it is
+distinct from the older ACL-only browser attempt and does not adopt login policy.
+
 ## Integration update — 3 Oct 2026
 
 The review below is a dated snapshot of `0755d06`, not a statement of current

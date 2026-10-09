@@ -123,7 +123,7 @@ class ReviewTaskV7SameSecondDecisionHistoryMySqlTest {
         assertThat(jdbc.queryForObject("""
                 SELECT version FROM flyway_schema_history
                 WHERE success = 1 ORDER BY installed_rank DESC LIMIT 1
-                """, String.class)).isEqualTo("8");
+                """, String.class)).isEqualTo("10");
         assertThat(immutableHistorySnapshot(jdbc)).isEqualTo(immutableBeforeUpgrade);
         if (alreadyAppliedV7) {
             assertThat(jdbc.queryForObject("SELECT checksum FROM flyway_schema_history WHERE version = '7'", Integer.class))

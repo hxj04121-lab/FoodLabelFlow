@@ -3,6 +3,9 @@ package com.spectrace.workflow;
 import com.spectrace.identity.domain.AuthenticatedActor;
 import com.spectrace.label.application.LabelVersionConflictException;
 import com.spectrace.support.MySqlIntegrationTestSupport;
+import com.spectrace.validation.application.port.ValidationRunRepository;
+import com.spectrace.validation.domain.ValidationRun;
+import com.spectrace.validation.domain.ValidationStatus;
 import com.spectrace.workflow.application.LabelWorkflowService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +16,7 @@ import org.springframework.test.annotation.DirtiesContext;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.time.Instant;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -46,6 +50,9 @@ class LabelWorkflowConcurrencyIntegrationTest
 
     @Autowired
     private LabelWorkflowService workflowService;
+
+    @Autowired
+    private ValidationRunRepository validationRuns;
 
     @Test
     void rejectsSubmitWhenNewerDraftWinsRace()
@@ -479,32 +486,18 @@ private void createDraftFixture() {
 }
 
     private void createPassedValidation() {
-        jdbcTemplate.update(
+        ValidationRun run = jdbcTemplate.queryForObject(
                 """
-                INSERT INTO validation_run (
-                    validation_run_id,
-                    label_version_id,
-                    rule_set_version_id,
-                    status,
-                    ran_by_user_id,
-                    ran_at,
-                    summary,
-                    data_provenance_id
-                )
-                SELECT
-                    'validation_scrum39_concurrency',
-                    label_version_id,
-                    rule_set_version_id,
-                    'PASSED',
-                    'user_label_officer',
-                    NOW(),
-                    'SCRUM-39 concurrency regression',
-                    data_provenance_id
+                SELECT label_version_id, rule_set_version_id, data_provenance_id
                 FROM label_version
                 WHERE label_version_id = ?
                 """,
-                LABEL_ID
-        );
+                (rs, row) -> new ValidationRun("validation_scrum39_concurrency",
+                        rs.getString("label_version_id"), rs.getString("rule_set_version_id"),
+                        ValidationStatus.PASSED, "user_label_officer", Instant.now(),
+                        "SCRUM-39 concurrency regression", rs.getString("data_provenance_id")),
+                LABEL_ID);
+        validationRuns.save(run);
     }
 
     private boolean currentFlag(
