@@ -43,12 +43,22 @@ export function Impact() {
   const [exactChange, setExactChange] = useState<ChangeRequest | null>(null)
   const local = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname)
   const identity = useCurrentIdentity()
+  const identityGeneration = identity.session.generation
+  const activeIdentity = useRef(identityGeneration)
+  activeIdentity.current = identityGeneration
+  useEffect(() => {
+    contextVersion.current++
+    manualRead.current?.abort()
+    setIdentityEnabled(false); setAnalysis(null); setExactChange(null); setChanges([])
+    setPreviousId(''); setTargetId(''); setDescription(''); setMessage(''); setError('')
+  }, [identityGeneration])
   const selected = exactChange?.changeRequestId === changeId ? exactChange : changes.find(change => change.changeRequestId === changeId)
 
   function captureContext() {
     const requestedQuery = query
     const requestedVersion = contextVersion.current
-    return () => currentQuery.current === requestedQuery && contextVersion.current === requestedVersion
+    const requestedIdentity = identityGeneration
+    return () => currentQuery.current === requestedQuery && contextVersion.current === requestedVersion && activeIdentity.current === requestedIdentity
   }
 
   function saveContext(id: string, analysisId = '', rule = ruleSetId, replace = false) {
@@ -77,6 +87,7 @@ export function Impact() {
     const rule = searchParams.get('ruleSetVersionId') ?? 'ruleset_us_falcpa_demo_v1'
     setChangeId(id); setRuleSetId(rule); setRunId(savedRun); setAnalysis(null); setExactChange(null)
     setError(''); setRestoring(!!(id || savedRun))
+    if (identity.state.status !== 'ready') { setRestoring(false); return () => controller.abort() }
     const fresh = freshAnalysis.current
     freshAnalysis.current = null
     const timer = setTimeout(() => controller.abort(), 15000)
@@ -98,7 +109,7 @@ export function Impact() {
       if (active) displayError(controller.signal.aborted ? new Error('The saved context read timed out. Refresh the saved context to try again.') : cause)
     }).finally(() => { clearTimeout(timer); if (active) setRestoring(false) })
     return () => { active = false; controller.abort(); manualRead.current?.abort(); clearTimeout(timer) }
-  }, [query, readAttempt])
+  }, [query, readAttempt, identityGeneration, identity.state.status])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -115,7 +126,7 @@ export function Impact() {
       if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Specification versions could not be loaded.')
     }).finally(() => { if (!controller.signal.aborted) setSpecificationsLoading(false) })
     return () => controller.abort()
-  }, [materialId, specificationAttempt])
+  }, [materialId, specificationAttempt, identityGeneration])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -123,6 +134,7 @@ export function Impact() {
     const timer = setTimeout(() => controller.abort(), 15000)
     setLoading(true)
     setChanges([])
+    if (identity.state.status !== 'ready') { clearTimeout(timer); setLoading(false); return () => controller.abort() }
     listChangeRequests(controller.signal).then(result => {
       if (controller.signal.aborted) return
       setChanges(result)
@@ -131,7 +143,7 @@ export function Impact() {
       if (active) displayError(controller.signal.aborted ? new Error('The change list read timed out. Refresh change requests to try again.') : cause)
     }).finally(() => { clearTimeout(timer); if (active) setLoading(false) })
     return () => { active = false; controller.abort(); clearTimeout(timer) }
-  }, [readAttempt])
+  }, [readAttempt, identityGeneration, identity.state.status])
 
   function displayError(cause: unknown, write: 'create' | 'run' | null = null,
     runTarget?: { changeId: string; ruleSetId: string }, createTarget?: Parameters<typeof createChangeRequest>[0]) {
@@ -152,11 +164,13 @@ export function Impact() {
     const input = uncertainCreate ?? { changeType: 'INGREDIENT_SPEC' as const, supplierMaterialId: materialId,
       previousSpecificationVersionId: previousId, targetSpecificationVersionId: targetId, description: description.trim() }
     const current = captureContext()
+    const actorGeneration = identityGeneration
     lock.current = true; setBusy(true); setError(''); setMessage('')
     try {
       const created = await createChangeRequest(input)
       setUncertainCreate(null)
       setChanges(changes => [created, ...changes])
+      if (activeIdentity.current !== actorGeneration) return
       if (!current()) {
         setMessage('Created change request ' + created.changeRequestId + ' for the earlier selection. The current context was retained.')
         setIdentityEnabled(false)
@@ -167,6 +181,10 @@ export function Impact() {
       setMessage('Created change request ' + created.changeRequestId + '.')
       setIdentityEnabled(false)
     } catch (cause: unknown) {
+      if (activeIdentity.current !== actorGeneration) {
+        setUncertainCreate(input)
+        return
+      }
       displayError(cause, 'create', undefined, input)
       if (uncertainCreate && cause instanceof LabelApiError && cause.status === 409) {
         setMessage('The same specification change conflicts with an existing record. Refresh change requests and inspect its exact ID; this does not confirm who created it or clear the unconfirmed command.')
@@ -179,9 +197,11 @@ export function Impact() {
     if (lock.current || restoring || !local || !identityEnabled || !identity.hasPermission('IMPACT.RUN') || !changeId || !ruleSetId.trim()) return
     const target = uncertainRun ?? { changeId, ruleSetId: ruleSetId.trim() }
     const current = captureContext()
+    const actorGeneration = identityGeneration
     lock.current = true; setBusy(true); setError(''); setMessage(''); setAnalysis(null)
     try {
       const loaded = await runImpactAnalysis(target.changeId, target.ruleSetId)
+      if (activeIdentity.current !== actorGeneration) return
       if (!current()) {
         setMessage('Analysis ' + loaded.impactAnalysisId + ' completed for the earlier selection. Load that exact ID to inspect it; the current context was retained.')
         setIdentityEnabled(false)
@@ -190,7 +210,10 @@ export function Impact() {
       }
       showAnalysis(loaded); setUncertainRun(null); setIdentityEnabled(false)
       setMessage('Analysis ' + loaded.impactAnalysisId + ' read from the server: ' + loaded.relevantProductCount + ' findings.')
-    } catch (cause: unknown) { displayError(cause, 'run', target) }
+    } catch (cause: unknown) {
+      if (activeIdentity.current !== actorGeneration) { setUncertainRun(target); return }
+      displayError(cause, 'run', target)
+    }
     finally { lock.current = false; setBusy(false) }
   }
 
@@ -228,7 +251,7 @@ export function Impact() {
         </select>
         <Button variant="outline" disabled={busy || loading} onClick={() => setReadAttempt(value => value + 1)}>Refresh change requests</Button>
         {(restoring || loading) && <p role="status">Reading the saved change context…</p>}
-        {!loading && changes.length === 0 && !error && <p>No recorded change requests are available.</p>}
+        {!loading && changes.length === 0 && !error && identity.state.status === 'ready' && <p>No recorded change requests are available.</p>}
         <Button variant="outline" asChild><Link to="/materials">Browse materials &amp; specs</Link></Button>
         <dl className="impact-context"><div><dt>Supplier material</dt><dd>{selected?.supplierMaterialId ?? 'Not selected'}</dd></div>
           <div><dt>Before specification</dt><dd>{selected?.previousSpecificationVersionId ?? 'Not selected'}</dd></div>

@@ -1,9 +1,10 @@
 # M3 Sprint 3 implementation, verification and assistance — 8 October 2026
 
 Owner: Xu Feiyang / M3. Tasks: SCRUM-49/71–74.
-Latest baseline: main `36f52bf`, safely integrated into XFY. Local production
-repairs were qualified against its production-identical predecessor `0dc1737`.
-Final owner/new-main acceptance pending.
+Local integration: main `36f52bf`, PR76 `6d5d897` and owner PR87 `417133e` on XFY.
+Current UI/CI completion is locally verified; team review, publication of these
+local changes and the combined source's merged-main CI remain pending.
+Earlier 8 October receipts below retain their original source scope.
 
 ## Safe reconciliation
 
@@ -25,22 +26,24 @@ the corresponding revert PR84/85 were closed without merging. Historical
 execution receipts below remain scoped to their original sources.
 
 PR86's identity/revision implementation and PR87's recovery/current-validation
-integration are available but unmerged. PR86's exact-head CI failed Sonar;
+integration have now been reused locally. Their remote PRs remain unmerged.
+PR86's exact-head CI failed Sonar;
 PR87 `417133e` has successful [PR CI37872081151](https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/37872081151),
 including real identity switching and existing live flows. Its workflow still
-does not run `scrum84-returned-revision-live.spec.ts`, and its acceptance document
-still records the full browser correction path as NOT RUN. Do not mark 73/74
-complete from those checks or copy the new revision implementation independently.
-Integrate owner changes while retaining PR76's exact task URL and timeout guards;
-verify identity switching, new ID/old PASS reset, fresh validation, independent
-approval/publication and 409/unknown-result recovery on that combined source.
+did not run `scrum84-returned-revision-live.spec.ts`, and its original acceptance
+document recorded the full correction path as NOT RUN. The current local change
+preserves PR76's URL/timeouts, combines actor-generation guards, fixes stored
+Publisher selection on reload and cancellation during response-body reads, and
+runs the expanded correction browser path in a fresh owned stack. CI now has a
+separate disposable revision stack and API bootstrap. Do not mark tasks Done
+from predecessor checks or local receipts alone.
 
 | Task | Actual implementation | Remaining acceptance |
 | --- | --- | --- |
-| 71 | Change create/list/detail, trigger/query/findings/task links; run/change/rule-set URL restore without POST replay | New repairs need own main CI and exact consumer acceptance |
-| 72 | Task list/detail, exact first replacement/declarations/validation; task URL/reload/back and stale-response repair | Current source-bound results and M3 assessment |
-| 73 | Actual actor/permissions and guarded submit/decision/publication/history | M4-adopted login/demo approach and controlled actor switch |
-| 74 | Full-path predecessor main evidence, current state/self-review UI fixtures, final implementation A07 and current live qualification | Correct negative scope, new-main evidence and owner decisions |
+| 71 | Actual impact integration, defensive classification, captured retries, URL/reload/back and actor isolation | Review/merge and matching main CI |
+| 72 | Exact task/replacement/validation context, URL/reload/back/timeout retained with identity guards; legacy target handoff | Review/merge and matching main CI |
+| 73 | Controlled Maker/Checker/Publisher, immutable corrected version, fresh validation, independent approval/publication and history verified locally | M4/team acceptance of the integrated demo choice and matching main CI |
+| 74 | Updated M3 A07, full correction browser/API/DB proof, zero-write denial checks and executable CI bootstrap | User A07 assessment and combined merged-main CI/artifacts |
 
 ## Verified merged-main predecessor
 
@@ -90,7 +93,7 @@ npx playwright test --grep-invert 'captures.*live'
 | validation-live.spec.ts | Actual evaluator PASS/blocking FAIL and exact persisted reads | Real backend/browser |
 | s3-product-flow-live.spec.ts | 40 API adoptions/findings, 20 replacements/validations/independent publications, CLOSED tasks and immutable history | Real backend/browser |
 
-## Real Docker qualification
+## Historical 8 October Docker qualification
 
 Final project `m3-s3-qualified-20261008` uses a fresh database, existing dev-auth
 setting and unchanged seeded grants. Loopback ports: frontend 15195, backend
@@ -136,14 +139,14 @@ correction flow. The [identity proposal](../architecture/S3-demo-identity-and-st
 still needs M4's adoption. The separate merged staging ADR above supplies the
 CI/local environment choice and requires its Jira decision record.
 
-## Four teammate requests
+## Four teammate follow-ups after local integration
 
 | Member | Concrete assistance | Deliverable |
 | --- | --- | --- |
-| M1 — Huang Xiangjia | Confirm version/outcome/task/replay meaning; verify reproducible V2/change/run demo inputs | Scoped impact review, exact setup steps/IDs and golden links |
-| M2 — Cai Runchen | Assemble exact adoption/impact/product-flow contract revision; resolve consumer/error/declaration/correction boundaries | Attributable cross-module review and final contract/evidence links |
-| M4 — Zhu Wenyu | Adopt login/demo choice; define controlled maker/checker/publisher switching and invalidation; confirm the existing permitted-creator qualification and immutable correction boundary | Owner ADR/implementation, controlled actor demo and final assessment |
-| M5 — shj040128shj | Record the merged SCRUM-68 ADR and its provenance in Jira; bind final merged SHA to full-path CI/artifacts; supply clean reset/demo procedure | Linked staging decision, exact final-main run/artifacts and local-demo receipt |
+| M1 — Huang Xiangjia | Existing impact semantics and demo inputs have been reviewed in PR76; no replacement backend work is requested | Retain the recorded review and golden links |
+| M2 — Cai Runchen | Review reuse of PR87 and its current-run/revision contract; final head includes no additional backend edits | Normal integration review and exact contract/evidence links |
+| M4 — Zhu Wenyu | Review the combined controlled switch/revision UI, including the Publisher reload fix, under the authored demo decision | Normal team acceptance of the integrated demo choice; no duplicate login implementation |
+| M5 — shj040128shj | Retain final merged-main CI/artifacts and verify the existing staging/Jira record and demo reset procedure | Exact final-main evidence and source-bound local-demo receipt |
 
 M3 retains its consumer review, UI fixes/tests, A07 and demo steps. These requests
 are prepared for the user; no teammate messages or Jira changes are made here.
@@ -160,7 +163,7 @@ are prepared for the user; no teammate messages or Jira changes are made here.
 5. Show permission, validation and correctly scoped self-review negatives,
    preserved history and any unresolved decision/correction boundary.
 
-## Current execution receipt
+## Historical 8 October execution receipt
 
 Verified on 8 October against the integrated local working tree, with no backend
 source changes from main `0dc1737`:
@@ -191,7 +194,7 @@ connection-refused attempts were environment failures, not passing test evidence
 Both services were restored. Final results above use the final repaired source
 and a newly initialized qualification database, not a replay over published data.
 
-These results qualify the current local source. A new merged-main CI receipt,
+These results qualified the 8 October source. A new merged-main CI receipt,
 owner decisions, exact consumer acceptance and A07 assessment remain separate.
 No task was marked Done and no teammate was messaged by that verification.
 
@@ -216,3 +219,58 @@ No new live business execution is claimed for these comment fixes. Keep the
 earlier Docker receipts separately scoped. New PR/main checks are required for
 the committed follow-up. The identity/revision integration and complete new
 browser correction path remain outside PR76 until owner changes are integrated.
+
+## Current integrated completion receipt — 9 October
+
+Source: XFY `6d5d897` plus owner PR87 `417133e`, followed by the M3 integration
+fixes recorded above. Backend production/test sources and dependencies remain
+identical to that owner head. No V1–V10 migration was rewritten. Source SHA-256
+fingerprints and the pre-integration head are retained outside Git.
+
+- Docker production backend/frontend builds passed. Actual runtime is Java 21,
+  Node 22-built frontend, MySQL 8.4.11; Flyway V1–V10 all installed successfully.
+  The existing 622 kB bundle advisory remains.
+- Local backend `clean verify`: **665 tests, 95 fresh XML suites, zero failures,
+  errors or skips**, exit 0. Java 25 compiled release 21. A task-only Maven Central
+  settings file and local Docker API option avoided unrelated host configuration;
+  project/user settings were not changed. Raw XML and logs are retained.
+- Final complete frontend fixture suite: **126 passed, 5 explicit live opt-ins
+  skipped**, zero failures (4.7 minutes). Final state/identity subset: **21 passed**.
+  It includes cancellation while the successful response body is still streaming,
+  old-actor isolation, preserved task URL and Publisher reload/permission checks.
+  A final two-line guard prevents impact/task pages claiming empty API results
+  before identity verification succeeds. After that change and two new regressions,
+  the related impact/task/state/identity/revision suites passed **46/46** (1.3m)
+  and the final TypeScript/Vite build passed. The 126 full-suite receipt precedes
+  only those empty-message guards; backend and revision workflow sources did not
+  change after their qualification. No second full-suite result is invented.
+- Real expanded returned-revision browser/API/MySQL path: **1 passed** (13.3s)
+  against fresh project `m3-revision-accept-20261009`, loopback MySQL 13324,
+  backend 18098, frontend 15198. Bootstrap imported only released specification
+  input; 40 adoptions, the change, 40 findings, initial replacement, PASS and
+  submission used real APIs. Actual findings matched the 20/20 golden partition.
+- The browser uses Checker → Maker → Checker → Publisher, edits Soy declaration
+  text, creates the new immutable label on the same task, verifies no inherited
+  validation, runs fresh PASS and independently approves/publishes. Exact DB
+  approval/publication/current-validation records and product pointer agree.
+  Old declaration, validation, approval/audit snapshots and original published
+  content remain intact. Reload retains Publisher and the published exact ID.
+- Missing validation and old-version submission return 409; Maker's missing
+  approval permission returns 403; label validation/decision/publication/audit
+  evidence is unchanged by those denied commands. Permitted-creator policy
+  coverage remains separately exercised by the existing backend/S3 suite.
+- Workflow YAML parses with the new separate-stack bootstrap/browser/cleanup
+  stages. Relative documentation links and diff checks pass.
+
+Local raw evidence is in `review-artifacts/m3-completion-20261009` outside the
+repository. Earlier failed fixture/reload attempts and the interrupted dev-server
+run are not counted as passes; final qualification used a new disposable DB.
+The older passing no-edit revision run is separate from the final edited-text
+receipt. The API seed/bootstrap and read-only DB assertions are test tooling,
+never application data fallbacks or fabricated human approval.
+
+The remote PR76 `6d5d897` [CI37878457974](https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/37878457974)
+passed; it qualifies only the earlier remote source. The current local merge
+still requires publication, normal team review, and actual combined **main** CI
+including the new live stage/artifacts. Tasks 71–74 remain open until their
+corresponding acceptance is recorded. No Jira status was changed.

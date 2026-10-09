@@ -24,6 +24,37 @@ async function impactReads(page: Page) {
   })
 }
 
+test('caller cancellation remains active while a successful response body is still streaming', async ({ page }) => {
+  await page.route('**/api/review-tasks?*', route => route.fulfill({ json: [] }))
+  await page.goto('/reviews')
+  await expect(page.getByRole('region', { name: 'Connected identity' })).toContainText('Demo Label Officer')
+  const result = await page.evaluate(async () => {
+    const { requestLabelJson } = await import('/src/api/labels.ts')
+    const originalFetch = window.fetch
+    let aborted = false
+    window.fetch = async (input, init) => {
+      if (input !== '/api/streamed-read-regression') return originalFetch(input, init)
+      const stream = new ReadableStream({ start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"incomplete":'))
+        init?.signal?.addEventListener('abort', () => {
+          aborted = true
+          controller.error(new DOMException('The read was aborted', 'AbortError'))
+        }, { once: true })
+      } })
+      return new Response(stream, { status: 200 })
+    }
+    const controller = new AbortController()
+    const read = requestLabelJson('/api/streamed-read-regression', { signal: controller.signal })
+      .then(() => 'unexpected-success', () => 'cancelled')
+    const timer = setTimeout(() => controller.abort(), 30)
+    try {
+      const outcome = await Promise.race([read, new Promise(resolve => setTimeout(() => resolve('hung'), 1000))])
+      return { outcome, aborted }
+    } finally { clearTimeout(timer); window.fetch = originalFetch }
+  })
+  expect(result).toEqual({ outcome: 'cancelled', aborted: true })
+})
+
 test('a browser-created analysis is restored by GET after reload without repeating the command', async ({ page }) => {
   await impactReads(page)
   let posts = 0

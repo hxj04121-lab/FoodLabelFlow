@@ -3,6 +3,9 @@ package com.spectrace.workflow;
 import com.spectrace.identity.domain.AuthenticatedActor;
 import com.spectrace.label.application.LabelVersionConflictException;
 import com.spectrace.support.MySqlIntegrationTestSupport;
+import com.spectrace.validation.application.port.ValidationRunRepository;
+import com.spectrace.validation.domain.ValidationRun;
+import com.spectrace.validation.domain.ValidationStatus;
 import com.spectrace.workflow.application.LabelReviewService;
 import com.spectrace.workflow.application.port.LabelReviewCommandRepository;
 import com.spectrace.workflow.application.port.LabelWorkflowRepository;
@@ -18,6 +21,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.time.Instant;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -53,6 +57,9 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private ValidationRunRepository validationRuns;
 
     @Autowired
     private LabelWorkflowRepository workflowRepository;
@@ -1246,33 +1253,18 @@ class WorkflowIntegrationTest extends MySqlIntegrationTestSupport {
     }
 
     private void createPassedValidation(String labelVersionId) {
-        jdbcTemplate.update(
+        ValidationRun run = jdbcTemplate.queryForObject(
                 """
-                INSERT INTO validation_run (
-                    validation_run_id,
-                    label_version_id,
-                    rule_set_version_id,
-                    status,
-                    ran_by_user_id,
-                    ran_at,
-                    summary,
-                    data_provenance_id
-                )
-                SELECT
-                    ?,
-                    label_version_id,
-                    rule_set_version_id,
-                    'PASSED',
-                    'user_label_officer',
-                    NOW(),
-                    'SCRUM-37 lifecycle transition test',
-                    data_provenance_id
+                SELECT label_version_id, rule_set_version_id, data_provenance_id
                 FROM label_version
                 WHERE label_version_id = ?
                 """,
-                "validation_run_scrum37_" + labelVersionId,
-                labelVersionId
-        );
+                (rs, row) -> new ValidationRun("validation_run_scrum37_" + labelVersionId,
+                        rs.getString("label_version_id"), rs.getString("rule_set_version_id"),
+                        ValidationStatus.PASSED, "user_label_officer", Instant.now(),
+                        "SCRUM-37 lifecycle transition test", rs.getString("data_provenance_id")),
+                labelVersionId);
+        validationRuns.save(run);
     }
 
         private void restoreSupersededBaseline() {

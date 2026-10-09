@@ -31,7 +31,7 @@ test('product search, group filter, pagination and traceability tabs', async ({
     .getByRole('combobox', { name: 'Filter fixture group' })
     .selectOption('REVIEW_REQUIRED_BASELINE_NO_SOY')
   await expect(page.getByText('20 products', { exact: true })).toBeVisible()
-  await page.getByRole('combobox').selectOption('all')
+  await page.getByRole('combobox', { name: 'Filter fixture group' }).selectOption('all')
   await page.getByRole('textbox', { name: 'Search products' }).fill('1106285')
   await expect(page.locator('tbody tr')).toHaveCount(1)
   await page
@@ -92,6 +92,32 @@ test('all routes, material details and honest unavailable states', async ({
 test('mobile navigation and no page-wide overflow', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto('/')
+  // 临时调试：查找超出手机屏幕的元素
+const overflowElements = await page.evaluate(() => {
+  const viewportWidth = document.documentElement.clientWidth
+
+  return Array.from(document.querySelectorAll('*'))
+    .map((element) => {
+      const rect = element.getBoundingClientRect()
+      return {
+        tag: element.tagName,
+        className: typeof element.className === 'string' ? element.className : '',
+        right: Math.round(rect.right),
+        width: Math.round(rect.width),
+      }
+    })
+    .filter((element) => element.right > viewportWidth + 1)
+    .slice(0, 20)
+})
+
+console.log('MOBILE OVERFLOW ELEMENTS:', overflowElements)
+
+// 原来的测试代码，保留不动
+expect(
+  await page.evaluate(
+    () => document.documentElement.scrollWidth <= innerWidth,
+  ),
+).toBeTruthy()
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,

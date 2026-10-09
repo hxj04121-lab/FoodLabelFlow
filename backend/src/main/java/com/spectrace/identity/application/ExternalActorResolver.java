@@ -1,6 +1,9 @@
 package com.spectrace.identity.application;
 
 import com.spectrace.identity.domain.AuthenticatedActor;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -9,11 +12,23 @@ import org.springframework.stereotype.Component;
 public class ExternalActorResolver {
     private final IdentityService identities;
     private final boolean devExternalEnabled;
+    private final boolean productionRuntime;
 
     public ExternalActorResolver(IdentityService identities,
             @Value("${spectrace.dev-external-auth.enabled:false}") boolean devExternalEnabled) {
+        this(identities, devExternalEnabled, null, "development");
+    }
+
+    @Autowired
+    public ExternalActorResolver(IdentityService identities,
+            @Value("${spectrace.dev-external-auth.enabled:false}") boolean devExternalEnabled,
+            Environment environment,
+            @Value("${spectrace.runtime.environment:development}") String runtimeEnvironment) {
         this.identities = identities;
         this.devExternalEnabled = devExternalEnabled;
+        this.productionRuntime = "production".equalsIgnoreCase(runtimeEnvironment)
+                || "prod".equalsIgnoreCase(runtimeEnvironment)
+                || (environment != null && environment.acceptsProfiles(Profiles.of("prod", "production")));
     }
 
     public AuthenticatedActor resolve(String provider, String subject) {
@@ -26,9 +41,14 @@ public class ExternalActorResolver {
             throw new UnknownIdentityException("Authentication provider namespace is not supported");
         }
         // Identity provider lookup is case-insensitive in MySQL; the flag must match that boundary.
-        if ("DEV_EXTERNAL".equalsIgnoreCase(provider.trim()) && !devExternalEnabled) {
+        if ("DEV_EXTERNAL".equalsIgnoreCase(provider.trim())
+                && (!devExternalEnabled || productionRuntime)) {
             throw new UnknownIdentityException("Development external authentication is disabled");
         }
         return identities.authenticate(provider, subject);
+    }
+
+    public boolean isDemoIdentitySwitchingEnabled() {
+        return devExternalEnabled && !productionRuntime;
     }
 }

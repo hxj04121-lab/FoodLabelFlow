@@ -5,7 +5,18 @@ Status: **local review draft; candidate and owner decisions remain pending**.
 
 ## Current consumer qualification — 8 Oct 2026
 
-9 October supplement: M1's [PR76 review](https://github.com/hxj04121-lab/FoodLabelFlow/pull/76#issuecomment-6072749690)
+Current local completion — 9 October: XFY now integrates owner PR87 `417133e`
+with PR76 `6d5d897` against main `36f52bf`. The existing revision/identity APIs
+were reused, retaining exact task URLs and read deadlines alongside actor
+generation guards. A new label adopts its own returned rule set, clears old
+PASS, and requires fresh validation before independent approval/publication.
+Unknown revisions reconcile captured task/old ID/declarations through reads;
+no automatic expected-ID replacement or repeated POST is added. The local
+correction browser test now checks API/DB history and denied writes and is wired
+to its own disposable CI stack. These changes still need team review and
+matching merged-main CI; no personal Jira closure or owner signoff is asserted.
+
+Earlier 9 October supplement: M1's [PR76 review](https://github.com/hxj04121-lab/FoodLabelFlow/pull/76#issuecomment-6072749690)
 confirms impact semantics and real restore/replay behavior without a blocking
 change. Its defensive finding-code check and explicit same-create retry are now
 addressed in XFY. The latter preserves captured inputs and treats 409 as a

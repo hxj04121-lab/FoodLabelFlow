@@ -1,9 +1,10 @@
 # A07 — M3 impact, review and publication UI
 
 Owner: Xu Feiyang / M3. Updated: 9 October 2026. Tasks: SCRUM-49/71–74.
-Status: implementation-bound delivery; final acceptance and owner decisions pending.
-Latest baseline: main `36f52bf`, integrated safely into XFY. It preserves the
-production sources of `0dc1737` on which the local state repairs were qualified.
+Status: verified local integration; final team acceptance and merged-main CI pending.
+Baseline: main `36f52bf` plus owner integration PR87 `417133e`, integrated locally
+into XFY while retaining the PR76 context repairs. The earlier Docker receipts
+remain historical; the new returned-revision path has its own execution record.
 
 ## Scope and actual implementation
 
@@ -23,9 +24,10 @@ records backend classes and transactions. This document records M3's UI design.
 | Change/run context | [Impact.tsx](../../frontend/src/pages/Impact.tsx), [impact client](../../frontend/src/api/impact.ts) | Complete paged reads, deduplication, exact change/run/rule-set URL context and GET-only restoration |
 | Task context | [Reviews.tsx](../../frontend/src/pages/Reviews.tsx), [workflow client](../../frontend/src/api/label-workflow.ts) | Bounded filtered pages; manual selection, reload and browser back preserve the exact task |
 | First replacement | [Labels.tsx](../../frontend/src/pages/Labels.tsx) | Exact task/product/formula binding; first-create immutable declarations; catalog readiness guard |
+| Returned replacement | [Labels.tsx](../../frontend/src/pages/Labels.tsx), [declaration panel](../../frontend/src/components/LabelDeclarationsPanel.tsx) | Save a complete new declaration snapshot as a new immutable ID; retain the same task; clear old PASS and verify the new binding |
 | Validation | [LabelValidationPanel.tsx](../../frontend/src/components/LabelValidationPanel.tsx) | Rule-level results bound to the exact label/rule set; declarations and derived facts remain separate |
 | Workflow | [LabelWorkflowPanel.tsx](../../frontend/src/components/LabelWorkflowPanel.tsx) | Separate commands, exact responses, permission controls and uncertain-command reconciliation |
-| Identity | [CurrentIdentityPanel.tsx](../../frontend/src/components/CurrentIdentityPanel.tsx) | Actual connected user/permissions; fail closed while unavailable; refresh does not select another actor |
+| Identity | [CurrentIdentityPanel.tsx](../../frontend/src/components/CurrentIdentityPanel.tsx), [identity session](../../frontend/src/api/identity-session.ts) | Controlled demo Maker/Checker/Publisher; verify server permissions; invalidate old responses and consent; reload verifies the stored selection |
 
 ## Implemented sequence: preserve resource context
 
@@ -98,18 +100,43 @@ sequenceDiagram
         checker->>ui: APPROVE, REQUEST_CHANGES or REJECT
         ui->>api: POST independent decision
         api-->>ui: Authoritative outcome
-        publisher->>ui: Open approved exact target
-        ui->>api: Check binding and POST publication
-        api-->>ui: PUBLISHED after atomic transaction
-        ui->>api: Reread exact label and task
-        api-->>ui: Persisted publication and resolved task
+        alt REQUEST_CHANGES
+            api-->>ui: Same task OPEN; old immutable label DRAFT
+            maker->>ui: Switch to verified Maker; save complete revised declarations
+            ui->>api: POST task draft-revisions with expected old label ID
+            api-->>ui: New immutable label ID and committed task binding
+            ui->>api: GET exact task and new declarations
+            ui->>ui: Adopt new ID; clear old validation and consent
+            maker->>ui: Validate new ID with its own returned rule set
+            ui->>api: POST validation; then explicitly submit with current PASS
+            api-->>ui: New version PENDING_REVIEW
+            checker->>ui: Switch to verified independent Checker; APPROVE
+            ui->>api: POST new-version decision
+            api-->>ui: New version APPROVED
+        else REJECT
+            api-->>ui: Rejected state; publication unavailable
+        end
+        alt Exact target is APPROVED
+            publisher->>ui: Open approved exact target
+            ui->>api: Check binding and POST publication
+            api-->>ui: PUBLISHED after atomic transaction
+            ui->>api: Reread exact label and task
+            api-->>ui: Persisted publication and resolved task
+        else Target is not APPROVED
+            ui-->>publisher: Publication remains unavailable
+        end
     end
 ```
 
-These actor contexts are distinct supported callers; the sequence does not
-claim an implemented in-product switch. M4 must adopt the login/demo decision
-and controlled switch. Approval is separate from publication. Live tests verify
-old SUPERSEDED/new PUBLISHED labels, CLOSED tasks and immutable history.
+These are distinct server-side callers selected through M4's controlled local
+demo switch. The backend verifies each operation and rejects DEV_EXTERNAL in
+production; OIDC remains deferred. The stored selection is a demo preference,
+not a token or proof of permissions. Reload resolves it through the server;
+invalid/revoked permissions keep writes unavailable. Approval and publication
+are separate. Only an APPROVED exact target proceeds to publication; REJECT
+ends that path. The returned old replacement remains DRAFT with immutable
+content and history. The original published label becomes SUPERSEDED only
+after the new version is actually published.
 
 ## Individual design problem: async consistency across context changes
 
@@ -132,6 +159,21 @@ prevent obsolete reads from committing. Task-detail and change-list reads have
 traversals and ready results are distinct; partial choices are not published as
 complete. Guards remain component-local, not durable cross-page command tracking.
 
+Identity generation adds a boundary to URL/request generation. Switch/refresh
+removes old permissions, consent and displayed responses; saved resource IDs
+remain available for authenticated rereads. Review details retain their URL and
+15-second deadline alongside that guard. Impact rereads saved context and ignores
+old-actor completions. Switching cannot undo a committed command; unknown impact
+commands retain captured inputs rather than clearing the protective guard.
+
+Revision recovery captures the original task, expected old label, maker and full
+declarations. 409, lost/invalid responses and 5xx lead only to exact reads. A
+matching stored new version may be adopted without claiming causal proof of the
+original command. Nonmatching state retains inputs and blocks another revision
+POST. No expected ID is automatically replaced and no revision POST is retried.
+New-ID adoption clears old PASS; the server also rechecks persisted current
+validation at submit, APPROVE and publish.
+
 ## Verification and remaining acceptance
 
 [Current test/evidence record](S3-M3-test-design.md) separates predecessor main
@@ -148,10 +190,9 @@ PR72 and its actual main workflow 37765740477, separately from the older officer
 ACL and local UI fixtures. See [the source/evidence supplement](S3-compound-maker-negative-20261008.md).
 Its disposable identity does not adopt M4's login/demo-switch choice.
 
-M3 assesses this A07 and accepts its exact consumer contract scope. M4 owns
-login/demo switching; M5 owns staging. Tests and artifacts do not adopt those
-choices. REQUEST_CHANGES returns the same immutable draft; declaration editing
-or task rebinding is not invented as a correction flow.
+M3's source assessment, M4's owner decision and M5's staging record retain their
+separate attribution. The owner implementation is integrated locally; its
+proposed ADR and unmerged PR are not team signoff or merged-main qualification.
 
 ## PR76 review follow-up — 9 October
 
@@ -173,14 +214,16 @@ rule set. A new revision must clear the old displayed PASS. Later FAILED results
 must be checked by the server at submit, APPROVE and publish; timestamp/UUID
 ordering cannot establish the current validation.
 
-As checked on 9 October, [PR86](https://github.com/hxj04121-lab/FoodLabelFlow/pull/86)
+At the start of 9 October, [PR86](https://github.com/hxj04121-lab/FoodLabelFlow/pull/86)
 provides switching and revision UI/API, and draft
 [PR87](https://github.com/hxj04121-lab/FoodLabelFlow/pull/87) integrates current-run
 guards and captured revision recovery. Neither is merged into main or XFY.
-Their login ADR still says proposed; their full revision-browser acceptance
+Their login ADR still said proposed; their full revision-browser acceptance
 document says NOT RUN, and the current containers workflow does not execute that
 new full revision test. Successful PR checks are not final main acceptance.
-These are available integration inputs, not missing features to independently
-reimplement in PR76. Preserve PR76's task URL/restoration/timeouts alongside their
-identity-generation guards, then update this sequence to the actually integrated
-implementation and record the full browser/main-CI proof.
+These owner implementations were reused in the current local integration,
+preserving PR76's task URL/restoration/timeouts. A fresh local MySQL/browser run
+now proves correction, exact validation, independent approval, publication and
+immutable history; it is wired into a separate disposable CI stack. An inherited
+reload bug that reset Publisher to Maker was corrected. Local results do not
+substitute for the combined source's future merged-main CI.
