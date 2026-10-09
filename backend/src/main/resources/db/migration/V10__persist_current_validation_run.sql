@@ -156,8 +156,31 @@ DROP PROCEDURE IF EXISTS sp_submit_label_for_review;
 DROP PROCEDURE IF EXISTS sp_record_label_decision;
 DROP PROCEDURE IF EXISTS sp_record_label_validation_pass;
 DROP PROCEDURE IF EXISTS sp_record_label_validation_fail;
+DROP PROCEDURE IF EXISTS sp_assert_label_actor_permission;
+DROP PROCEDURE IF EXISTS sp_record_label_validation_fixture;
 
 DELIMITER $$
+
+-- Shared permission read only: callers retain their original lock and transaction position.
+CREATE PROCEDURE sp_assert_label_actor_permission(
+  IN p_actor_user_id VARCHAR(80),
+  IN p_permission_code VARCHAR(140),
+  IN p_denied_message VARCHAR(128)
+)
+BEGIN
+  DECLARE v_permission_count INT DEFAULT 0;
+  SELECT COUNT(*) INTO v_permission_count
+  FROM user_account ua
+  JOIN user_role ur ON ur.user_id = ua.user_id
+  JOIN role_permission rp ON rp.role_id = ur.role_id
+  JOIN permission p ON p.permission_id = rp.permission_id
+  WHERE ua.user_id = p_actor_user_id
+    AND ua.is_active = 'Y'
+    AND p.permission_code = p_permission_code;
+  IF v_permission_count < 1 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = p_denied_message;
+  END IF;
+END$$
 
 CREATE PROCEDURE sp_assert_current_label_version(
   IN p_label_version_id VARCHAR(120)
@@ -261,7 +284,6 @@ CREATE PROCEDURE sp_submit_label_for_review(
   IN p_actor_user_id VARCHAR(80)
 )
 BEGIN
-  DECLARE v_permission_count INT DEFAULT 0;
   DECLARE v_returned_task_id VARCHAR(140);
 
   DECLARE EXIT HANDLER FOR SQLEXCEPTION
@@ -276,23 +298,9 @@ BEGIN
     p_label_version_id
   );
 
-  SELECT COUNT(*) INTO v_permission_count
-  FROM user_account ua
-  JOIN user_role ur
-    ON ur.user_id = ua.user_id
-  JOIN role_permission rp
-    ON rp.role_id = ur.role_id
-  JOIN permission p
-    ON p.permission_id = rp.permission_id
-  WHERE ua.user_id = p_actor_user_id
-    AND ua.is_active = 'Y'
-    AND p.permission_code = 'LABEL.SUBMIT_REVIEW';
-
-  IF v_permission_count < 1 THEN
-    SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT =
-        'Actor lacks LABEL.SUBMIT_REVIEW permission';
-  END IF;
+  CALL sp_assert_label_actor_permission(
+    p_actor_user_id, 'LABEL.SUBMIT_REVIEW', 'Actor lacks LABEL.SUBMIT_REVIEW permission'
+  );
 
   -- The Java command and direct helper require a fresh immutable revision.
   -- V4 decisions did not populate V7's decision summary: retain attributed
@@ -383,7 +391,6 @@ CREATE PROCEDURE sp_record_label_decision(
   IN p_comments VARCHAR(1000)
 )
 BEGIN
-  DECLARE v_permission_count INT DEFAULT 0;
   DECLARE v_permission_code VARCHAR(140);
   DECLARE v_new_status VARCHAR(40);
   DECLARE v_creator_user_id VARCHAR(80);
@@ -422,23 +429,9 @@ BEGIN
   FROM label_version
   WHERE label_version_id = p_label_version_id;
 
-  SELECT COUNT(*) INTO v_permission_count
-  FROM user_account ua
-  JOIN user_role ur
-    ON ur.user_id = ua.user_id
-  JOIN role_permission rp
-    ON rp.role_id = ur.role_id
-  JOIN permission p
-    ON p.permission_id = rp.permission_id
-  WHERE ua.user_id = p_actor_user_id
-    AND ua.is_active = 'Y'
-    AND p.permission_code = v_permission_code;
-
-  IF v_permission_count < 1 THEN
-    SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT =
-        'Actor lacks required label-decision permission';
-  END IF;
+  CALL sp_assert_label_actor_permission(
+    p_actor_user_id, v_permission_code, 'Actor lacks required label-decision permission'
+  );
 
   SELECT rt.review_task_id
   INTO v_review_task_id
@@ -558,68 +551,89 @@ BEGIN
   COMMIT;
 END$$
 
-CREATE PROCEDURE sp_record_label_validation_pass(
+-- One fixture command owns the same transaction as the legacy PASS/FAIL helpers.
+-- Permission and bound-rule reads precede START TRANSACTION, so a denied call
+-- cannot implicitly commit an existing caller transaction before it is rejected.
+CREATE PROCEDURE sp_record_label_validation_fixture(
   IN p_label_version_id VARCHAR(120),
-  IN p_actor_user_id VARCHAR(80)
+  IN p_actor_user_id VARCHAR(80),
+  IN p_fixture_status VARCHAR(40),
+  IN p_message VARCHAR(1000)
 )
 BEGIN
-  DECLARE v_permission_count INT DEFAULT 0;
   DECLARE v_rule_set_version_id VARCHAR(100);
   DECLARE v_validation_run_id VARCHAR(140);
+  DECLARE v_status VARCHAR(40);
+  DECLARE v_suffix VARCHAR(4);
+  DECLARE v_summary VARCHAR(1000);
+  DECLARE v_result_message VARCHAR(1000);
+  DECLARE v_result_code VARCHAR(140);
+  DECLARE v_severity VARCHAR(40);
+  DECLARE v_passed CHAR(1);
+  DECLARE v_blocking CHAR(1);
   DECLARE EXIT HANDLER FOR SQLEXCEPTION
   BEGIN
     ROLLBACK;
     RESIGNAL;
   END;
 
-  SELECT COUNT(*) INTO v_permission_count
-  FROM user_account ua
-  JOIN user_role ur ON ur.user_id = ua.user_id
-  JOIN role_permission rp ON rp.role_id = ur.role_id
-  JOIN permission p ON p.permission_id = rp.permission_id
-  WHERE ua.user_id = p_actor_user_id
-    AND ua.is_active = 'Y'
-    AND p.permission_code = 'LABEL.VALIDATE';
-
-  IF v_permission_count < 1 THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Actor lacks LABEL.VALIDATE permission';
-  END IF;
-
+  CALL sp_assert_label_actor_permission(
+    p_actor_user_id, 'LABEL.VALIDATE', 'Actor lacks LABEL.VALIDATE permission'
+  );
   SELECT rule_set_version_id INTO v_rule_set_version_id
   FROM label_version
   WHERE label_version_id = p_label_version_id;
-
   IF v_rule_set_version_id IS NULL THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Label version does not exist';
   END IF;
 
-  SET v_validation_run_id = CONCAT('val_pass_', p_label_version_id);
+  IF p_fixture_status = 'PASSED' THEN
+    SET v_status = 'PASSED', v_suffix = 'pass',
+        v_summary = 'Fixture validation passed: structured label declarations match formula-derived allergens.',
+        v_result_message = 'SOY/MILK/WHEAT controlled fixture allergens match the structured label declaration.',
+        v_result_code = 'FORMULA_LABEL_ALLERGEN_MATCH', v_severity = 'INFO',
+        v_passed = 'Y', v_blocking = 'N';
+  ELSEIF p_fixture_status = 'FAILED' THEN
+    SET v_status = 'FAILED', v_suffix = 'fail',
+        v_summary = p_message, v_result_message = p_message,
+        v_result_code = 'FORMULA_LABEL_ALLERGEN_MISMATCH', v_severity = 'ERROR',
+        v_passed = 'N', v_blocking = 'Y';
+  ELSE
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Unsupported fixture validation status';
+  END IF;
+  SET v_validation_run_id = CONCAT('val_', v_suffix, '_', p_label_version_id);
 
   START TRANSACTION;
   CALL sp_insert_validation_run(
-    v_validation_run_id, p_label_version_id, v_rule_set_version_id, 'PASSED',
-    p_actor_user_id, NOW(), 'Fixture validation passed: structured label declarations match formula-derived allergens.', 'prov_validation_fixture'
+    v_validation_run_id, p_label_version_id, v_rule_set_version_id, v_status,
+    p_actor_user_id, NOW(), v_summary, 'prov_validation_fixture'
   );
-
   INSERT INTO validation_result (
     validation_result_id, validation_run_id, rule_definition_id, result_code,
     severity, passed, blocking, message
   ) VALUES (
-    CONCAT('valres_pass_', p_label_version_id), v_validation_run_id, NULL,
-    'FORMULA_LABEL_ALLERGEN_MATCH', 'INFO', 'Y', 'N',
-    'SOY/MILK/WHEAT controlled fixture allergens match the structured label declaration.'
+    CONCAT('valres_', v_suffix, '_', p_label_version_id), v_validation_run_id, NULL,
+    v_result_code, v_severity, v_passed, v_blocking, v_result_message
   );
-
   INSERT INTO audit_event (
     audit_event_id, event_type, entity_type, entity_id, event_at, actor_user_id,
     before_value, after_value, event_payload, correlation_id, data_provenance_id
   ) VALUES (
-    CONCAT('audit_val_pass_', p_label_version_id), 'LABEL_VALIDATION_PASSED',
+    CONCAT('audit_val_', v_suffix, '_', p_label_version_id), CONCAT('LABEL_VALIDATION_', v_status),
     'LABEL_VERSION', p_label_version_id, NOW(), p_actor_user_id,
-    NULL, JSON_OBJECT('validation_status','PASSED'), JSON_OBJECT('helper','sp_record_label_validation_pass'),
+    NULL, JSON_OBJECT('validation_status', v_status),
+    JSON_OBJECT('helper', CONCAT('sp_record_label_validation_', v_suffix)),
     p_label_version_id, 'prov_validation_fixture'
   );
   COMMIT;
+END$$
+
+CREATE PROCEDURE sp_record_label_validation_pass(
+  IN p_label_version_id VARCHAR(120),
+  IN p_actor_user_id VARCHAR(80)
+)
+BEGIN
+  CALL sp_record_label_validation_fixture(p_label_version_id, p_actor_user_id, 'PASSED', NULL);
 END$$
 
 CREATE PROCEDURE sp_record_label_validation_fail(
@@ -628,62 +642,7 @@ CREATE PROCEDURE sp_record_label_validation_fail(
   IN p_message VARCHAR(1000)
 )
 BEGIN
-  DECLARE v_permission_count INT DEFAULT 0;
-  DECLARE v_rule_set_version_id VARCHAR(100);
-  DECLARE v_validation_run_id VARCHAR(140);
-  DECLARE EXIT HANDLER FOR SQLEXCEPTION
-  BEGIN
-    ROLLBACK;
-    RESIGNAL;
-  END;
-
-  SELECT COUNT(*) INTO v_permission_count
-  FROM user_account ua
-  JOIN user_role ur ON ur.user_id = ua.user_id
-  JOIN role_permission rp ON rp.role_id = ur.role_id
-  JOIN permission p ON p.permission_id = rp.permission_id
-  WHERE ua.user_id = p_actor_user_id
-    AND ua.is_active = 'Y'
-    AND p.permission_code = 'LABEL.VALIDATE';
-
-  IF v_permission_count < 1 THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Actor lacks LABEL.VALIDATE permission';
-  END IF;
-
-  SELECT rule_set_version_id INTO v_rule_set_version_id
-  FROM label_version
-  WHERE label_version_id = p_label_version_id;
-
-  IF v_rule_set_version_id IS NULL THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Label version does not exist';
-  END IF;
-
-  SET v_validation_run_id = CONCAT('val_fail_', p_label_version_id);
-
-  START TRANSACTION;
-  CALL sp_insert_validation_run(
-    v_validation_run_id, p_label_version_id, v_rule_set_version_id, 'FAILED',
-    p_actor_user_id, NOW(), p_message, 'prov_validation_fixture'
-  );
-
-  INSERT INTO validation_result (
-    validation_result_id, validation_run_id, rule_definition_id, result_code,
-    severity, passed, blocking, message
-  ) VALUES (
-    CONCAT('valres_fail_', p_label_version_id), v_validation_run_id, NULL,
-    'FORMULA_LABEL_ALLERGEN_MISMATCH', 'ERROR', 'N', 'Y', p_message
-  );
-
-  INSERT INTO audit_event (
-    audit_event_id, event_type, entity_type, entity_id, event_at, actor_user_id,
-    before_value, after_value, event_payload, correlation_id, data_provenance_id
-  ) VALUES (
-    CONCAT('audit_val_fail_', p_label_version_id), 'LABEL_VALIDATION_FAILED',
-    'LABEL_VERSION', p_label_version_id, NOW(), p_actor_user_id,
-    NULL, JSON_OBJECT('validation_status','FAILED'), JSON_OBJECT('helper','sp_record_label_validation_fail'),
-    p_label_version_id, 'prov_validation_fixture'
-  );
-  COMMIT;
+  CALL sp_record_label_validation_fixture(p_label_version_id, p_actor_user_id, 'FAILED', p_message);
 END$$
 
 DELIMITER ;

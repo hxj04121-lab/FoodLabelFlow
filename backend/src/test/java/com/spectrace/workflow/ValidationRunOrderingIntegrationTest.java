@@ -128,6 +128,118 @@ class ValidationRunOrderingIntegrationTest {
         } finally { MYSQL.stop(); }
     }
 
+    @Test @Timeout(120)
+    void sqlFixtureWrappersPreserveMetadataHistoryAndNullOrEmptyFailureSemantics() throws Exception {
+        String product = unusedProduct();
+        var draft = draftWithTask(product);
+        String label = draft.get("labelVersionId").stringValue();
+        String rule = draft.get("ruleSetVersionId").stringValue();
+        jdbc.update("CALL sp_record_label_validation_pass(?,?)", label, S3CompoundMakerFixture.USER_ID);
+        assertFixtureRecord(label, rule, "pass", "PASSED",
+                "Fixture validation passed: structured label declarations match formula-derived allergens.",
+                "SOY/MILK/WHEAT controlled fixture allergens match the structured label declaration.");
+        var originalPass = jdbc.queryForMap("SELECT * FROM validation_run WHERE validation_run_id=?", "val_pass_" + label);
+        String message = "Private fixture mismatch: SOY declaration missing.";
+        jdbc.update("CALL sp_record_label_validation_fail(?,?,?)", label, S3CompoundMakerFixture.USER_ID, message);
+        assertFixtureRecord(label, rule, "fail", "FAILED", message, message);
+        assertThat(jdbc.queryForMap("SELECT * FROM validation_run WHERE validation_run_id=?", "val_pass_" + label))
+                .as("a later FAIL preserves the earlier PASS evidence").isEqualTo(originalPass);
+        assertThat(((Number) current(label, rule).get("current_sequence")).longValue()).isEqualTo(2L);
+        assertThat(((Number) current(label, rule).get("observed_run_count")).longValue()).isEqualTo(2L);
+
+        var emptyDraft = draftWithTask(unusedProduct());
+        String emptyLabel = emptyDraft.get("labelVersionId").stringValue();
+        String emptyRule = emptyDraft.get("ruleSetVersionId").stringValue();
+        var beforeNullFailure = allPersistenceRows();
+        SQLException nullFailure;
+        try (var connection = Objects.requireNonNull(jdbc.getDataSource()).getConnection();
+             var call = connection.prepareCall("{call sp_record_label_validation_fail(?,?,?)}")) {
+            call.setString(1, emptyLabel); call.setString(2, S3CompoundMakerFixture.USER_ID);
+            call.setNull(3, java.sql.Types.VARCHAR);
+            nullFailure = catchThrowableOfType(call::execute, SQLException.class);
+        }
+        assertThat((Throwable) nullFailure).isNotNull();
+        assertThat(nullFailure.getErrorCode()).as("real NOT NULL failure after the run/current writes").isEqualTo(1048);
+        assertThat(nullFailure.getSQLState()).isEqualTo("23000");
+        assertThat(allPersistenceRows()).as("NULL failure rolls back run, result, current, registration and audit").isEqualTo(beforeNullFailure);
+        jdbc.update("CALL sp_record_label_validation_fail(?,?,?)", emptyLabel, S3CompoundMakerFixture.USER_ID, "");
+        assertFixtureRecord(emptyLabel, emptyRule, "fail", "FAILED", "", "");
+        assertThat(((Number) current(emptyLabel, emptyRule).get("current_sequence")).longValue()).isEqualTo(1L);
+        observe("sqlFixtureMetadataAndRealNullRollback", Map.of("label", label, "emptyMessageLabel", emptyLabel,
+                "nullSqlState", nullFailure.getSQLState(), "nullErrorCode", nullFailure.getErrorCode(),
+                "currentAfterPassThenFail", current(label, rule), "currentAfterRolledBackNullThenEmpty", current(emptyLabel, emptyRule)));
+    }
+
+    @Test @Timeout(120)
+    void deniedSqlFixtureWrappersRollBackCallerInputWithoutImplicitCommit() throws Exception {
+        String actor = "user_approver";
+        assertThat(jdbc.queryForObject("""
+                SELECT COUNT(*) FROM user_account ua JOIN user_role ur ON ur.user_id=ua.user_id
+                JOIN role_permission rp ON rp.role_id=ur.role_id JOIN permission p ON p.permission_id=rp.permission_id
+                WHERE ua.user_id=? AND ua.is_active='Y' AND p.permission_code='LABEL.VALIDATE'
+                """, Integer.class, actor)).isZero();
+        var before = allPersistenceRows();
+        for (String suffix : List.of("pass", "fail")) {
+            String marker = "denied_fixture_" + UUID.randomUUID().toString().replace("-", "");
+            SQLException denied;
+            try (var connection = Objects.requireNonNull(jdbc.getDataSource()).getConnection()) {
+                connection.setAutoCommit(false);
+                try (var insert = connection.prepareStatement("""
+                        INSERT INTO change_request(change_request_id,change_request_code,change_type,status,
+                            requested_at,requested_by_user_id,description,from_formula_version_id,to_formula_version_id,data_provenance_id)
+                        SELECT ?,?,'FORMULA','ANALYZED',NOW(),'user_label_officer','Uncommitted private rejection input',
+                            current_formula_version_id,current_formula_version_id,data_provenance_id FROM product WHERE product_id=?
+                        """)) {
+                    insert.setString(1, marker); insert.setString(2, marker); insert.setString(3, "prod_usda_1106285");
+                    assertThat(insert.executeUpdate()).isEqualTo(1);
+                }
+                assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM change_request WHERE change_request_id=?", Integer.class, marker))
+                        .as("the caller input is genuinely uncommitted before the wrapper").isZero();
+                String sql = suffix.equals("pass") ? "{call sp_record_label_validation_pass(?,?)}"
+                        : "{call sp_record_label_validation_fail(?,?,?)}";
+                try (var call = connection.prepareCall(sql)) {
+                    call.setString(1, "missing_label_permission_must_be_checked_first"); call.setString(2, actor);
+                    if (suffix.equals("fail")) call.setString(3, "Private rejected FAIL input");
+                    denied = catchThrowableOfType(call::execute, SQLException.class);
+                }
+                assertThat((Throwable) denied).isNotNull();
+                assertThat(denied.getSQLState()).isEqualTo("45000");
+                assertThat(denied.getMessage()).contains("Actor lacks LABEL.VALIDATE permission");
+                connection.commit(); // Exposes any accidental START-before-permission commit or missing rollback.
+            }
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM change_request WHERE change_request_id=?", Integer.class, marker)).isZero();
+            assertThat(allPersistenceRows()).as("denied %s leaves all twenty-one tables identical", suffix).isEqualTo(before);
+            observe("deniedSqlFixtureCallerRollback", Map.of("wrapper", suffix, "marker", marker,
+                    "sqlState", denied.getSQLState(), "callerCommitAfterRejection", true));
+        }
+    }
+
+    private void assertFixtureRecord(String label, String rule, String suffix, String status, String summary, String message) {
+        String runId = "val_" + suffix + "_" + label;
+        boolean passed = status.equals("PASSED");
+        assertThat(jdbc.queryForMap("SELECT * FROM validation_run WHERE validation_run_id=?", runId))
+                .containsEntry("label_version_id", label).containsEntry("rule_set_version_id", rule)
+                .containsEntry("status", status).containsEntry("ran_by_user_id", S3CompoundMakerFixture.USER_ID)
+                .containsEntry("summary", summary).containsEntry("data_provenance_id", "prov_validation_fixture");
+        assertThat(jdbc.queryForMap("SELECT * FROM validation_result WHERE validation_result_id=?", "valres_" + suffix + "_" + label))
+                .containsEntry("validation_run_id", runId).containsEntry("rule_definition_id", null)
+                .containsEntry("result_code", passed ? "FORMULA_LABEL_ALLERGEN_MATCH" : "FORMULA_LABEL_ALLERGEN_MISMATCH")
+                .containsEntry("severity", passed ? "INFO" : "ERROR").containsEntry("passed", passed ? "Y" : "N")
+                .containsEntry("blocking", passed ? "N" : "Y").containsEntry("message", message);
+        assertThat(jdbc.queryForMap("""
+                SELECT event_type,entity_type,entity_id,actor_user_id,before_value,correlation_id,data_provenance_id,
+                    JSON_UNQUOTE(JSON_EXTRACT(after_value,'$.validation_status')) AS fixture_status,
+                    JSON_UNQUOTE(JSON_EXTRACT(event_payload,'$.helper')) AS fixture_helper
+                FROM audit_event WHERE audit_event_id=?
+                """, "audit_val_" + suffix + "_" + label))
+                .containsEntry("event_type", "LABEL_VALIDATION_" + status).containsEntry("entity_type", "LABEL_VERSION")
+                .containsEntry("entity_id", label).containsEntry("actor_user_id", S3CompoundMakerFixture.USER_ID)
+                .containsEntry("before_value", null).containsEntry("correlation_id", label)
+                .containsEntry("data_provenance_id", "prov_validation_fixture").containsEntry("fixture_status", status)
+                .containsEntry("fixture_helper", "sp_record_label_validation_" + suffix);
+        assertThat(current(label, rule)).containsEntry("validation_run_id", runId).containsEntry("origin", "RECORDED");
+    }
+
     @Test
     @Timeout(120)
     void laterFailedValidationBlocksSubmissionDespiteLexicallyLargerOlderPassedUuid() throws Exception {
