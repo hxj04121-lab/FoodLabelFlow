@@ -1,199 +1,186 @@
-# A07 draft — M3 review/publication UI
+# A07 — M3 impact, review and publication UI
 
-Owner: Xu Feiyang / M3. Related: SCRUM-49, SCRUM-71–74.
-Date: 2026-09-29. Status: proposed interaction design, not implementation evidence.
+Owner: Xu Feiyang / M3. Updated: 9 October 2026. Tasks: SCRUM-49/71–74.
+Status: implementation-bound delivery; final acceptance and owner decisions pending.
+Latest baseline: main `36f52bf`, integrated safely into XFY. It preserves the
+production sources of `0dc1737` on which the local state repairs were qualified.
 
-## Scope and source of truth
+## Scope and actual implementation
 
-The M3 use case is **Review and publish a replacement label through the browser**.
-M3 presents task/version context, validation feedback and permitted operations.
-M4 authenticates actors and enforces submission, maker-checker, transitions and
-publication. M1 creates impact findings/tasks; M2 defines the shared contracts;
-M5 supplies persistence and CI support. The browser does not decide whether a
-label may legally transition or perform publication transactions.
+The user follows specification change → impact findings → exact ReviewTask →
+replacement label → rule-level validation → independent decision → publication.
+M3 consumes owner APIs. Classification, authentication/authorization, validation
+policy, maker-checker and atomic publication remain backend responsibilities.
 
-Sources: Jira SCRUM-49/71/72/73/74 and module parents SCRUM-47/48/50/51 read on
-28 Sep; [M2 Day 1 candidate](S3-M2-day1-contract-diff-freeze-candidate.md), merged
-in `0745fcd`; current source listed below. S3 method names in these diagrams are
-logical operations, **not proposed HTTP paths or implemented Java/React methods**.
-The exact contract, login approach and state transitions still require review.
+Actual contracts: [impact](../contracts/s3-impact-review-publication-api-v1.yaml),
+[product flow](../contracts/s3-label-product-flow-api-v1.yaml), and its
+[error matrix](../contracts/s3-label-product-flow-error-matrix-v1.md).
+The broader [integration A07](../architecture/S3-label-product-flow-a07.md)
+records backend classes and transactions. This document records M3's UI design.
 
-## Existing implementation and proposed extension
-
-| Area | Current main / this foundation | Proposed next step |
+| Concern | Actual source | Behavior |
 | --- | --- | --- |
-| Impact route | `frontend/src/pages/Impact.tsx`: unavailable state, disabled selector/action, materials navigation, no API client | Wire the frozen change/run/finding contract in SCRUM-71 |
-| Review route | `frontend/src/pages/Upcoming.tsx` remains a placeholder | Task list/detail and replacement label navigation in SCRUM-72 |
-| Exact label reads | `frontend/src/api/labels.ts`: getLabelDraft, getLabelDerivedAllergens, getLabelDeclarations | Reuse with the task's bound label; never substitute current/latest |
-| Validation feedback | `frontend/src/components/LabelValidationPanel.tsx`: version checks and rule-level results | Reuse for the task target; assess pending-response/reset behavior at the task boundary |
-| Read cancellation | `frontend/src/components/useLabelRead.ts`: abort and active-request guard | Apply this existing approach to task/run reads; include identity in invalidation |
-| Identity | Label client uses fixed local demo headers; shell profile is a preview | Adopt M4's login/controlled-user-switch decision; no identity claim from avatar text |
-| Review/publication | No S3 HTTP controller in the reviewed main | M4 provides authoritative operations and guards; M3 consumes results |
+| Change/run context | [Impact.tsx](../../frontend/src/pages/Impact.tsx), [impact client](../../frontend/src/api/impact.ts) | Complete paged reads, deduplication, exact change/run/rule-set URL context and GET-only restoration |
+| Task context | [Reviews.tsx](../../frontend/src/pages/Reviews.tsx), [workflow client](../../frontend/src/api/label-workflow.ts) | Bounded filtered pages; manual selection, reload and browser back preserve the exact task |
+| First replacement | [Labels.tsx](../../frontend/src/pages/Labels.tsx) | Exact task/product/formula binding; first-create immutable declarations; catalog readiness guard |
+| Validation | [LabelValidationPanel.tsx](../../frontend/src/components/LabelValidationPanel.tsx) | Rule-level results bound to the exact label/rule set; declarations and derived facts remain separate |
+| Workflow | [LabelWorkflowPanel.tsx](../../frontend/src/components/LabelWorkflowPanel.tsx) | Separate commands, exact responses, permission controls and uncertain-command reconciliation |
+| Identity | [CurrentIdentityPanel.tsx](../../frontend/src/components/CurrentIdentityPanel.tsx) | Actual connected user/permissions; fail closed while unavailable; refresh does not select another actor |
 
-## Analysis sequence: user-visible review and publication
-
-Preconditions: an impact finding requires review; its task has a replacement
-draft bound to an adopted formula; M4 supplies authenticated Maker A and Checker
-B. The maker in the self-approval rule means the label creator, not merely the
-last person to submit it. Any missing target must be resolved through M4's
-agreed creation/binding flow before validation or submission.
-
-```mermaid
-sequenceDiagram
-    actor maker as Maker A
-    actor checker as Checker B
-    participant ui as M3 Review UI
-    participant tasks as Task and Label Boundary
-    participant validation as Validation Service
-    participant workflow as M4 Review and Publication
-    participant store as Transactional Persistence
-    maker->>ui: Open the finding's review task
-    ui->>tasks: Read task and its exact replacement label
-    tasks-->>ui: Task, target versions and permitted context
-    ui-->>maker: Show task, label and version context
-    maker->>ui: Validate replacement label
-    ui->>validation: Validate exact label and rule-set versions
-    validation-->>ui: Validation run and rule-level results
-    ui-->>maker: Show blocking findings or successful validation
-    maker->>ui: Submit for review
-    ui->>workflow: Submit using authenticated actor and version context
-    workflow->>validation: Check latest validation for the same versions
-    alt Validation or state precondition fails
-        workflow-->>ui: Agreed domain error
-        ui-->>maker: Explain failure; do not show submission success
-    else Submission permitted
-        workflow->>store: Persist submission and required audit
-        store-->>workflow: Committed
-        workflow-->>ui: Authoritative review state
-        checker->>ui: Switch to Checker B and open the task
-        ui->>tasks: Reread task, label and actor-dependent context
-        tasks-->>ui: Exact target and current permitted actions
-        checker->>ui: Approve replacement
-        ui->>workflow: Request approval for the exact target
-        alt Actor, permission or current-version guard fails
-            workflow-->>ui: Agreed error; no successful transition
-            ui-->>checker: Explain rejection and refresh when appropriate
-        else Approval permitted
-            workflow->>store: Record approval
-            store-->>workflow: Approval recorded
-            workflow->>store: Publish atomically under approved-state guards
-            store-->>workflow: Old superseded, new published, task resolved, evidence committed
-            workflow-->>ui: Authoritative outcome
-            ui->>tasks: Reread task and old/new labels
-            tasks-->>ui: Persisted publication state
-            ui-->>checker: Show published and superseded versions
-        end
-    end
-```
-
-The approval/publication segment groups logical responsibilities only. M4/M2
-must decide whether publication is part of the approval command or a separate
-authorized command. The diagram does not assert two backend transactions or
-an automatic publish trigger. For a separate command, add the corresponding
-actor action and request after approval; until confirmed, do not implement
-either behavior in the UI. Publication includes the current-pointer change,
-task resolution, PublicationRecord and AuditEvent in one backend transaction.
-
-## Design problem: keeping version, identity and async state consistent
-
-A task page can still have a request for task A in flight after the user opens
-task B. The actor can also change while a validation or decision is pending.
-Blindly accepting late responses can show a passing result for the wrong label,
-enable an operation for the wrong identity, or report publication that has not
-been verified. Independent booleans such as `approved` and `published` also
-permit contradictory combinations in client state.
-
-### Options and decision
-
-| Option | Benefit | Cost / failure mode | Decision |
-| --- | --- | --- | --- |
-| Independent booleans with optimistic lifecycle updates | Small initial UI | Contradictory states, stale responses, rollback complexity; frontend may imply a transition the server rejected | Reject for review/publication |
-| A new frontend state-machine library mirroring all domain states | Explicit transition model | Adds a dependency and duplicates an unsettled M4 policy | Defer; reconsider only if UI complexity warrants it |
-| Local explicit request states, exact-context guards and authoritative rereads | Fits existing React/hooks; keeps server rules authoritative | Requires deliberate invalidation and command reconciliation | Proposed approach |
-
-Use a small presentation state model (unavailable, loading, ready, error,
-submitting, outcome-uncertain) rather than pretending these are server lifecycle
-states. Do not introduce a reusable workflow framework in the foundation.
-Keep the server's lifecycle and permission information distinct from transport
-state. UI action availability is a convenience, never authorization.
-
-On task, target-version or actor change, invalidate pending reads and clear
-identity-sensitive results. AbortController reduces wasted work; an active
-request/context check prevents late commits even when cancellation arrives too
-late. Keep label, formula, rule-set and jurisdiction bound consistently with
-the existing S2 contracts. The exact task DTO and actor representation are TBD.
-
-### Proposed design sequence: reads and uncertain commands
+## Implemented sequence: preserve resource context
 
 ```mermaid
 sequenceDiagram
     actor user as User
-    participant view as Review Page
-    participant client as API Client
-    participant api as Owner API
-    user->>view: Open task A as actor X
-    view->>client: Read with context A and cancellation signal
-    client->>api: Read authoritative resources
-    user->>view: Switch to task B or actor Y
-    view->>view: Invalidate A and clear old results/actions
-    view->>client: Abort old read and start new-context read
-    api-->>client: Late response for A
-    client-->>view: Old read resolves or fails
-    view->>view: Ignore response from invalidated context
-    api-->>client: New-context response
-    client-->>view: Resources for current context
-    view->>view: Verify target binding, then render
-    user->>view: Request a permitted operation
-    view->>view: Lock duplicate submission for current command
-    view->>client: Send command under captured actor/target context
-    client->>api: Command
-    alt Confirmed response
-        api-->>client: Authoritative result or domain rejection
-        client-->>view: Response for captured context
-        view->>view: Apply only if context still matches
-        view->>client: Reread state after successful operation
-    else Response lost or outcome uncertain
-        client-->>view: Uncertain outcome
-        view->>view: Keep write retry blocked; show reconciliation guidance
-        view->>client: Reconcile using frozen owner contract
+    participant impact as Impact page
+    participant impactApi as Impact client and API
+    participant reviews as Review workspace
+    participant taskApi as ReviewTask client and API
+    user->>impact: Select a recorded change
+    impact->>impact: Save exact change and rule-set IDs in URL
+    impact->>impactApi: GET exact selected change
+    impactApi-->>impact: Specification context or error
+    user->>impact: Run analysis with consent and permission
+    impact->>impactApi: POST captured change and rule set
+    impactApi-->>impact: Validated analysis and findings
+    impact->>impact: Save returned run ID in URL
+    user->>impact: Reload browser
+    impact->>impactApi: GET exact change and saved analysis
+    impactApi-->>impact: Persisted context and findings
+    impact->>impact: Check run, change and rule-set binding
+    user->>reviews: Open or manually select a task
+    reviews->>reviews: Save exact reviewTaskId in URL
+    reviews->>taskApi: GET exact task
+    taskApi-->>reviews: Task and nullable label binding
+    user->>reviews: Select B while A is loading
+    reviews->>reviews: Invalidate A, clear old detail and abort old read
+    reviews->>taskApi: GET B
+    taskApi-->>reviews: Current task response
+    reviews->>reviews: Accept only the current request generation
+    user->>reviews: Reload or navigate back
+    reviews->>taskApi: GET task named by URL
+```
+
+A fresh returned POST/read response supplies its own URL transition without an
+unnecessary second analysis GET. Reload/back/refresh reread authoritative state.
+No restored URL causes a business POST. Wrong IDs or run/change/rule-set pairs
+produce errors, never a switch to first/current/latest. An uncertain analysis
+is reconciled only against its captured change/rule-set context.
+Manual reads capture both URL and context generation and are aborted/ignored
+after navigation. Completed create/run commands for an earlier selection report
+their actual returned resource ID without redirecting the newer view; cancelling
+a UI read is never presented as undoing a committed write.
+
+## Implemented sequence: validate, independently review and publish
+
+```mermaid
+sequenceDiagram
+    actor maker as Connected maker
+    actor checker as Connected independent checker
+    actor publisher as Connected publisher
+    participant ui as Label and workflow UI
+    participant api as Label and workflow APIs
+    maker->>ui: Open task and prepare explicit declarations
+    ui->>api: Create first replacement with exact task binding
+    api-->>ui: Immutable draft and committed binding
+    maker->>ui: Validate exact label and rule set
+    ui->>api: POST validation
+    api-->>ui: Persisted rule-level results
+    alt No passing validation for this context
+        ui-->>maker: Submission disabled and feedback visible
+    else Passing validation and permission
+        maker->>ui: Submit for review
+        ui->>api: POST review submission
+        api-->>ui: Exact PENDING_REVIEW label
+        checker->>ui: Open target in connected checker context
+        ui->>api: Read actual actor, label and task
+        api-->>ui: Permissions and exact context
+        checker->>ui: APPROVE, REQUEST_CHANGES or REJECT
+        ui->>api: POST independent decision
+        api-->>ui: Authoritative outcome
+        publisher->>ui: Open approved exact target
+        ui->>api: Check binding and POST publication
+        api-->>ui: PUBLISHED after atomic transaction
+        ui->>api: Reread exact label and task
+        api-->>ui: Persisted publication and resolved task
     end
 ```
 
-Cancelling a browser request does not undo a committed server write. Never
-automatically resend a decision/publication command after a timeout. If the
-actor changes mid-command, do not apply the old result to the new actor's page;
-reconcile the original operation and reread the new context. Read retries are
-different from write retries. M4/M5 must define how command outcomes and
-idempotency are identified before this flow is implemented.
+These actor contexts are distinct supported callers; the sequence does not
+claim an implemented in-product switch. M4 must adopt the login/demo decision
+and controlled switch. Approval is separate from publication. Live tests verify
+old SUPERSEDED/new PUBLISHED labels, CLOSED tasks and immutable history.
 
-## UI invariants and verification
+## Individual design problem: async consistency across context changes
 
-1. No selected/bound target means no validation or review operation.
-2. A displayed validation result matches the label and rule-set versions being
-   reviewed; mismatches produce an error, not a passing badge.
-3. Missing permission, self-approval and validation gates are enforced by the
-   backend, even if someone bypasses disabled UI controls.
-4. A successful approval response alone is not assumed to mean publication.
-   Display the server-returned lifecycle, then verify persisted old/new versions.
-5. Failed/unknown requests never become empty-success results or seed data.
-6. Task/actor changes cannot inherit old success, error or pending state.
+The old task page displayed B after a manual click but reloaded A or no task
+from an unchanged URL. In-memory impact results also disappeared on reload.
+Late responses could replace the next selection, while an unconfirmed command
+could be mistaken for a safe retry.
 
-Verification maps to [the test design](S3-M3-test-design.md): UI-05/07/08 cover
-stale reads and version/identity changes; UI-10 covers uncertain writes;
-E2E-02/03/04 prove required backend rejection and user feedback; E2E-01 checks
-durable publication and history. Foundation tests currently prove only the
-unconnected impact page's behavior.
+| Option | Tradeoff | Decision |
+| --- | --- | --- |
+| Component state only | Simple, but refresh/back cannot recover exact context | Replaced for resource selection |
+| Store whole responses in browser storage | Can silently show stale workflow/permissions | Rejected as resource authority |
+| URL IDs plus authoritative reads and async guards | Reuses router/React; requires mismatch and cancellation handling | Implemented |
+| New workflow/query framework | Duplicates existing mechanisms and unsettled policies | Not needed |
 
-## Open decisions and final A07 gate
+Presentation states (loading, ready, error, command in flight, unconfirmed)
+remain separate from server lifecycle enums. Abort plus active/generation guards
+prevent obsolete reads from committing. Task-detail and change-list reads have
+15-second deadlines and visible read retries. Empty collections, failed/capped
+traversals and ready results are distinct; partial choices are not published as
+complete. Guards remain component-local, not durable cross-page command tracking.
 
-- M2/M1: final run/finding/task resource shapes and exact version references.
-- M4: task query/binding operations, allowed-action/permission representation,
-  login decision, submission rules, decision states and publication command model.
-- M4/M5: command reconciliation, conflict tokens and publication evidence IDs.
-- M3: after integration, replace logical participants with the actual components,
-  clients and operations; verify diagrams against code and add screenshots.
-- Capture the design tradeoff before/after with implemented examples, link the
-  final contract revision and main CI evidence, and review with module owners.
+## Verification and remaining acceptance
 
-This is the requested initial A07 draft. It does not claim SCRUM-74 completion,
-backend design ownership, or a currently working review/publication UI.
+[Current test/evidence record](S3-M3-test-design.md) separates predecessor main
+CI, current fixture regressions and current Docker executions. The new
+`s3-state-regressions.spec.ts` covers URL/reload/back, no command replay, mismatch,
+paging, late success/error, timeout/retry and permitted-creator UI behavior.
+
+The real seeded officer's approval attempt is ACL403 because that maker lacks
+APPROVE. A UI-only fixture supplies APPROVE to the same creator and proves clear
+independent-review feedback and disabled approval, without changing stored
+grants. Existing backend service/unit maker-checker proof remains separate.
+A permitted-creator HTTP/database/browser negative is now supplied by merged
+PR72 and its actual main workflow 37765740477, separately from the older officer
+ACL and local UI fixtures. See [the source/evidence supplement](S3-compound-maker-negative-20261008.md).
+Its disposable identity does not adopt M4's login/demo-switch choice.
+
+M3 assesses this A07 and accepts its exact consumer contract scope. M4 owns
+login/demo switching; M5 owns staging. Tests and artifacts do not adopt those
+choices. REQUEST_CHANGES returns the same immutable draft; declaration editing
+or task rebinding is not invented as a correction flow.
+
+## PR76 review follow-up — 9 October
+
+[M1's review](https://github.com/hxj04121-lab/FoodLabelFlow/pull/76#issuecomment-6072749690)
+accepts the impact versions, classification, task links, replay and GET-only
+restoration. The client now also rejects NO_ACTION with missing codes and
+REVIEW_REQUIRED without missing codes. An unknown create retains the complete
+original request and offers an explicit retry of those same inputs. Form changes
+and new creates remain disabled. A duplicate 409 is visible and keeps the
+unknown-command guard: an existing record does not prove this caller created it.
+Reads and retries do not silently report creation success. This guard is still
+component-local and resets on reload; no durable command-result log is claimed.
+
+[M2's handoff](https://github.com/hxj04121-lab/FoodLabelFlow/pull/76#issuecomment-6059466596)
+defines a correction as a new immutable label on the same task, followed by that
+new ID's validation, independent approval and separate publication. The draft
+uses its own server-selected rule set, which need not equal the impact run's
+rule set. A new revision must clear the old displayed PASS. Later FAILED results
+must be checked by the server at submit, APPROVE and publish; timestamp/UUID
+ordering cannot establish the current validation.
+
+As checked on 9 October, [PR86](https://github.com/hxj04121-lab/FoodLabelFlow/pull/86)
+provides switching and revision UI/API, and draft
+[PR87](https://github.com/hxj04121-lab/FoodLabelFlow/pull/87) integrates current-run
+guards and captured revision recovery. Neither is merged into main or XFY.
+Their login ADR still says proposed; their full revision-browser acceptance
+document says NOT RUN, and the current containers workflow does not execute that
+new full revision test. Successful PR checks are not final main acceptance.
+These are available integration inputs, not missing features to independently
+reimplement in PR76. Preserve PR76's task URL/restoration/timeouts alongside their
+identity-generation guards, then update this sequence to the actually integrated
+implementation and record the full browser/main-CI proof.
