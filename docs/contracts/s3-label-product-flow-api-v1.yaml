@@ -1,16 +1,17 @@
 openapi: 3.1.0
 info:
   title: S3 Label Creation, Returned-Task Revision, Review, Publication and Caller Read API
-  version: 1.1.0
-  description: Explicit product-flow extension candidate prepared on 8 October 2026. Declarations are entered
-    only while creating a fresh first or returned-task revision snapshot. Existing declaration GET and frozen S2 validation contracts
-    are unchanged. Java application services remain responsible for permissions, lifecycle, maker-checker and
-    transaction guards. Exact cross-module acceptance is pending.
+  version: 1.2.0
+  description: Additive S4 M2 contract revision prepared on 10 October 2026. Declarations are entered only
+    while creating a fresh first or returned-task revision snapshot. Existing declaration GET and frozen S2
+    validation contracts are unchanged. Java application services remain responsible for permissions,
+    lifecycle, maker-checker and transaction guards. Exact cross-module acceptance is pending.
 x-spec-trace-contract-state: CANDIDATE_PENDING_CROSS_MODULE_ACCEPTANCE
 x-spec-trace-revision-scope: Optional explicit declarations and expected ReviewTask binding on draft creation;
   strict command JSON; separate review submission, decision and publication HTTP adapters; paged task collection
-  and current caller reads. The local revision proposal adds an explicit returned-task correction command and
-  rejects unchanged returned-version resubmission; M4 adoption is pending, not inferred from technical tests.
+  and current caller reads. The returned-task correction command and demo identity options are implemented on
+  main through PR 88. This contract documents those merged endpoints; merge and technical tests do not replace
+  S4 cross-module review or owner acceptance.
 security:
 - ExternalAuthProvider: []
   ExternalSubject: []
@@ -200,7 +201,7 @@ paths:
       operationId: reviseReturnedReviewTaskDraft
       summary: Create a new immutable correction for an exact returned task target.
       x-required-permission: LABEL.CREATE
-      x-adoption-status: Local tested proposal; M4 workflow adoption and M3 consumer acceptance must be recorded separately.
+      x-adoption-status: Implemented on main through PR 88; M4 workflow review and M3 consumer acceptance remain separately pending.
       description: Only an OPEN unresolved task with a returned DRAFT target may be revised. REQUEST_CHANGES
         must be the decision summary, or a null summary must have an attributed REQUEST_CHANGES approval record
         for that exact task/label as produced by legacy direct helpers. expectedLabelVersionId must equal the
@@ -368,6 +369,29 @@ paths:
                 $ref: '#/components/schemas/ReviewTaskList'
         '400':
           $ref: '#/components/responses/InvalidTaskQuery'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/identity/demo-options:
+    get:
+      operationId: getDemoIdentityOptions
+      summary: List existing mapped demo identities when local development switching is enabled.
+      description: Returns the configured MAKER, CHECKER and PUBLISHER subject mappings and their resolved
+        current-identity views. This endpoint is available only when the existing demo identity switching
+        feature is enabled outside production. It does not create identities, grant permissions, or select
+        an identity for subsequent requests; the caller must use the existing DEV_EXTERNAL provider/subject
+        headers and the server resolves the mapped actor. No production login or authentication scheme is added.
+      security: []
+      responses:
+        '200':
+          description: The configured demo options in stable MAKER, CHECKER, PUBLISHER order.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DemoIdentityOption'
         '401':
           $ref: '#/components/responses/AuthenticationRequired'
         '500':
@@ -620,6 +644,21 @@ components:
       maxItems: 100
       items:
         $ref: '#/components/schemas/ReviewTask'
+    DemoIdentityOption:
+      type: object
+      additionalProperties: false
+      required: [key, subject, actor]
+      properties:
+        key:
+          type: string
+          enum: [MAKER, CHECKER, PUBLISHER]
+          description: Stable local demo selector key; it is not an authorization claim.
+        subject:
+          type: string
+          minLength: 1
+          description: Existing mapped DEV_EXTERNAL subject used by the local demo selector.
+        actor:
+          $ref: '#/components/schemas/CurrentIdentity'
     CurrentIdentity:
       type: object
       additionalProperties: false
