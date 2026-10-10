@@ -12,7 +12,7 @@ pending where the owner work has not landed.
 The GitHub API reported `main` at `80297ae89d825bd937002fecb912ee4cfc9378d8`.
 This local worktree is based on `417133e947a2bc9c1a771bbe69b50b6498c1eee6`
 (the PR #87 head), because native `git fetch` could not resolve `github.com` and
-that commit was the newest available local object. GitHub compare reports main 13
+that commit was the newest available local object. A final recovery check found that the `80297ae` main object was still absent locally and DNS resolution for `github.com` still failed, so the candidate could not be rebased or cherry-picked onto current main. GitHub compare reports main 13
 commits ahead of this baseline, with 19 changed paths across CI, docs and frontend
 and no backend paths. The S3 OpenAPI/error matrices, impact/workflow controllers and
 existing backend contract tests were also compared by blob SHA and matched. The
@@ -69,7 +69,9 @@ final report is called complete.
 
 | Check | Result |
 | --- | --- |
-| Offline Maven contract suite on JDK 25 (`S4M2ContractAlignmentTest`, `S3ImpactApiContractTest`, `OpenApiContractTest`, `SharedApiErrorContractTest`) | **PASS — 14 tests, 0 failures/errors/skips.** Includes route/schema parity for the returned-revision and demo-options consumers and DTO/OpenAPI parity for the existing M1 impact response. |
+| Offline Maven contract suite on JDK 25 (`S4M2ContractAlignmentTest`, `S3ImpactApiContractTest`, `OpenApiContractTest`, `SharedApiErrorContractTest`) | **PASS - 14 tests, 0 failures/errors/skips.** Includes route/schema parity for the returned-revision and demo-options consumers and DTO/OpenAPI parity for the existing M1 impact response. |
 | `git diff --check` and relative links in this report | **PASS.** |
-| `DemoIdentityHttpTest` | **Not completed.** Mockito self-attachment failed to open the local `javatool` pipe under JDK 25; the run was stopped after this environment error. |
+| `DemoIdentityHttpTest` on JDK 25 | **PASS - 15 tests, 0 failures/errors/skips.** Mockito Core 5.23.0 was supplied as a test-process `-javaagent`; no POM or OS security settings were changed. |
+| Current-main verification and push | **Blocked.** The current `main` object was unavailable locally and DNS still failed at the final recovery check. No remote branch or PR was created; all candidate commits remain local and based on `417133e`. |
+| Jira SCRUM-86 | **In Progress.** Local candidate progress, passing contract checks and outstanding acceptance blockers are recorded in Jira comment `10222`; cross-module acceptance remains pending. |
 | Docker-backed integration and full Sprint 4 live demo | **Not run.** No usable Docker engine was available for this task. |
