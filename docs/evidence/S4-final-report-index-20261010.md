@@ -10,15 +10,16 @@ pending where the owner work has not landed.
 ## Baseline and contract review
 
 The GitHub API reported `main` at `80297ae89d825bd937002fecb912ee4cfc9378d8`.
-This local worktree is based on `417133e947a2bc9c1a771bbe69b50b6498c1eee6`
-(the PR #87 head), because native `git fetch` could not resolve `github.com` and
-that commit was the newest available local object. A final recovery check found that the `80297ae` main object was still absent locally and DNS resolution for `github.com` still failed, so the candidate could not be rebased or cherry-picked onto current main. GitHub compare reports main 13
-commits ahead of this baseline, with 19 changed paths across CI, docs and frontend
-and no backend paths. The S3 OpenAPI/error matrices, impact/workflow controllers and
-existing backend contract tests were also compared by blob SHA and matched. The
-focused backend checks therefore use the same backend sources as main; this worktree
-is still not a checkout-wide main verification.
-
+This local worktree is based on `80297ae89d825bd937002fecb912ee4cfc9378d8`,
+the current `origin/main` head. After GitHub DNS recovered, `git ls-remote` and
+`git fetch --no-tags origin main` both succeeded; the final remote-ref check returned
+the same SHA. Branch `codex/s4-scrum-86-main-80297ae` was created from that main,
+and both candidate commits were cherry-picked without conflicts. The original
+candidate branch/worktree remains unchanged. The implementation and tests below
+were run at code head `9129e74890abe84c543a08b175f0859fc77a6675` on this main-based
+branch. GitHub's earlier compare of main to the PR #87 baseline showed 13 commits
+ahead and 19 changed paths in CI/docs/frontend, with no backend paths; this run
+verifies against a full main checkout.
 PR #76 and PR #88 are merged; PR #88 integrates PR #87's returned-task revision
 implementation and the M3 identity/context flow. GitHub returned no PR #88 review
 submissions. The main commit status and workflow-run queries returned no records in
@@ -69,9 +70,12 @@ final report is called complete.
 
 | Check | Result |
 | --- | --- |
-| Offline Maven contract suite on JDK 25 (`S4M2ContractAlignmentTest`, `S3ImpactApiContractTest`, `OpenApiContractTest`, `SharedApiErrorContractTest`) | **PASS - 14 tests, 0 failures/errors/skips.** Includes route/schema parity for the returned-revision and demo-options consumers and DTO/OpenAPI parity for the existing M1 impact response. |
+| Offline Maven contract and demo HTTP tests on JDK 25 (`S4M2ContractAlignmentTest`, `S3ImpactApiContractTest`, `OpenApiContractTest`, `SharedApiErrorContractTest`, `DemoIdentityHttpTest`) | **PASS - 29 tests, 0 failures/errors/skips.** Mockito Core 5.23.0 was supplied as a process-only `-javaagent`. |
 | `git diff --check` and relative links in this report | **PASS.** |
-| `DemoIdentityHttpTest` on JDK 25 | **PASS - 15 tests, 0 failures/errors/skips.** Mockito Core 5.23.0 was supplied as a test-process `-javaagent`; no POM or OS security settings were changed. |
-| Current-main verification and push | **Blocked.** The current `main` object was unavailable locally and DNS still failed at the final recovery check. No remote branch or PR was created; all candidate commits remain local and based on `417133e`. |
-| Jira SCRUM-86 | **In Progress.** Local candidate progress, passing contract checks and outstanding acceptance blockers are recorded in Jira comment `10222`; cross-module acceptance remains pending. |
-| Docker-backed integration and full Sprint 4 live demo | **Not run.** No usable Docker engine was available for this task. |
+| `ReturnedDraftRevisionHttpMySqlTest` with Testcontainers MySQL 8.4.11 | **PASS - 10 tests, 0 failures/errors/skips.** Docker Engine 29.7.2. Includes real HTTP/database validation, revision, rollback, concurrency and publication checks. |
+| Latest-main base and branch | **PASS.** Branch base is `80297ae89d825bd937002fecb912ee4cfc9378d8`; the two candidate commits cherry-picked cleanly. No PR was created. |
+| E2E topology and artifacts | Disposable Compose project `foodlab-scrum86-20261011`, dedicated MySQL volume and loopback port 13308; local JDK 25 backend on 18081; built frontend container on 15174 with an ignored, read-only test proxy override. Raw observations and screenshot are in `frontend/test-results/revision-evidence-foodlab-scrum86/`. Backend Docker image build was stopped after Maven `dependency:go-offline` stalled; the same main-based jar was packaged locally and used for the passing E2E. |
+| Local package build | **PASS.** `mvn -o -DskipTests package` built the main-based backend jar. |
+| Full backend suite | **Not run.** Validation covered the contract/demo HTTP group, the returned-revision HTTP/MySQL integration class, and the requested live revision browser flow; no `mvn clean verify` or full Sprint 4 signoff is claimed. |
+| Jira SCRUM-86 | **In Progress.** Progress and earlier checks are recorded in Jira comment `10222`; no implementation defect was found in this run. Cross-module acceptance remains pending. |
+| Live returned-revision browser E2E | **PASS - 1 test.** Real browser created V2, required fresh V2 `PASSED` validation, obtained Checker approval, published through Publisher, and verified immutable V1, zero-write denial paths, task `CLOSED`, and V2 current/published. Task `3e0980a5-e865-4d69-a395-74611912f155`; V1 `label_0780ff362d1b4a7f9d5dc009452aaf26`; V2 `label_ac475d0fb1134f69adeb582e2586ab0d`; validation `5020745f-0bae-4268-8031-27111b055d80`. |
