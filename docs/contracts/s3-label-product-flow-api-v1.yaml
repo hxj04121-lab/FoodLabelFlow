@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
-  title: S3 Label Creation, Returned-Task Revision, Review, Publication and Caller Read API
-  version: 1.2.0
-  description: Additive S4 M2 contract revision prepared on 10 October 2026. Declarations are entered only
+  title: Label Creation, Returned-Task Revision, Review, Publication and Caller Read API
+  version: 1.3.0
+  description: Additive S4 M2 contract revision prepared on 14 October 2026. Declarations are entered only
     while creating a fresh first or returned-task revision snapshot. Existing declaration GET and frozen S2
     validation contracts are unchanged. Java application services remain responsible for permissions,
     lifecycle, maker-checker and transaction guards. Exact cross-module acceptance is pending.
@@ -373,19 +373,56 @@ paths:
           $ref: '#/components/responses/AuthenticationRequired'
         '500':
           $ref: '#/components/responses/InternalError'
+  /api/audit/products/{productId}/label-history:
+    get:
+      operationId: readProductLabelHistory
+      summary: Read label versions, declarations, approval decisions and audit events for one product.
+      x-required-permission: AUDIT.READ
+      description: Requires the existing resolved identity and AUDIT.READ. The resource reads persisted label
+        snapshots, approval records, publications and label/review-task audit events. Product display name comes
+        from the current catalog product description. This is a read-only view and never infers missing events.
+      parameters:
+      - name: productId
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 100
+      responses:
+        '200':
+          description: Complete recorded label history for the product.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductLabelHistory'
+        '401':
+          $ref: '#/components/responses/AuthenticationRequired'
+        '403':
+          $ref: '#/components/responses/AuthorizationDenied'
+        '404':
+          description: Product does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/identity/demo-options:
     get:
       operationId: getDemoIdentityOptions
       summary: List existing mapped demo identities when local development switching is enabled.
-      description: Returns the configured MAKER, CHECKER and PUBLISHER subject mappings and their resolved
+      description: Returns the configured MAKER, CHECKER, PUBLISHER, CHANGE_MANAGER and DATA_ADMIN subject mappings and their resolved
         current-identity views. This endpoint is available only when the existing demo identity switching
         feature is enabled outside production. It does not create identities, grant permissions, or select
         an identity for subsequent requests; the caller must use the existing DEV_EXTERNAL provider/subject
-        headers and the server resolves the mapped actor. No production login or authentication scheme is added.
+        headers and the server resolves the mapped actor. CHANGE_MANAGER and DATA_ADMIN reuse existing seeded
+        users and role grants; DATA_ADMIN has DATA.MAINTAIN and FORMULA.RELEASE. No production login or
+        authentication scheme is added.
       security: []
       responses:
         '200':
-          description: The configured demo options in stable MAKER, CHECKER, PUBLISHER order.
+          description: The configured demo options in stable MAKER, CHECKER, PUBLISHER, CHANGE_MANAGER, DATA_ADMIN order.
           content:
             application/json:
               schema:
@@ -651,7 +688,7 @@ components:
       properties:
         key:
           type: string
-          enum: [MAKER, CHECKER, PUBLISHER]
+          enum: [MAKER, CHECKER, PUBLISHER, CHANGE_MANAGER, DATA_ADMIN]
           description: Stable local demo selector key; it is not an authorization claim.
         subject:
           type: string
@@ -659,6 +696,82 @@ components:
           description: Existing mapped DEV_EXTERNAL subject used by the local demo selector.
         actor:
           $ref: '#/components/schemas/CurrentIdentity'
+    ProductLabelHistory:
+      type: object
+      additionalProperties: false
+      required: [productId, productDisplayName, versions, approvals, auditEvents]
+      properties:
+        productId: { type: string }
+        productDisplayName: { type: string }
+        versions:
+          type: array
+          items: { $ref: '#/components/schemas/ProductLabelVersionHistory' }
+        approvals:
+          type: array
+          items: { $ref: '#/components/schemas/ProductLabelApprovalHistory' }
+        auditEvents:
+          type: array
+          items: { $ref: '#/components/schemas/ProductLabelAuditEvent' }
+    ProductLabelVersionHistory:
+      type: object
+      additionalProperties: false
+      required: [labelVersionId, versionNumber, jurisdictionCode, lifecycleStatus, formulaVersionId,
+        ruleSetVersionId, createdAt, createdByUserId, createdByDisplayName, publishedAt, publishedByUserId,
+        publishedByDisplayName, publicationChannel, declarations]
+      properties:
+        labelVersionId: { type: string }
+        versionNumber: { type: integer }
+        jurisdictionCode: { type: string }
+        lifecycleStatus: { type: string }
+        formulaVersionId: { type: string }
+        ruleSetVersionId: { type: string }
+        createdAt: { type: string }
+        createdByUserId: { type: string }
+        createdByDisplayName: { type: string }
+        publishedAt: { type: [string, 'null'] }
+        publishedByUserId: { type: [string, 'null'] }
+        publishedByDisplayName: { type: [string, 'null'] }
+        publicationChannel: { type: [string, 'null'] }
+        declarations:
+          type: array
+          items: { $ref: '#/components/schemas/ProductLabelDeclarationHistory' }
+    ProductLabelDeclarationHistory:
+      type: object
+      additionalProperties: false
+      required: [allergenCode, declarationType, source, displayText]
+      properties:
+        allergenCode: { type: string }
+        declarationType: { type: string }
+        source: { type: string }
+        displayText: { type: [string, 'null'] }
+    ProductLabelApprovalHistory:
+      type: object
+      additionalProperties: false
+      required: [approvalRecordId, labelVersionId, reviewTaskId, decision, decidedByUserId,
+        decidedByDisplayName, decidedAt, comments]
+      properties:
+        approvalRecordId: { type: string }
+        labelVersionId: { type: string }
+        reviewTaskId: { type: string }
+        decision: { type: string }
+        decidedByUserId: { type: string }
+        decidedByDisplayName: { type: string }
+        decidedAt: { type: string }
+        comments: { type: [string, 'null'] }
+    ProductLabelAuditEvent:
+      type: object
+      additionalProperties: false
+      required: [auditEventId, eventType, entityType, entityId, eventAt, actorUserId,
+        actorDisplayName, eventPayload]
+      properties:
+        auditEventId: { type: string }
+        eventType: { type: string }
+        entityType: { type: string }
+        entityId: { type: string }
+        eventAt: { type: string }
+        actorUserId: { type: string }
+        actorDisplayName: { type: string }
+        eventPayload: { type: string }
     CurrentIdentity:
       type: object
       additionalProperties: false

@@ -1,6 +1,13 @@
 # Sprint 4 final report index and M2 contract review
 
-Date: 10 October 2026. Owner: Cai Runchen / M2. Jira: SCRUM-86.
+First created: 10 October 2026. Updated: 14 October 2026. Owner: Cai Runchen / M2. Jira: SCRUM-86.
+
+## 14 October candidate update
+
+M2's S4 contract revision, contract tests and A07 consolidation are summarized in
+[S4-M2 contract-freeze evidence](S4-M2-contract-freeze-20261014.md). This index
+does not claim ownership of the other members' implementation work or record
+their acceptance. The cross-module contract review remains pending.
 
 This is an evidence index and contract review, not a Sprint 4 acceptance statement.
 It records the current main snapshot and links the available member use cases,
@@ -35,14 +42,12 @@ documents that development-only read with its existing feature gate, and correct
 the stale revision/identity language. The contract remains
 `CANDIDATE_PENDING_CROSS_MODULE_ACCEPTANCE` until owners record their review.
 
-The existing impact read model remains M1-owned. Its response and OpenAPI already
-carry `relevantProductCount`, `noActionCount`, `reviewRequiredCount` and the
-`NO_ACTION` / `REVIEW_REQUIRED` discriminator, and the current-identity schema
-already carries `displayName`. No duplicate read-model field was added. The new
-contract test compares the impact OpenAPI properties to the existing Java response
-record. If SCRUM-85's “display name” means a separate product display field, the
-current `ImpactAnalysisResponse` and impact contract do not identify that field;
-M1 should name its intended source and canonical property before M2/M3 freeze it.
+The impact read model remains M1-owned. The S4 contract now names its additive
+product display field `productDisplayName` alongside `relevantProductCount`,
+`noActionCount`, `reviewRequiredCount` and the `NO_ACTION` / `REVIEW_REQUIRED`
+discriminator. M2 documents the consumer contract without duplicating M1's
+implementation. Producer confirmation and consumer acceptance remain open review
+items.
 
 The next cross-module acceptance gates remain: M1 confirms the final additive
 read-model names and adoption/reset handoff; M3 records consumer acceptance of the
@@ -73,7 +78,7 @@ final report is called complete.
 | Offline Maven contract and demo HTTP tests on JDK 25 (`S4M2ContractAlignmentTest`, `S3ImpactApiContractTest`, `OpenApiContractTest`, `SharedApiErrorContractTest`, `DemoIdentityHttpTest`) | **PASS - 29 tests, 0 failures/errors/skips.** Mockito Core 5.23.0 was supplied as a process-only `-javaagent`. |
 | `git diff --check` and relative links in this report | **PASS.** |
 | `ReturnedDraftRevisionHttpMySqlTest` with Testcontainers MySQL 8.4.11 | **PASS - 10 tests, 0 failures/errors/skips.** Docker Engine 29.7.2. Includes real HTTP/database validation, revision, rollback, concurrency and publication checks. |
-| Latest-main base and branch | **PASS.** Branch base is `80297ae89d825bd937002fecb912ee4cfc9378d8`; the two candidate commits cherry-picked cleanly. No PR was created. |
+| Latest-main base and branch | **PASS.** Branch base is `80297ae89d825bd937002fecb912ee4cfc9378d8`; the two earlier M2 candidate commits cherry-picked cleanly. |
 | E2E topology and artifacts | Disposable Compose project `foodlab-scrum86-20261011`, dedicated MySQL volume and loopback port 13308; local JDK 25 backend on 18081; built frontend container on 15174 with an ignored, read-only test proxy override. Raw observations and screenshot are in `frontend/test-results/revision-evidence-foodlab-scrum86/`. Backend Docker image build was stopped after Maven `dependency:go-offline` stalled; the same main-based jar was packaged locally and used for the passing E2E. |
 | Local package build | **PASS.** `mvn -o -DskipTests package` built the main-based backend jar. |
 | Full backend suite | **Not run.** Validation covered the contract/demo HTTP group, the returned-revision HTTP/MySQL integration class, and the requested live revision browser flow; no `mvn clean verify` or full Sprint 4 signoff is claimed. |

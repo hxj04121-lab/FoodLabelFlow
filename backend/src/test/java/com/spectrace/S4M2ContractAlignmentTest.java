@@ -19,19 +19,21 @@ class S4M2ContractAlignmentTest {
 
     private static final String LABEL_CONTRACT = "docs/contracts/s3-label-product-flow-api-v1.yaml";
     private static final String IMPACT_CONTRACT = "docs/contracts/s3-impact-review-publication-api-v1.yaml";
+    private static final String BATCH_CONTRACT = "docs/contracts/s4-catalog-batch-adoption-api-v1.yaml";
 
     @Test
     void mergedRevisionAndDemoIdentityEndpointsAreDescribedForTheirConsumers() throws IOException {
         Map<String, Object> contract = load(LABEL_CONTRACT);
 
-        assertThat(at(contract, "info").get("version")).isEqualTo("1.2.0");
+        assertThat(at(contract, "info").get("version")).isEqualTo("1.3.0");
         assertThat(contract.get("x-spec-trace-contract-state"))
                 .isEqualTo("CANDIDATE_PENDING_CROSS_MODULE_ACCEPTANCE");
         var paths = at(contract, "paths");
         assertThat(paths).containsKeys(
                 "/api/review-tasks/{reviewTaskId}/draft-revisions",
                 "/api/identity/current",
-                "/api/identity/demo-options");
+                "/api/identity/demo-options",
+                "/api/audit/products/{productId}/label-history");
 
         var revision = at(paths, "/api/review-tasks/{reviewTaskId}/draft-revisions");
         assertThat(revision).containsOnlyKeys("post");
@@ -57,13 +59,20 @@ class S4M2ContractAlignmentTest {
         assertThat(valueAt(schemas, "DemoIdentityOption", "required"))
                 .isEqualTo(List.of("key", "subject", "actor"));
         assertThat(valueAt(schemas, "DemoIdentityOption", "properties", "key", "enum"))
-                .isEqualTo(List.of("MAKER", "CHECKER", "PUBLISHER"));
+                .isEqualTo(List.of("MAKER", "CHECKER", "PUBLISHER", "CHANGE_MANAGER", "DATA_ADMIN"));
         assertThat(valueAt(schemas, "DemoIdentityOption", "properties", "actor", "$ref"))
                 .isEqualTo("#/components/schemas/CurrentIdentity");
         assertThat(at(schemas, "CurrentIdentity", "properties")).containsOnlyKeys(
                 Arrays.stream(CurrentIdentityView.class.getRecordComponents()).map(c -> c.getName()).toArray(String[]::new));
         assertThat(at(schemas, "DemoIdentityOption", "properties")).containsOnlyKeys(
                 Arrays.stream(DemoIdentityOption.class.getRecordComponents()).map(c -> c.getName()).toArray(String[]::new));
+
+        var history = at(paths, "/api/audit/products/{productId}/label-history", "get");
+        assertThat(history.get("x-required-permission")).isEqualTo("AUDIT.READ");
+        assertThat(valueAt(history, "responses", "200", "content", "application/json", "schema", "$ref"))
+                .isEqualTo("#/components/schemas/ProductLabelHistory");
+        assertThat(at(schemas, "ProductLabelHistory", "properties")).containsOnlyKeys(
+                "productId", "productDisplayName", "versions", "approvals", "auditEvents");
 
         String matrix = Files.readString(repositoryRoot().resolve("docs/contracts/s3-label-product-flow-error-matrix-v1.md"));
         assertThat(matrix).contains("`POST /api/review-tasks/{id}/draft-revisions`",
@@ -82,6 +91,29 @@ class S4M2ContractAlignmentTest {
                 "relevantProductCount", "noActionCount", "reviewRequiredCount", "findings");
         assertThat(valueAt(schemas, "ReviewRequiredFinding", "properties", "outcome", "const"))
                 .isEqualTo("REVIEW_REQUIRED");
+        assertThat(valueAt(schemas, "NoActionFinding", "required")).asList().contains("productDisplayName");
+        assertThat(valueAt(schemas, "ReviewRequiredFinding", "required")).asList().contains("productDisplayName");
+        assertThat(valueAt(schemas, "NoActionFinding", "properties", "productDisplayName", "minLength"))
+                .isEqualTo(1);
+        assertThat(at(schemas, "NoActionFinding", "properties")).containsKeys(
+                Arrays.stream(ImpactAnalysisResponse.Finding.class.getRecordComponents())
+                        .filter(component -> !component.getName().equals("reviewTask"))
+                        .map(component -> component.getName()).toArray(String[]::new))
+                .containsKey("productDisplayName");
+    }
+
+    @Test
+    void batchAdoptionContractDescribesTheActualPerProductSummary() throws IOException {
+        Map<String, Object> contract = load(BATCH_CONTRACT);
+        var operation = at(contract, "paths", "/api/catalog/specifications/{specificationVersionId}/formula-adoptions", "post");
+        assertThat(operation.get("operationId")).isEqualTo("adoptSpecificationForCurrentProducts");
+        assertThat(operation.get("x-required-permissions")).isEqualTo(List.of("DATA.MAINTAIN", "FORMULA.RELEASE"));
+        assertThat(at(operation, "responses")).containsKeys("200", "401", "403", "404", "422", "500", "503");
+        assertThat(at(contract, "components", "schemas", "BatchAdoptionSummary", "properties").keySet())
+                .containsExactlyInAnyOrder("targetSpecificationVersionId", "candidateCount", "adoptedCount",
+                        "skippedCount", "failedCount", "results");
+        assertThat(at(contract, "components", "schemas", "BatchAdoptionResult", "properties").keySet())
+                .containsExactlyInAnyOrder("productId", "status", "formulaVersionId", "replayed", "errorCode", "message");
     }
 
     private static Map<String, Object> load(String relativePath) throws IOException {
