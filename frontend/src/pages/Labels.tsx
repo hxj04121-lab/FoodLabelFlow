@@ -118,6 +118,20 @@ export function Labels() {
     setSearchParams(next, { replace: true })
   }
 
+  async function prefillFromCurrentLabel(task: ReviewTask, signal?: AbortSignal) {
+    const previous = await getLabelDraft(task.currentLabelVersionId, signal)
+    if (signal?.aborted) return
+    if (previous.productId !== task.productId || previous.labelVersionId !== task.currentLabelVersionId) {
+      throw new LabelApiError('REVIEW_TASK_SOURCE_MISMATCH', 'The task current label does not match its product.', 409)
+    }
+    const stored = await getLabelDeclarations(previous, signal)
+    if (signal?.aborted) return
+    const priorUserDeclarations = stored.declarations.filter(row => row.declarationSource === 'USER_ENTERED')
+    setProductId(task.productId)
+    setDeclarationIds(priorUserDeclarations.map(row => row.allergenId))
+    setMessage(`Prefilled ${priorUserDeclarations.length} declarations from published label ${previous.labelVersionId}. Review them before creating the replacement draft.`)
+  }
+
   useEffect(() => {
     const controller = new AbortController()
     setFormulaLoading(true)
@@ -168,7 +182,10 @@ export function Labels() {
     getReviewTask(exactTaskId, controller.signal).then(async task => {
       if (!active) return
       setReviewTask(task)
-      if (!task.draftLabelVersionId) return
+      if (!task.draftLabelVersionId) {
+        await prefillFromCurrentLabel(task, controller.signal)
+        return
+      }
       const requestedLabelId = searchParams.get('labelVersionId')?.trim()
       if (requestedLabelId && requestedLabelId !== task.targetLabelVersionId) {
         throw new LabelApiError('REVIEW_TASK_TARGET_MISMATCH', 'The selected label is not the current target of this review task.', 409)
@@ -328,7 +345,8 @@ export function Labels() {
       const task = await getReviewTask(exactTaskId)
       setReviewTask(task)
       if (!task.draftLabelVersionId) {
-        setMessage(`Review task ${exactTaskId} has no bound draft.` + (uncertain ? ` ${UNCONFIRMED_DRAFT_MESSAGE}` : ''))
+        await prefillFromCurrentLabel(task)
+        setReviewTaskId(exactTaskId)
         return
       }
       const loaded = await getLabelDraft(task.draftLabelVersionId)

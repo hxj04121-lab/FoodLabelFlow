@@ -27,9 +27,15 @@ public record ImpactAnalysisView(ImpactAnalysisRun run, List<FindingView> findin
     }
 
     /** reviewTask is present exactly for a REVIEW_REQUIRED finding. */
-    public record FindingView(ImpactFinding finding, ReviewTaskLinkage reviewTask) {
+    public record FindingView(ImpactFinding finding, ReviewTaskLinkage reviewTask, String productDisplayName) {
+        public FindingView(ImpactFinding finding, ReviewTaskLinkage reviewTask) {
+            this(finding, reviewTask, finding.productId());
+        }
+
         public FindingView {
             Objects.requireNonNull(finding, "finding");
+            productDisplayName = com.spectrace.shared.contract.ContractValues.requiredText(
+                    productDisplayName, "productDisplayName");
             if (finding.requiresReviewTask() != (reviewTask != null)) {
                 throw new IllegalStateException("Finding " + finding.impactFindingId()
                         + " must have a review task exactly when it is REVIEW_REQUIRED");

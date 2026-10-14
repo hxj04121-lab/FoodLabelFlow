@@ -1,5 +1,6 @@
 import { createChangeRequest, getChangeRequest, getImpactAnalysis, listChangeRequests, runImpactAnalysis,
   type ChangeRequest, type ImpactAnalysis } from '@/api/impact'
+import { adoptSpecificationForCurrentProducts, type BatchAdoptionSummary } from '@/api/catalog'
 import { LabelApiError } from '@/api/labels'
 import { Panel, SectionHead } from '@/components/catalog-shared'
 import { Badge } from '@/components/ui/badge'
@@ -33,6 +34,10 @@ export function Impact() {
   const [specificationAttempt, setSpecificationAttempt] = useState(0)
   const [specifications, setSpecifications] = useState<Array<{ specification_version_id: string }>>([])
   const [specificationsLoading, setSpecificationsLoading] = useState(true)
+  const [batchAdoption, setBatchAdoption] = useState<BatchAdoptionSummary | null>(null)
+  const [batchBusy, setBatchBusy] = useState(false)
+  const [outcomeFilter, setOutcomeFilter] = useState<'ALL' | 'REVIEW_REQUIRED' | 'NO_ACTION'>('ALL')
+  const [productNames, setProductNames] = useState<Record<string, string>>({})
   const lock = useRef(false)
   const freshAnalysis = useRef<ImpactAnalysis | null>(null)
   const contextVersion = useRef(0)
@@ -50,7 +55,7 @@ export function Impact() {
     contextVersion.current++
     manualRead.current?.abort()
     setIdentityEnabled(false); setAnalysis(null); setExactChange(null); setChanges([])
-    setPreviousId(''); setTargetId(''); setDescription(''); setMessage(''); setError('')
+    setPreviousId(''); setTargetId(''); setDescription(''); setMessage(''); setError(''); setBatchAdoption(null)
   }, [identityGeneration])
   const selected = exactChange?.changeRequestId === changeId ? exactChange : changes.find(change => change.changeRequestId === changeId)
 
@@ -127,6 +132,21 @@ export function Impact() {
     }).finally(() => { if (!controller.signal.aborted) setSpecificationsLoading(false) })
     return () => controller.abort()
   }, [materialId, specificationAttempt, identityGeneration])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    catalogList('/products', controller.signal).then(rows => {
+      if (controller.signal.aborted) return
+      const names: Record<string, string> = {}
+      for (const row of rows) {
+        if (typeof row.product_id === 'string' && typeof row.product_description === 'string') {
+          names[row.product_id] = row.product_description
+        }
+      }
+      setProductNames(names)
+    }).catch(() => { if (!controller.signal.aborted) setProductNames({}) })
+    return () => controller.abort()
+  }, [identityGeneration])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -217,6 +237,23 @@ export function Impact() {
     finally { lock.current = false; setBusy(false) }
   }
 
+  async function adoptTargetForCurrentProducts() {
+    if (!targetId || batchBusy || !local || !identityEnabled ||
+        !identity.hasPermission('DATA.MAINTAIN') || !identity.hasPermission('FORMULA.RELEASE')) return
+    const actorGeneration = identityGeneration
+    const requestedTargetId = targetId
+    setBatchBusy(true); setError(''); setMessage(''); setBatchAdoption(null)
+    try {
+      const summary = await adoptSpecificationForCurrentProducts(requestedTargetId)
+      if (activeIdentity.current !== actorGeneration) return
+      setBatchAdoption(summary)
+      setMessage(`Batch adoption finished for ${summary.candidateCount} current products.`)
+    } catch (cause: unknown) {
+      if (activeIdentity.current !== actorGeneration) return
+      setError(cause instanceof Error ? cause.message : 'Batch specification adoption failed.')
+    } finally { setBatchBusy(false) }
+  }
+
   async function load() {
     if (lock.current || restoring || !runId.trim()) return
     const current = captureContext()
@@ -258,7 +295,7 @@ export function Impact() {
           <div><dt>After specification</dt><dd>{selected?.targetSpecificationVersionId ?? 'Not selected'}</dd></div></dl>
         <label htmlFor="impact-rule-set">Impact rule set ID</label><input id="impact-rule-set" value={ruleSetId}
           disabled={busy || !!uncertainRun} onChange={event => { setRuleSetId(event.target.value); setAnalysis(null); saveContext(changeId, '', event.target.value, true) }} />
-        <label className="demo-consent"><input type="checkbox" checked={identityEnabled} disabled={!local || busy}
+        <label className="demo-consent"><input type="checkbox" checked={identityEnabled} disabled={!local || busy || batchBusy}
           onChange={event => setIdentityEnabled(event.target.checked)} />Use the connected identity for impact writes</label>
         <Button disabled={!local || !identityEnabled || !identity.hasPermission('IMPACT.RUN') || busy || restoring || !changeId || !ruleSetId.trim()} onClick={run}>
           {uncertainRun ? 'Retry the same impact analysis' : 'Run impact analysis'}</Button>
@@ -266,20 +303,34 @@ export function Impact() {
           disabled={busy} onChange={event => setRunId(event.target.value)} />
         <Button variant="outline" disabled={busy || restoring || !runId.trim()} onClick={load}>Load impact analysis</Button>
         <details><summary>Create a specification change request</summary><div className="impact-create">
-          <label htmlFor="impact-material">Supplier material</label><select id="impact-material" value={materialId} disabled={busy || !!uncertainRun || !!uncertainCreate}
+          <label htmlFor="impact-material">Supplier material</label><select id="impact-material" value={materialId} disabled={busy || batchBusy || !!uncertainRun || !!uncertainCreate}
             onChange={event => { setMaterialId(event.target.value); setPreviousId(''); setTargetId('') }}>
             {data.supplier_material.map(material => <option key={material.supplier_material_id} value={material.supplier_material_id}>{material.supplier_material_id}</option>)}
           </select>
           <Button variant="outline" disabled={busy || specificationsLoading || !!uncertainCreate} onClick={() => { setPreviousId(''); setTargetId(''); setSpecificationAttempt(value => value + 1) }}>Refresh specification versions</Button>
-          <label htmlFor="impact-before">Previous specification</label><select id="impact-before" value={previousId} disabled={busy || specificationsLoading || !!uncertainRun || !!uncertainCreate} onChange={event => setPreviousId(event.target.value)}>
+          <label htmlFor="impact-before">Previous specification</label><select id="impact-before" value={previousId} disabled={busy || batchBusy || specificationsLoading || !!uncertainRun || !!uncertainCreate} onChange={event => setPreviousId(event.target.value)}>
             <option value="">Select the previous version</option>{specifications.map(spec => <option key={spec.specification_version_id} value={spec.specification_version_id}>{spec.specification_version_id}</option>)}
           </select>
-          <label htmlFor="impact-after">Target specification</label><select id="impact-after" value={targetId} disabled={busy || specificationsLoading || !!uncertainRun || !!uncertainCreate} onChange={event => setTargetId(event.target.value)}>
+          <label htmlFor="impact-after">Target specification</label><select id="impact-after" value={targetId} disabled={busy || batchBusy || specificationsLoading || !!uncertainRun || !!uncertainCreate} onChange={event => setTargetId(event.target.value)}>
             <option value="">Select the target version</option>{specifications.map(spec => <option key={spec.specification_version_id} value={spec.specification_version_id}>{spec.specification_version_id}</option>)}
           </select>
           <label htmlFor="impact-description">Change description</label><textarea id="impact-description" value={description} maxLength={1000} disabled={busy || !!uncertainCreate} onChange={event => setDescription(event.target.value)} />
           <Button disabled={!local || !identityEnabled || !identity.hasPermission('CHANGE_REQUEST.CREATE') || busy || restoring || !!uncertainCreate || !!uncertainRun || specificationsLoading || !previousId || !targetId || previousId === targetId || !description.trim()} onClick={create}>Create change request</Button>
           {uncertainCreate && <Button variant="outline" disabled={!local || !identityEnabled || !identity.hasPermission('CHANGE_REQUEST.CREATE') || busy || restoring || !!uncertainRun} onClick={create}>Retry the same change request</Button>}
+          <div className="batch-adoption">
+            <p>Adopt the selected target specification into each current formula that uses this material. Each product commits independently and an identical retry returns the saved result.</p>
+            <Button variant="outline" disabled={!local || !identityEnabled || !identity.hasPermission('DATA.MAINTAIN') || !identity.hasPermission('FORMULA.RELEASE') || busy || batchBusy || specificationsLoading || !targetId} onClick={adoptTargetForCurrentProducts}>
+              {batchBusy ? 'Adopting per product…' : 'Adopt for current products'}
+            </Button>
+            {batchAdoption && <section aria-label="Batch adoption summary" aria-live="polite">
+              <h3>Adoption summary</h3>
+              <p>{batchAdoption.adoptedCount} adopted · {batchAdoption.skippedCount} skipped · {batchAdoption.failedCount} failed · {batchAdoption.candidateCount} candidates</p>
+              <ul>{batchAdoption.results.map(result => <li key={result.productId}>
+                {productNames[result.productId] ?? result.productId} ({result.productId}): {result.status.toLowerCase()}
+                {result.formulaVersionId ? ` · ${result.formulaVersionId}` : ''}{result.replayed ? ' · replayed' : ''}
+              </li>)}</ul>
+            </section>}
+          </div>
         </div></details>
         {!local && <p role="alert">Impact writes are disabled outside localhost until approved authentication is connected.</p>}
         {error && <p className="error-notice" role="alert">{error}</p>}
@@ -289,8 +340,13 @@ export function Impact() {
         {!analysis && <><h3>No analysis loaded</h3><p>Run or load an exact analysis. This empty state does not mean no products are affected.</p></>}
         {analysis && <><h3>{analysis.impactAnalysisId}</h3><p>{analysis.relevantProductCount} findings · {analysis.noActionCount} no action · {analysis.reviewRequiredCount} review required</p>
           <p>Change {analysis.changeRequestId} · Rule set {analysis.ruleSetVersionId}</p>
-          <div className="impact-findings">{analysis.findings.map(finding => <article key={finding.impactFindingId}>
-            <h4>{finding.productId}</h4><Badge variant="outline">{finding.outcome}</Badge><p>{finding.explanation}</p>
+          <label htmlFor="impact-outcome-filter">Show findings</label>
+          <select id="impact-outcome-filter" value={outcomeFilter} onChange={event => setOutcomeFilter(event.target.value as typeof outcomeFilter)}>
+            <option value="ALL">All outcomes</option><option value="REVIEW_REQUIRED">Review required</option><option value="NO_ACTION">No action</option>
+          </select>
+          <p>Showing {analysis.findings.filter(finding => outcomeFilter === 'ALL' || finding.outcome === outcomeFilter).length} of {analysis.relevantProductCount} findings</p>
+          <div className="impact-findings">{analysis.findings.filter(finding => outcomeFilter === 'ALL' || finding.outcome === outcomeFilter).map(finding => <article key={finding.impactFindingId}>
+            <h4>{finding.productDisplayName}</h4><p>Product {finding.productId}</p><Badge variant="outline">{finding.outcome}</Badge><p>{finding.explanation}</p>
             <p>Current formula: {finding.currentFormulaVersionId}<br />Proposed formula: {finding.proposedFormulaVersionId}</p>
             {finding.missingAllergenCodes.length > 0 && <p>Missing declarations: {finding.missingAllergenCodes.join(', ')}</p>}
             {finding.reviewTask && <><p>Review task: {finding.reviewTask.reviewTaskId}</p>

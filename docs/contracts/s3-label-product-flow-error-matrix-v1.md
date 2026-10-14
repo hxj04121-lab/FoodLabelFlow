@@ -1,4 +1,4 @@
-# S3 label product-flow error matrix — extension v1.2.0
+# Label product-flow and S4 history error matrix — extension v1.3.0
 
 [Later compound-maker qualification](../evidence/S3-compound-maker-negative-20261008.md)
 separately exercises a creator who has APPROVE through isolated MySQL, HTTP and
@@ -28,6 +28,9 @@ S2 validation contract keep their earlier versions and responsibilities.
 | 409 | `LABEL_VERSION_CONFLICT` | Current label/formula changed, publication body does not match the task target, requested first task is mismatched/ambiguous, or an unresolved task is already bound. | Reread exact resources and reconcile; no blind command replay, new draft or task rebind. |
 | 409 | `LABEL_WORKFLOW_CONFLICT` | Invalid lifecycle transition, missing/failed latest exact-label/rule-set validation, missing pending task, final APPROVE decision/record absent, or task already resolved. | Fix the domain prerequisite through supported operations. No synthetic PASSED run or direct SQL state/decision may stand in for the gate. |
 | 500 | `INTERNAL_ERROR` | Unexpected application, persistence or audit failure. | The write transaction rolls back. Treat a lost/failed response as uncertain until exact label/task reads reconcile it; no automatic repeat decision/publication. |
+| 403 | `AUTHORIZATION_DENIED` | `GET /api/audit/products/{productId}/label-history` resolves an actor without `AUDIT.READ`. | Switch to an authorized Change Manager, Data Admin or Auditor identity; the endpoint remains read-only. |
+| 404 | `PRODUCT_NOT_FOUND` | Product history path names an unknown product. | Select an existing catalog product. No partial history is returned. |
+| 500 | `INTERNAL_ERROR` | Product label-history query fails unexpectedly. | Retry the read after service recovery; no business state is written. |
 
 Expected controller/identity errors use the shared four-field `ApiError`: `code`, `message`, `traceId`,
 `evidenceId`. IDs remain null when real corresponding identifiers do not
@@ -46,7 +49,8 @@ identity advice has higher precedence, preserving 401 and 403.
 | Same decision route | REJECT with optional comment | `LABEL.REJECT` | 200 same-label REJECTED; task CLOSED/resolved. |
 | `POST /api/review-tasks/{id}/publications` | Exact `labelVersionId` | `LABEL.PUBLISH` | 200 same-label PUBLISHED/current; task CLOSED/resolved and durable publication/audit. |
 | `GET /api/review-tasks` | Optional exact status, limit default 20 (1–100), offset default 0 (0–100000) | Active resolved identity; no added operation permission | 200 direct ReviewTaskView array ordered created_at DESC/task ID ASC, possibly empty. |
-| `GET /api/identity/demo-options` | No body or query; development-only option discovery | None; existing development feature gate applies | 200 direct MAKER/CHECKER/PUBLISHER option array. It creates no identity or grant; actor selection is sent through the existing mapped provider/subject context. Disabled/production configuration or an unavailable mapping returns 401. |
+| `GET /api/identity/demo-options` | No body or query; development-only option discovery | None; existing development feature gate applies | 200 direct MAKER/CHECKER/PUBLISHER/CHANGE_MANAGER/DATA_ADMIN option array. The last two reuse seeded identities. It creates no identity or grant; actor selection is sent through the existing mapped provider/subject context. Disabled/production configuration or an unavailable mapping returns 401. |
+| `GET /api/audit/products/{productId}/label-history` | Exact product path | `AUDIT.READ` | 200 version snapshots, declaration snapshots, approval decisions, publication details and matching label/review-task audit events; unknown product is 404. |
 | `GET /api/identity/current` | Existing connected request context | Active resolved identity; no grants or actor selection | 200 actual userId/username/displayName and sorted roles/permissions. |
 | Exact label/declaration/task GET | Path ID | Existing active identity; no new permission grant | 200 direct resource, including null unbound task references or an empty declaration list. |
 

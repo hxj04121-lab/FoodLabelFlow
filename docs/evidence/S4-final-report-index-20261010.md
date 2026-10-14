@@ -2,6 +2,16 @@
 
 Date: 10 October 2026. Owner: Cai Runchen / M2. Jira: SCRUM-86.
 
+## 14 October candidate update
+
+The S4 work described below was pending on the 10 October snapshot. The current
+M1–M5 implementation candidate, updated evidence map, local results, security
+notes and outstanding release gates are recorded in
+[S4 full-sprint candidate evidence](S4-full-sprint-candidate-20261014.md).
+That report supersedes the old pending implementation labels as a candidate
+status only; it does not claim teammate acceptance, a Docker rehearsal, merged
+contracts, green main CI or completed release/security gates.
+
 This is an evidence index and contract review, not a Sprint 4 acceptance statement.
 It records the current main snapshot and links the available member use cases,
 analysis/design diagrams and design-problem decisions. S4 task artifacts are marked

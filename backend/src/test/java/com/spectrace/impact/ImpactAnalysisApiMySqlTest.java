@@ -111,13 +111,16 @@ class ImpactAnalysisApiMySqlTest {
         List<String> productIds = new ArrayList<>();
         for (JsonNode finding : body.get("findings")) {
             productIds.add(finding.get("productId").stringValue());
+            assertThat(finding.get("productDisplayName").stringValue()).isEqualTo(jdbc.queryForObject(
+                    "SELECT product_description FROM product WHERE product_id = ?", String.class,
+                    finding.get("productId").stringValue()));
             if (finding.get("outcome").stringValue().equals("NO_ACTION")) {
-                assertThat(names(finding)).containsExactly("impactFindingId", "productId", "outcome",
+                assertThat(names(finding)).containsExactly("impactFindingId", "productId", "productDisplayName", "outcome",
                         "currentFormulaVersionId", "proposedFormulaVersionId", "currentLabelVersionId",
                         "missingAllergenCodes", "explanation");
                 assertThat(finding.get("missingAllergenCodes")).isEmpty();
             } else {
-                assertThat(names(finding)).containsExactly("impactFindingId", "productId", "outcome",
+                assertThat(names(finding)).containsExactly("impactFindingId", "productId", "productDisplayName", "outcome",
                         "currentFormulaVersionId", "proposedFormulaVersionId", "currentLabelVersionId",
                         "missingAllergenCodes", "explanation", "reviewTask");
                 assertThat(finding.get("missingAllergenCodes").get(0).stringValue()).isEqualTo("SOY");

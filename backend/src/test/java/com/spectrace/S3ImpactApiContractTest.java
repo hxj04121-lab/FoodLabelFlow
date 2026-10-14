@@ -23,7 +23,7 @@ class S3ImpactApiContractTest {
         Map<String, Object> contract = load(CONTRACT);
 
         assertThat(contract.get("openapi")).isEqualTo("3.1.0");
-        assertThat(at(contract, "info").get("version")).isEqualTo("1.0.0");
+        assertThat(at(contract, "info").get("version")).isEqualTo("1.1.0");
         assertThat(contract.get("x-spec-trace-contract-state"))
                 .isEqualTo("CANDIDATE_PENDING_CROSS_MODULE_ACCEPTANCE");
         assertThat(at(contract, "paths")).containsOnlyKeys(

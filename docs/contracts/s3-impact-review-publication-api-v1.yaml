@@ -1,11 +1,12 @@
 openapi: 3.1.0
 info:
   title: SpecTrace Sprint 3 Impact, Review and Publication Handoff API
-  version: 1.0.0
+  version: 1.1.0
   description: >-
-    M2-owned, versioned integration candidate for Sprint 3. This file defines the
+    M2-owned, versioned integration candidate, revised for Sprint 4. This file defines the
     boundary for INGREDIENT_SPEC change requests, synchronous impact analysis,
-    ReviewTask linkage and publication references. It does not define or implement
+    ReviewTask linkage and publication references. Version 1.1.0 adds the current
+    catalog productDisplayName to each impact finding. It does not define or implement
     M1 classification/task creation, M4 review/publication transitions, or M5
     persistence. Cross-module acceptance is pending; this version is the candidate
     presented for integration review, not evidence that reviewers accepted it.
@@ -497,6 +498,7 @@ components:
       required:
         - impactFindingId
         - productId
+        - productDisplayName
         - outcome
         - currentFormulaVersionId
         - proposedFormulaVersionId
@@ -508,6 +510,10 @@ components:
           $ref: '#/components/schemas/Identifier'
         productId:
           $ref: '#/components/schemas/Identifier'
+        productDisplayName:
+          type: string
+          minLength: 1
+          description: Current catalog product description for clear impact-review identification.
         outcome:
           type: string
           const: NO_ACTION
@@ -535,6 +541,7 @@ components:
       required:
         - impactFindingId
         - productId
+        - productDisplayName
         - outcome
         - currentFormulaVersionId
         - proposedFormulaVersionId
@@ -547,6 +554,10 @@ components:
           $ref: '#/components/schemas/Identifier'
         productId:
           $ref: '#/components/schemas/Identifier'
+        productDisplayName:
+          type: string
+          minLength: 1
+          description: Current catalog product description for clear impact-review identification.
         outcome:
           type: string
           const: REVIEW_REQUIRED

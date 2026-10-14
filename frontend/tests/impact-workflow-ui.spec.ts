@@ -4,7 +4,7 @@ import { test, expect } from './catalog-fixture'
 const change = { changeRequestId: 'change_ui', changeType: 'INGREDIENT_SPEC', supplierMaterialId: 'mat_chocolate_base',
   previousSpecificationVersionId: 'spec_chocolate_v1', targetSpecificationVersionId: 'spec_chocolate_v2',
   description: 'Recorded soy change', status: 'SUBMITTED', createdAt: '2026-10-08T00:00:00Z' }
-const finding = { impactFindingId: 'finding_ui', productId: 'prod_usda_1106285', outcome: 'REVIEW_REQUIRED',
+const finding = { impactFindingId: 'finding_ui', productId: 'prod_usda_1106285', productDisplayName: 'UI food product', outcome: 'REVIEW_REQUIRED',
   currentFormulaVersionId: 'formula_old', proposedFormulaVersionId: 'formula_new', currentLabelVersionId: 'label_old',
   missingAllergenCodes: ['SOY'], explanation: 'Soy must be declared.', reviewTask: { reviewTaskId: 'task_ui',
     impactFindingId: 'finding_ui', productId: 'prod_usda_1106285', currentFormulaVersionId: 'formula_old',

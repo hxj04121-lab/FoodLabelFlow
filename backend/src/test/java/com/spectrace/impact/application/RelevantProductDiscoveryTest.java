@@ -7,6 +7,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -54,9 +56,9 @@ class RelevantProductDiscoveryTest {
 
     @Test
     void aDuplicatedProductFromTheLookupIsAServerFaultNotAMerge() {
-        RelevantProductLookupPort duplicating = material -> List.of(
+        RelevantProductLookupPort duplicating = lookup(material -> List.of(
                 product("prod_a", "label_a_v1", "fi_a_v1_1"),
-                product("prod_a", "label_a_v1", "fi_a_v1_2"));
+                product("prod_a", "label_a_v1", "fi_a_v1_2")));
 
         assertThatIllegalStateException()
                 .isThrownBy(() -> new RelevantProductDiscovery(duplicating).discover(MATERIAL))
@@ -66,10 +68,10 @@ class RelevantProductDiscoveryTest {
     @Test
     void theMaterialIsRequiredAndPassedToTheLookupUnchanged() {
         var requested = new ArrayList<String>();
-        var discovering = new RelevantProductDiscovery(material -> {
+        var discovering = new RelevantProductDiscovery(lookup(material -> {
             requested.add(material);
             return List.of();
-        });
+        }));
 
         assertThatIllegalArgumentException().isThrownBy(() -> discovering.discover(" "));
         assertThat(discovering.discover(MATERIAL)).isEmpty();
@@ -86,5 +88,20 @@ class RelevantProductDiscoveryTest {
 
     private static RelevantProduct product(String productId, String labelVersionId, String... formulaItemIds) {
         return new RelevantProduct(productId, "formula_" + productId + "_v1", labelVersionId, List.of(formulaItemIds));
+    }
+
+    private static RelevantProductLookupPort lookup(Function<String, List<RelevantProduct>> products) {
+        return new RelevantProductLookupPort() {
+            @Override
+            public List<RelevantProduct> findProductsUsingMaterial(String supplierMaterialId) {
+                return products.apply(supplierMaterialId);
+            }
+
+            @Override
+            public Map<String, String> findProductDisplayNames(List<String> productIds) {
+                return productIds.stream().distinct().collect(java.util.stream.Collectors.toUnmodifiableMap(
+                        productId -> productId, productId -> productId));
+            }
+        };
     }
 }

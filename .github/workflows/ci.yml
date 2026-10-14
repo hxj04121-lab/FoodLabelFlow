@@ -53,6 +53,9 @@ jobs:
       - name: Install Chromium for SCRUM-84 browser regressions
         working-directory: frontend
         run: npx playwright install --with-deps chromium
+      - name: Verify Sprint 4 impact, adoption and replacement-prefill browser regressions
+        working-directory: frontend
+        run: npx playwright test tests/s4-demo-ui.spec.ts tests/s4-label-prefill.spec.ts --workers=1
       - name: Verify SCRUM-84 controlled identity switching and stale response isolation
         working-directory: frontend
         run: npx playwright test tests/scrum84-identity-switch.spec.ts tests/scrum84-returned-revision-ui.spec.ts --workers=1

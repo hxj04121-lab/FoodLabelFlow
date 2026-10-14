@@ -43,6 +43,35 @@ public class CatalogStore {
     public List<Map<String, Object>> versions(String productId) {
         return jdbc.queryForList("SELECT * FROM formula_version WHERE product_id=? ORDER BY version_number", productId);
     }
+    public List<Map<String, Object>> currentProductsUsingMaterial(String materialId) {
+        return jdbc.queryForList("""
+                SELECT DISTINCT p.product_id, p.current_formula_version_id
+                FROM product p
+                JOIN formula_version fv ON fv.formula_version_id = p.current_formula_version_id
+                  AND fv.product_id = p.product_id AND fv.lifecycle_status = 'RELEASED'
+                  AND fv.is_current_released = 'Y'
+                JOIN formula_item fi ON fi.formula_version_id = fv.formula_version_id
+                  AND fi.supplier_material_id = ?
+                ORDER BY p.product_id
+                """, materialId);
+    }
+    public Map<String, Object> findBatchAdoption(String productId, String targetSpecificationVersionId) {
+        var rows = jdbc.queryForList("""
+                SELECT formula_version_id, source_formula_version_id
+                FROM formula_adoption_batch_item
+                WHERE product_id = ? AND target_specification_version_id = ?
+                """, productId, targetSpecificationVersionId);
+        return rows.isEmpty() ? null : rows.getFirst();
+    }
+    public void recordBatchAdoption(String productId, String sourceFormulaVersionId,
+                                    String targetSpecificationVersionId, String formulaVersionId) {
+        jdbc.update("""
+                INSERT INTO formula_adoption_batch_item(
+                  product_id, source_formula_version_id, target_specification_version_id,
+                  formula_version_id, adopted_at)
+                VALUES (?, ?, ?, ?, UTC_TIMESTAMP())
+                """, productId, sourceFormulaVersionId, targetSpecificationVersionId, formulaVersionId);
+    }
     public String supplier(Supplier value) {
         String id = id();
         jdbc.update("INSERT INTO supplier(supplier_id,supplier_code,supplier_name,data_provenance_id) VALUES (?,?,?,?)",

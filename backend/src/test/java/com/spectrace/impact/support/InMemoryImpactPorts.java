@@ -238,6 +238,12 @@ public final class InMemoryImpactPorts {
                     .sorted(Comparator.comparing(RelevantProduct::productId))
                     .toList();
         }
+
+        @Override
+        public Map<String, String> findProductDisplayNames(List<String> productIds) {
+            return productIds.stream().distinct().collect(java.util.stream.Collectors.toUnmodifiableMap(
+                    productId -> productId, productId -> productId));
+        }
     }
 
     public static final class SpecificationVersions implements SpecificationVersionLookupPort {

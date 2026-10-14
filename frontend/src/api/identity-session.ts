@@ -1,6 +1,6 @@
 import type { CurrentIdentity } from './identity'
 
-export type DemoIdentityKey = 'MAKER' | 'CHECKER' | 'PUBLISHER'
+export type DemoIdentityKey = 'MAKER' | 'CHECKER' | 'PUBLISHER' | 'CHANGE_MANAGER' | 'DATA_ADMIN'
 export type DemoIdentityStatus = 'loading' | 'ready' | 'switching' | 'unavailable'
 
 export type IdentitySessionSnapshot = {
@@ -15,12 +15,16 @@ export const demoIdentityChoices: Array<{ key: DemoIdentityKey; subject: string;
   { key: 'MAKER', subject: 'dev-external-label-officer', label: 'Maker' },
   { key: 'CHECKER', subject: 'dev-external-qa-approver', label: 'Checker' },
   { key: 'PUBLISHER', subject: 'dev-external-publisher', label: 'Publisher' },
+  { key: 'CHANGE_MANAGER', subject: 'dev-external-change-manager', label: 'Change Manager' },
+  { key: 'DATA_ADMIN', subject: 'dev-external-admin', label: 'Data Admin' },
 ]
 
 const requiredPermissions: Record<DemoIdentityKey, string[]> = {
   MAKER: ['LABEL.CREATE', 'LABEL.VALIDATE', 'LABEL.SUBMIT_REVIEW'],
   CHECKER: ['LABEL.APPROVE', 'LABEL.REQUEST_CHANGES'],
   PUBLISHER: ['LABEL.PUBLISH'],
+  CHANGE_MANAGER: ['CHANGE_REQUEST.CREATE', 'IMPACT.RUN', 'AUDIT.READ'],
+  DATA_ADMIN: ['DATA.MAINTAIN', 'FORMULA.RELEASE', 'AUDIT.READ'],
 }
 
 function readSelection(): DemoIdentityKey {

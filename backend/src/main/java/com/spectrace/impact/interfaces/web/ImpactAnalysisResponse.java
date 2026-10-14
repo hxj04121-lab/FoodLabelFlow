@@ -40,6 +40,7 @@ public record ImpactAnalysisResponse(
     public record Finding(
             String impactFindingId,
             String productId,
+            String productDisplayName,
             ImpactClassification outcome,
             String currentFormulaVersionId,
             String proposedFormulaVersionId,
@@ -53,6 +54,7 @@ public record ImpactAnalysisResponse(
             return new Finding(
                     finding.impactFindingId(),
                     finding.productId(),
+                    view.productDisplayName(),
                     finding.classification(),
                     finding.currentFormulaVersionId(),
                     finding.proposedFormulaVersionId(),

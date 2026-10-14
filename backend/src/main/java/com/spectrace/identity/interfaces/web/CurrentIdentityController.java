@@ -29,7 +29,9 @@ public class CurrentIdentityController {
         return List.of(
                 option("MAKER", "dev-external-label-officer"),
                 option("CHECKER", "dev-external-qa-approver"),
-                option("PUBLISHER", "dev-external-publisher"));
+                option("PUBLISHER", "dev-external-publisher"),
+                option("CHANGE_MANAGER", "dev-external-change-manager"),
+                option("DATA_ADMIN", "dev-external-admin"));
     }
 
     private DemoIdentityOption option(String key, String subject) {
