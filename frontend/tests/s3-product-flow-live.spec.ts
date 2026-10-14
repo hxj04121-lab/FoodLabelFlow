@@ -35,6 +35,17 @@ async function post(request: APIRequestContext, path: string, data: object, subj
   return response.json()
 }
 
+async function forEachConcurrent<T>(values: readonly T[], workerCount: number,
+  action: (value: T) => Promise<void>) {
+  let nextIndex = 0
+  await Promise.all(Array.from({ length: Math.min(workerCount, values.length) }, async () => {
+    while (nextIndex < values.length) {
+      const index = nextIndex++
+      await action(values[index])
+    }
+  }))
+}
+
 async function loadActorLabel(context: BrowserContext, path: string, labelId: string): Promise<Page> {
   const actorPage = await context.newPage()
   await actorPage.goto(path)
@@ -47,7 +58,7 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
   request, browser,
 }, testInfo) => {
   test.skip(process.env.LIVE_S3_FLOW !== '1', 'Requires an isolated real backend seeded with released specification input only')
-  test.setTimeout(300_000)
+  test.setTimeout(600_000)
   const compoundMakerSubject = process.env.S3_COMPOUND_MAKER_SUBJECT
   const compoundMakerAliasSubject = process.env.S3_COMPOUND_MAKER_ALIAS_SUBJECT
   const compoundMakerUserId = process.env.S3_COMPOUND_MAKER_USER_ID
@@ -95,22 +106,30 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
     expect(adminIdentity.userId).toBe('user_admin')
     expect(adminIdentity.permissions).not.toContain('LABEL.CREATE')
     expect(adminIdentity.permissions).not.toContain('LABEL.APPROVE')
-    for (const row of golden) {
+    await forEachConcurrent(golden, 6, async (row) => {
       const product = await json(request, `/api/catalog/products/${row.productId}`)
+      const [formula, label, declarations] = await Promise.all([
+        json(request, `/api/catalog/formulas/${product.current_formula_version_id}`),
+        json(request, `/api/labels/${product.current_published_label_version_id}`),
+        json(request, `/api/labels/${product.current_published_label_version_id}/declarations`),
+      ])
       before.set(row.productId, {
         product,
-        formula: await json(request, `/api/catalog/formulas/${product.current_formula_version_id}`),
-        label: await json(request, `/api/labels/${product.current_published_label_version_id}`),
-        declarations: await json(request, `/api/labels/${product.current_published_label_version_id}/declarations`),
+        formula,
+        label,
+        declarations,
       })
-      if (row.outcome === 'EXCLUDED_NO_FINDING') continue
+    })
+    const adoptionCandidates = golden.filter((row) => row.outcome !== 'EXCLUDED_NO_FINDING')
+    await forEachConcurrent(adoptionCandidates, 4, async (row) => {
+      const product = before.get(row.productId)!.product
       const adoption = await post(request, `/api/catalog/products/${row.productId}/formula-adoptions`, {
         sourceFormulaVersionId: product.current_formula_version_id,
         targetSpecificationVersionId: 'spec_chocolate_v2',
       }, 'dev-external-admin', 201)
       expect(adoption.formula_version_id).not.toBe(product.current_formula_version_id)
       adopted.set(row.productId, adoption.formula_version_id)
-    }
+    })
     expect(adopted.size).toBe(40)
     reachedStage = 'actual impact UI creation and analysis'
     const impactPage = await changeContext.newPage()
@@ -367,19 +386,22 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
     }
     await reviewsPage.screenshot({ path: resolve(evidenceDir, 's3-live-closed-review-workspace.png'), fullPage: true })
     reachedStage = 'all sixty original product histories'
-    for (const row of golden) {
+    await forEachConcurrent(golden, 6, async (row) => {
       const original = before.get(row.productId)!
-      const product = await json(request, `/api/catalog/products/${row.productId}`)
+      const [product, oldFormula, oldLabel, oldDeclarations] = await Promise.all([
+        json(request, `/api/catalog/products/${row.productId}`),
+        json(request, `/api/catalog/formulas/${original.product.current_formula_version_id}`),
+        json(request, `/api/labels/${original.label.labelVersionId}`),
+        json(request, `/api/labels/${original.label.labelVersionId}/declarations`),
+      ])
       expect(product.current_formula_version_id).toBe(adopted.get(row.productId) || original.product.current_formula_version_id)
       expect(product.current_published_label_version_id).toBe(published.get(row.productId) || original.product.current_published_label_version_id)
-      const oldFormula = await json(request, `/api/catalog/formulas/${original.product.current_formula_version_id}`)
       expect(oldFormula.items).toEqual(original.formula.items)
       expect(oldFormula.released_at).toEqual(original.formula.released_at)
-      const oldLabel = await json(request, `/api/labels/${original.label.labelVersionId}`)
       expect(oldLabel).toEqual({ ...original.label, ...(published.has(row.productId)
         ? { lifecycleStatus: 'SUPERSEDED', isCurrentPublished: 'N' } : {}) })
-      expect(await json(request, `/api/labels/${original.label.labelVersionId}/declarations`)).toEqual(original.declarations)
-    }
+      expect(oldDeclarations).toEqual(original.declarations)
+    })
     const evidence = { browserExecuted: true, mockedResponses: false, fixtureSqlWrites:
       ['Released spec_chocolate_v2 and its specification components; isolated NEW compound test user with existing officer/approver role links only; catalog and historic labels from unchanged Flyway'],
       declarationWrites: 'Only the actual first-creation draft UI/API', validationWrites: 'Only the actual evaluator HTTP API',

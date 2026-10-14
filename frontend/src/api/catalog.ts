@@ -41,12 +41,14 @@ export async function adoptSpecificationForCurrentProducts(specificationVersionI
   }
   if (!value || typeof value !== 'object') throw new Error('The batch adoption API returned an invalid summary.')
   const summary = value as BatchAdoptionSummary
+  const invalidResult = Array.isArray(summary.results) && summary.results.some(row => !row ||
+    typeof row.productId !== 'string' || typeof row.replayed !== 'boolean' ||
+    !['ADOPTED', 'SKIPPED', 'FAILED'].includes(row.status))
   if (summary.targetSpecificationVersionId !== specificationVersionId || !Array.isArray(summary.results) ||
+      invalidResult ||
       summary.candidateCount !== summary.results.length || summary.adoptedCount !== summary.results.filter(row => row.status === 'ADOPTED').length ||
       summary.skippedCount !== summary.results.filter(row => row.status === 'SKIPPED').length ||
-      summary.failedCount !== summary.results.filter(row => row.status === 'FAILED').length ||
-      summary.results.some(row => !row || typeof row.productId !== 'string' || typeof row.replayed !== 'boolean' ||
-        !['ADOPTED', 'SKIPPED', 'FAILED'].includes(row.status))) {
+      summary.failedCount !== summary.results.filter(row => row.status === 'FAILED').length) {
     throw new Error('The batch adoption API returned inconsistent product results.')
   }
   return summary

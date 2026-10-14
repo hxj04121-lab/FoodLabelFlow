@@ -79,6 +79,27 @@ class RelevantProductDiscoveryTest {
     }
 
     @Test
+    void requiresADisplayNameForEveryDistinctRequestedProduct() {
+        RelevantProductLookupPort missingName = new RelevantProductLookupPort() {
+            @Override
+            public List<RelevantProduct> findProductsUsingMaterial(String supplierMaterialId) {
+                return List.of();
+            }
+
+            @Override
+            public Map<String, String> findProductDisplayNames(List<String> productIds) {
+                assertThat(productIds).containsExactly("prod_a", "prod_b");
+                return Map.of("prod_a", "Chocolate product");
+            }
+        };
+
+        assertThatIllegalStateException()
+                .isThrownBy(() -> new RelevantProductDiscovery(missingName)
+                        .displayNames(List.of("prod_a", "prod_a", "prod_b")))
+                .withMessageContaining("no display name");
+    }
+
+    @Test
     void aTargetAlwaysCarriesALabelAndAMatchingItem() {
         assertThatIllegalArgumentException().isThrownBy(() ->
                 new RelevantProductTarget("prod_a", "formula_a_v1", null, List.of("fi_a_v1_1")));

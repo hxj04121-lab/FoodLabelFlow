@@ -100,6 +100,42 @@ test('Data Admin can call the permission-gated current-product batch from the im
   expect(batchCalls).toBe(1)
 })
 
+test('Data Admin rejects inconsistent batch adoption rows without claiming success', async ({ page }) => {
+  await currentIdentity(page)
+  await page.route('**/api/identity/demo-options', route => route.fulfill({ json: [
+    { key: 'DATA_ADMIN', subject: 'dev-external-admin', actor: { userId: 'user_admin', permissions: ['DATA.MAINTAIN', 'FORMULA.RELEASE'] } },
+  ] }))
+  let batchCalls = 0
+  await page.route('**/api/catalog/specifications/spec_chocolate_v1/formula-adoptions', route => {
+    batchCalls++
+    return route.fulfill({ json: batchCalls === 1 ? {
+      targetSpecificationVersionId: 'spec_chocolate_v1', candidateCount: 1, adoptedCount: 0, skippedCount: 0, failedCount: 0,
+      results: [null],
+    } : batchCalls === 2 ? {
+      targetSpecificationVersionId: 'spec_chocolate_v1', candidateCount: 1, adoptedCount: 0, skippedCount: 0, failedCount: 0,
+      results: [{ productId: 'prod_s4', status: 'UNKNOWN', formulaVersionId: null, replayed: false, errorCode: null, message: null }],
+    } : {
+      targetSpecificationVersionId: 'spec_chocolate_v1', candidateCount: 0, adoptedCount: 0, skippedCount: 0, failedCount: 0,
+      results: [],
+    } })
+  })
+
+  await page.goto('/impact')
+  await page.getByLabel('Demo identity').selectOption('DATA_ADMIN')
+  await expect(page.getByRole('region', { name: 'Connected identity' })).toContainText('user_admin')
+  await page.getByRole('checkbox', { name: 'Use the connected identity for impact writes' }).check()
+  await page.getByText('Create a specification change request', { exact: true }).click()
+  await page.getByLabel('Target specification', { exact: true }).selectOption('spec_chocolate_v1')
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await page.getByRole('button', { name: 'Adopt for current products' }).click()
+    await expect(page.getByRole('alert')).toContainText('inconsistent product results')
+  }
+  await page.getByRole('button', { name: 'Adopt for current products' }).click()
+  await expect(page.getByRole('region', { name: 'Batch adoption summary' })).toContainText('0 adopted')
+  expect(batchCalls).toBe(3)
+})
+
 test('Maker cannot invoke the Data Admin-only batch adoption endpoint', async ({ page }) => {
   let batchCalls = 0
   await currentIdentity(page)
@@ -184,4 +220,91 @@ test('Maker cannot read product label history', async ({ page }) => {
   await page.goto('/label-history')
   await expect(page.getByRole('alert')).toContainText('This identity cannot read audit history')
   expect(historyCalls).toBe(0)
+})
+
+test('Change Manager reads published and draft label snapshots, approvals and attributable events', async ({ page }) => {
+  await currentIdentity(page)
+  await page.route('**/api/identity/demo-options', route => route.fulfill({ json: [
+    { key: 'CHANGE_MANAGER', subject: 'dev-external-change-manager', actor: { userId: 'user_change_manager', permissions: ['AUDIT.READ'] } },
+  ] }))
+  await page.route('**/api/catalog/products?*', route => route.fulfill({ json: [
+    { product_id: 'prod_history', product_description: 'Chocolate product' },
+    { product_id: 'prod_empty_history', product_description: 'Empty history product' },
+    { product_id: 7, product_description: 'Invalid product row' },
+    { product_id: 'prod_missing_name' },
+  ] }))
+  await page.route('**/api/audit/products/*/label-history', route => {
+    const empty = route.request().url().includes('prod_empty_history')
+    return route.fulfill({ json: empty ? {
+      productId: 'prod_empty_history', productDisplayName: 'Empty history product',
+      versions: [], approvals: [], auditEvents: [],
+    } : {
+      productId: 'prod_history', productDisplayName: 'Chocolate product',
+      versions: [
+        { labelVersionId: 'label-history-v2', versionNumber: 2, jurisdictionCode: 'US', lifecycleStatus: 'PUBLISHED',
+          formulaVersionId: 'formula-v2', ruleSetVersionId: 'rules-us-v1', createdAt: '2026-10-13T10:00:00Z',
+          createdByUserId: 'maker-1', createdByDisplayName: 'Maker', publishedAt: '2026-10-13T11:00:00Z',
+          publishedByUserId: 'publisher-1', publishedByDisplayName: 'Publisher', publicationChannel: 'WEB',
+          declarations: [{ allergenCode: 'SOY', declarationType: 'CONTAINS', source: 'USER_ENTERED', displayText: 'Contains soy' }] },
+        { labelVersionId: 'label-history-draft', versionNumber: 3, jurisdictionCode: 'US', lifecycleStatus: 'DRAFT',
+          formulaVersionId: 'formula-v2', ruleSetVersionId: 'rules-us-v1', createdAt: '2026-10-14T10:00:00Z',
+          createdByUserId: 'maker-2', createdByDisplayName: 'Second Maker', publishedAt: null,
+          publishedByUserId: null, publishedByDisplayName: null, publicationChannel: null, declarations: [] },
+      ],
+      approvals: [{ approvalRecordId: 'approval-1', labelVersionId: 'label-history-v2', reviewTaskId: 'task-1',
+        decision: 'APPROVE', decidedByUserId: 'checker-1', decidedByDisplayName: 'Checker',
+        decidedAt: '2026-10-13T10:30:00Z', comments: 'Independent review complete' }],
+      auditEvents: [{ auditEventId: 'audit-1', eventType: 'LABEL_PUBLISHED', entityType: 'LABEL_VERSION',
+        entityId: 'label-history-v2', eventAt: '2026-10-13T11:00:00Z', actorUserId: 'publisher-1',
+        actorDisplayName: 'Publisher', eventPayload: '{"channel":"WEB"}' }],
+    } })
+  })
+
+  await page.goto('/label-history')
+  await page.getByLabel('Demo identity').selectOption('CHANGE_MANAGER')
+  await expect(page.getByRole('region', { name: 'Connected identity' })).toContainText('user_change_manager')
+  await expect(page.getByLabel('Product', { exact: true })).toHaveValue('prod_history')
+  const history = page.getByRole('region', { name: 'Product label history' })
+  await expect(history).toContainText('Chocolate product')
+  await expect(page.getByText('2 label versions · 1 decisions · 1 audit events')).toBeVisible()
+  await expect(history).toContainText('Published')
+  await expect(history).toContainText('Contains soy [USER_ENTERED]')
+  await expect(history).toContainText('Not published')
+  await expect(history).toContainText('Independent review complete')
+  await expect(history).toContainText('LABEL_PUBLISHED')
+  await expect(history).toContainText('{"channel":"WEB"}')
+
+  const emptyHistory = page.waitForResponse(response => response.url().includes('/api/audit/products/prod_empty_history/label-history'))
+  await page.getByLabel('Product', { exact: true }).selectOption('prod_empty_history')
+  await emptyHistory
+  await expect(history).toContainText('No label versions exist for this product.')
+  await expect(history).toContainText('No approval decisions recorded.')
+  await expect(history).toContainText('No attributable label audit events recorded.')
+})
+
+test('label history reports a malformed read and refreshes the exact selected product', async ({ page }) => {
+  let historyCalls = 0
+  await currentIdentity(page)
+  await page.route('**/api/identity/demo-options', route => route.fulfill({ json: [
+    { key: 'DATA_ADMIN', subject: 'dev-external-admin', actor: { userId: 'user_admin', permissions: ['AUDIT.READ'] } },
+  ] }))
+  await page.route('**/api/catalog/products?*', route => route.fulfill({ json: [
+    { product_id: 'prod_history', product_description: 'Chocolate product' },
+  ] }))
+  await page.route('**/api/audit/products/prod_history/label-history', route => {
+    historyCalls++
+    return route.fulfill({ json: historyCalls === 1 ? {
+      productId: 'another-product', productDisplayName: 'Wrong product', versions: [], approvals: [], auditEvents: [],
+    } : {
+      productId: 'prod_history', productDisplayName: 'Chocolate product', versions: [], approvals: [], auditEvents: [],
+    } })
+  })
+
+  await page.goto('/label-history')
+  await page.getByLabel('Demo identity').selectOption('DATA_ADMIN')
+  await expect(page.getByRole('alert')).toContainText('incomplete product history')
+  await page.getByRole('button', { name: 'Refresh history' }).click()
+  await expect(page.getByRole('region', { name: 'Product label history' }))
+    .toContainText('No label versions exist for this product.')
+  expect(historyCalls).toBe(2)
 })

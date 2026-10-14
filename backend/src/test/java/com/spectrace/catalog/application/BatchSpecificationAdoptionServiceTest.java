@@ -165,4 +165,83 @@ class BatchSpecificationAdoptionServiceTest {
         assertThat(summary.adoptedCount()).isEqualTo(1);
         verify(catalog).adoptSpecification(PRODUCT, new AdoptSpecification("formula-current-at-lock", TARGET));
     }
+
+    @Test
+    void rejectsBlankAndOverlongTargetIdsBeforePermissionOrCatalogAccess() {
+        CatalogStore store = mock(CatalogStore.class);
+        CatalogService catalog = mock(CatalogService.class);
+        PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
+        var service = new BatchSpecificationAdoptionService(store, catalog, transactions);
+
+        assertThatThrownBy(() -> service.adopt("  ")).isInstanceOf(CatalogFailure.class);
+        assertThatThrownBy(() -> service.adopt("x".repeat(101))).isInstanceOf(CatalogFailure.class);
+
+        verifyNoInteractions(store, catalog, transactions);
+    }
+
+    @Test
+    void skipsProductsWithoutCurrentFormulaAndReturnsAnEmptySummaryForNoCandidates() {
+        CatalogStore store = mock(CatalogStore.class);
+        CatalogService catalog = mock(CatalogService.class);
+        PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
+        when(store.get(CatalogStore.Kind.SPECIFICATION, TARGET, false))
+                .thenReturn(Map.of("supplier_material_id", "material-1"));
+        when(store.currentProductsUsingMaterial("material-1"))
+                .thenReturn(List.of(Map.of("product_id", PRODUCT)));
+        when(store.findBatchAdoption(PRODUCT, TARGET)).thenReturn(null);
+        when(store.get(CatalogStore.Kind.PRODUCT, PRODUCT, true))
+                .thenReturn(java.util.Collections.singletonMap("current_formula_version_id", null));
+
+        var skipped = new BatchSpecificationAdoptionService(store, catalog, transactions).adopt(TARGET);
+
+        assertThat(skipped.skippedCount()).isEqualTo(1);
+        assertThat(skipped.results().getFirst()).isEqualTo(new BatchSpecificationAdoptionService.Result(
+                PRODUCT, "SKIPPED", null, false, "NO_CURRENT_FORMULA", "Product has no current released formula."));
+        verify(transactions).getTransaction(any());
+
+        when(store.currentProductsUsingMaterial("material-1")).thenReturn(List.of());
+        var empty = new BatchSpecificationAdoptionService(store, catalog, transactions).adopt(" " + TARGET + " ");
+        assertThat(empty.targetSpecificationVersionId()).isEqualTo(TARGET);
+        assertThat(empty.candidateCount()).isZero();
+        assertThat(empty.results()).isEmpty();
+    }
+
+    @Test
+    void resolvesConcurrentReplayAndSeparatesSkippedCatalogConflictsFromFailures() {
+        CatalogStore store = mock(CatalogStore.class);
+        CatalogService catalog = mock(CatalogService.class);
+        PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
+        when(transactions.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
+        when(store.get(CatalogStore.Kind.SPECIFICATION, TARGET, false))
+                .thenReturn(Map.of("supplier_material_id", "material-1"));
+        when(store.currentProductsUsingMaterial("material-1")).thenReturn(List.of(
+                Map.of("product_id", "product-race"), Map.of("product_id", "product-skip"),
+                Map.of("product_id", "product-fail")));
+        when(store.findBatchAdoption("product-race", TARGET)).thenReturn(null)
+                .thenReturn(Map.of("formula_version_id", "formula-raced", "source_formula_version_id", "formula-old"));
+        when(store.findBatchAdoption("product-skip", TARGET)).thenReturn(null).thenReturn(null);
+        when(store.findBatchAdoption("product-fail", TARGET)).thenReturn(null).thenReturn(null);
+        for (String productId : List.of("product-race", "product-skip", "product-fail")) {
+            when(store.get(CatalogStore.Kind.PRODUCT, productId, true))
+                    .thenReturn(Map.of("current_formula_version_id", "formula-old"));
+        }
+        when(catalog.adoptSpecification("product-race", new AdoptSpecification("formula-old", TARGET)))
+                .thenThrow(new CatalogFailure(409, "FORMULA_CHANGED", "Formula changed"));
+        when(catalog.adoptSpecification("product-skip", new AdoptSpecification("formula-old", TARGET)))
+                .thenThrow(new CatalogFailure(422, "SPECIFICATION_INCOMPATIBLE", "Target is incompatible"));
+        when(catalog.adoptSpecification("product-fail", new AdoptSpecification("formula-old", TARGET)))
+                .thenThrow(new CatalogFailure(403, "AUTHORIZATION_DENIED", "Permission revoked"));
+
+        var summary = new BatchSpecificationAdoptionService(store, catalog, transactions).adopt(TARGET);
+
+        assertThat(summary.adoptedCount()).isEqualTo(1);
+        assertThat(summary.skippedCount()).isEqualTo(1);
+        assertThat(summary.failedCount()).isEqualTo(1);
+        assertThat(summary.results()).containsExactly(
+                new BatchSpecificationAdoptionService.Result("product-race", "ADOPTED", "formula-raced", true, null, null),
+                new BatchSpecificationAdoptionService.Result("product-skip", "SKIPPED", null, false,
+                        "SPECIFICATION_INCOMPATIBLE", "Target is incompatible"),
+                new BatchSpecificationAdoptionService.Result("product-fail", "FAILED", null, false,
+                        "AUTHORIZATION_DENIED", "Adoption failed; retry after resolving the catalog error."));
+    }
 }

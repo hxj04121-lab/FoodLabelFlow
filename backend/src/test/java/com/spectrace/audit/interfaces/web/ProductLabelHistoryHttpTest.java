@@ -1,6 +1,7 @@
 package com.spectrace.audit.interfaces.web;
 
 import com.spectrace.audit.application.ProductLabelHistoryService;
+import com.spectrace.audit.application.AuditHistoryFailure;
 import com.spectrace.identity.application.AuthorizationService;
 import com.spectrace.identity.application.ExternalActorResolver;
 import com.spectrace.identity.application.IdentityService;
@@ -65,5 +66,31 @@ class ProductLabelHistoryHttpTest {
                 .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
 
         verifyNoInteractions(identities, history);
+    }
+
+    @Test
+    void mapsMissingProductHistoryToNotFound() throws Exception {
+        when(identities.authenticate("DEV_EXTERNAL", "change-manager")).thenReturn(
+                new AuthenticatedActor("change-manager-1", "change.manager", "Change Manager",
+                        Set.of("CHANGE_MANAGER"), Set.of("AUDIT.READ")));
+        when(history.get("product-1")).thenThrow(new AuditHistoryFailure(404, "PRODUCT_NOT_FOUND", "Product not found"));
+
+        mvc.perform(get(PATH).header("X-Auth-Provider", "DEV_EXTERNAL").header("X-External-Subject", "change-manager"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("PRODUCT_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("Product not found"));
+    }
+
+    @Test
+    void hidesUnexpectedHistoryReadFailuresBehindGenericServerError() throws Exception {
+        when(identities.authenticate("DEV_EXTERNAL", "change-manager")).thenReturn(
+                new AuthenticatedActor("change-manager-1", "change.manager", "Change Manager",
+                        Set.of("CHANGE_MANAGER"), Set.of("AUDIT.READ")));
+        when(history.get("product-1")).thenThrow(new IllegalStateException("database details"));
+
+        mvc.perform(get(PATH).header("X-Auth-Provider", "DEV_EXTERNAL").header("X-External-Subject", "change-manager"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"))
+                .andExpect(jsonPath("$.message").value("The label history could not be read"));
     }
 }
