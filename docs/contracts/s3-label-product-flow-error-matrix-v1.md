@@ -1,4 +1,4 @@
-# S3 label product-flow error matrix — extension v1.1.0 revision proposal
+# Label product-flow and S4 history error matrix — extension v1.3.0
 
 [Later compound-maker qualification](../evidence/S3-compound-maker-negative-20261008.md)
 separately exercises a creator who has APPROVE through isolated MySQL, HTTP and
@@ -7,7 +7,10 @@ earlier officer missing-permission scope. Actual results remain receipt-bound.
 
 State: **candidate; exact cross-module acceptance pending**. The associated
 [OpenAPI extension](s3-label-product-flow-api-v1.yaml) adds the declaration-create
-and workflow adapter boundary, paged task reads and current-caller read. The existing
+and workflow adapter boundary, paged task reads, current-caller read and the merged
+demo identity options endpoint. PR #88 integrated the returned-task revision and
+identity switching flows on main; this revision records their existing wire behavior
+without claiming M1/M3/M4 S4 owner acceptance. The existing
 [impact matrix](s3-impact-api-error-matrix-v1.md), declaration read and frozen
 S2 validation contract keep their earlier versions and responsibilities.
 
@@ -16,7 +19,7 @@ S2 validation contract keep their earlier versions and responsibilities.
 | 400 | `LABEL_COMMAND_INVALID` | Non-object/missing/malformed JSON, duplicate keys, trailing JSON, unknown request fields, wrong JSON types, forbidden actor/source/state fields, invalid decision or blank/oversized command values. | Correct the command. The four write routes validate the command before writes. Framework method/media failures retain 405/415 status; no canonical error-code/envelope promise is made for a rejection before handler lookup. |
 | 400 | `LABEL_DRAFT_INVALID` | Invalid draft/declaration application input: unknown/noncanonical allergen ID, missing jurisdiction catalog membership, repeated case-insensitive allergen ID, unsupported declaration type or invalid first-snapshot input. | Use canonical catalog IDs such as `all_soy`, not `SOY`. No new label, declaration or binding survives rejection. |
 | 400 | `REVIEW_TASK_QUERY_INVALID` | Task collection status is blank/unknown/lowercase, limit or offset is malformed, limit is outside 1–100 or offset outside 0–100000. | Correct the query. Filtering precedes deterministic pagination; no business write occurs. |
-| 401 | `AUTHENTICATION_REQUIRED` | Missing provider/subject, unknown subject, inactive identity, unsupported non-ASCII provider namespace, or DEV_EXTERNAL when the existing development-auth flag is false (case-insensitive provider match). | Obtain the existing supported connected identity context. Do not fabricate a subject in the UI; no write occurs. |
+| 401 | `AUTHENTICATION_REQUIRED` | Missing provider/subject, unknown subject, inactive identity, unsupported non-ASCII provider namespace, DEV_EXTERNAL when the existing development-auth flag is false (case-insensitive provider match), or `GET /api/identity/demo-options` when demo switching is disabled or one configured mapping cannot resolve. | Obtain the existing supported connected identity context. Do not fabricate a subject in the UI; no write occurs. |
 | 403 | `AUTHORIZATION_DENIED` | Caller lacks the operation permission; APPROVE caller is the label creator. | A distinct permitted checker must approve. UI controls do not replace the backend check. No decision/task/approval/audit transition commits. |
 | 404 | `LABEL_NOT_FOUND` | The exact path label does not exist. | Correct the label ID; do not silently select a latest label. |
 | 404 | `REVIEW_TASK_NOT_FOUND` | The exact task read/publication path resource is absent. | Correct the task ID and reread its binding. No publication commits. |
@@ -25,6 +28,9 @@ S2 validation contract keep their earlier versions and responsibilities.
 | 409 | `LABEL_VERSION_CONFLICT` | Current label/formula changed, publication body does not match the task target, requested first task is mismatched/ambiguous, or an unresolved task is already bound. | Reread exact resources and reconcile; no blind command replay, new draft or task rebind. |
 | 409 | `LABEL_WORKFLOW_CONFLICT` | Invalid lifecycle transition, missing/failed latest exact-label/rule-set validation, missing pending task, final APPROVE decision/record absent, or task already resolved. | Fix the domain prerequisite through supported operations. No synthetic PASSED run or direct SQL state/decision may stand in for the gate. |
 | 500 | `INTERNAL_ERROR` | Unexpected application, persistence or audit failure. | The write transaction rolls back. Treat a lost/failed response as uncertain until exact label/task reads reconcile it; no automatic repeat decision/publication. |
+| 403 | `AUTHORIZATION_DENIED` | `GET /api/audit/products/{productId}/label-history` resolves an actor without `AUDIT.READ`. | Switch to an authorized Change Manager, Data Admin or Auditor identity; the endpoint remains read-only. |
+| 404 | `PRODUCT_NOT_FOUND` | Product history path names an unknown product. | Select an existing catalog product. No partial history is returned. |
+| 500 | `INTERNAL_ERROR` | Product label-history query fails unexpectedly. | Retry the read after service recovery; no business state is written. |
 
 Expected controller/identity errors use the shared four-field `ApiError`: `code`, `message`, `traceId`,
 `evidenceId`. IDs remain null when real corresponding identifiers do not
@@ -39,10 +45,12 @@ identity advice has higher precedence, preserving 401 and 403.
 | `POST /api/labels/{id}/review-submissions` | Exactly `{}` | `LABEL.SUBMIT_REVIEW` | 200 same-label resource in PENDING_REVIEW. A returned REQUEST_CHANGES version is 409 `LABEL_WORKFLOW_CONFLICT`; create a fresh revision first. |
 | `POST /api/labels/{id}/review-decisions` | APPROVE with optional comment | `LABEL.APPROVE` plus independent maker-checker | 200 same-label APPROVED; task still unresolved IN_REVIEW. |
 | Same decision route | REQUEST_CHANGES with optional comment | `LABEL.REQUEST_CHANGES` | 200 same-label DRAFT; task OPEN, unresolved. |
-| `POST /api/review-tasks/{id}/draft-revisions` | Exact `expectedLabelVersionId` plus complete `declarations` | `LABEL.CREATE` | 201 new LabelDraft plus Location; both task references atomically advance, decision/resolver summary clears. Local proposal pending actual M4 workflow adoption. |
+| `POST /api/review-tasks/{id}/draft-revisions` | Exact `expectedLabelVersionId` plus complete `declarations` | `LABEL.CREATE` | 201 new LabelDraft plus Location; both task references atomically advance, decision/resolver summary clears. Implemented on main through PR #88; S4 cross-module acceptance remains pending. |
 | Same decision route | REJECT with optional comment | `LABEL.REJECT` | 200 same-label REJECTED; task CLOSED/resolved. |
 | `POST /api/review-tasks/{id}/publications` | Exact `labelVersionId` | `LABEL.PUBLISH` | 200 same-label PUBLISHED/current; task CLOSED/resolved and durable publication/audit. |
 | `GET /api/review-tasks` | Optional exact status, limit default 20 (1–100), offset default 0 (0–100000) | Active resolved identity; no added operation permission | 200 direct ReviewTaskView array ordered created_at DESC/task ID ASC, possibly empty. |
+| `GET /api/identity/demo-options` | No body or query; development-only option discovery | None; existing development feature gate applies | 200 direct MAKER/CHECKER/PUBLISHER/CHANGE_MANAGER/DATA_ADMIN option array. The last two reuse seeded identities. It creates no identity or grant; actor selection is sent through the existing mapped provider/subject context. Disabled/production configuration or an unavailable mapping returns 401. |
+| `GET /api/audit/products/{productId}/label-history` | Exact product path | `AUDIT.READ` | 200 version snapshots, declaration snapshots, approval decisions, publication details and matching label/review-task audit events; unknown product is 404. |
 | `GET /api/identity/current` | Existing connected request context | Active resolved identity; no grants or actor selection | 200 actual userId/username/displayName and sorted roles/permissions. |
 | Exact label/declaration/task GET | Path ID | Existing active identity; no new permission grant | 200 direct resource, including null unbound task references or an empty declaration list. |
 
@@ -67,7 +75,7 @@ resource rereads.
   `REVIEW_TASK_NOT_FOUND`. Strict revision JSON errors use 400 `LABEL_COMMAND_INVALID`;
   application declaration errors retain 400 `LABEL_DRAFT_INVALID` through the existing
   global label advice. All failed revision writes roll back.
-  This proposal is not an attributed M4 approval or a replacement of earlier acceptance.
+  The merged implementation is not an attributed M4 S4 approval or a replacement of earlier acceptance.
 - The separate APPROVE response is not publication. An unresolved approved task
   can only be published by the guarded publication command.
 - Write timeouts/cancellation do not undo a committed operation. Read the exact
@@ -86,7 +94,10 @@ The current-caller resource contains only five actual DTO fields. Permission-awa
 presentation uses this read and stays disabled while it is loading/unavailable;
 application services remain authoritative for command permissions and maker-checker.
 Refreshing the resource rereads the connected actor; it does not select a different
-actor. A controlled switch and the adopted login/demo choice remain proposed.
+actor. The local controlled selector and its `GET /api/identity/demo-options` read
+are implemented on main through PR #88. They reuse the existing mapped DEV_EXTERNAL
+subjects and grant no permissions. This is not a production login decision or an
+M4 S4 acceptance record.
 
 [ExternalActorResolver](../../backend/src/main/java/com/spectrace/identity/application/ExternalActorResolver.java)
 enforces the existing DEV_EXTERNAL opt-out and rejects non-ASCII provider namespaces

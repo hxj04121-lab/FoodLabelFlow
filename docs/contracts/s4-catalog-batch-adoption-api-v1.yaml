@@ -1,0 +1,100 @@
+openapi: 3.1.0
+info:
+  title: S4 Catalog Batch Formula Adoption API
+  version: 1.0.0
+  description: Additive S4 API for adopting one released specification into every current product formula using its supplier material.
+x-spec-trace-contract-state: CANDIDATE_PENDING_CROSS_MODULE_ACCEPTANCE
+security:
+  - ExternalAuthProvider: []
+    ExternalSubject: []
+paths:
+  /api/catalog/specifications/{specificationVersionId}/formula-adoptions:
+    post:
+      operationId: adoptSpecificationForCurrentProducts
+      summary: Adopt the exact target specification independently for each current product formula that uses its material.
+      x-required-permissions: [DATA.MAINTAIN, FORMULA.RELEASE]
+      description: >-
+        Selects products from the current released FormulaVersion and its FormulaItems, not historical formulas.
+        Each product is locked and adopted in an independent transaction. FormulaVersion creation, release,
+        audit events and the replay marker commit together. Repeating the same target returns the saved formula
+        ID for committed product/target pairs. Products that no longer qualify or fail a domain precondition are
+        represented as SKIPPED or FAILED so one item does not roll back other products. The target ID is the
+        path parameter; there is no request body and the actor comes from the existing identity headers.
+      parameters:
+        - name: specificationVersionId
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 100 }
+      responses:
+        '200':
+          description: Per-product adoption summary, including already committed replays.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BatchAdoptionSummary' }
+        '401':
+          description: Identity headers do not resolve to an active actor.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '403':
+          description: Actor lacks DATA.MAINTAIN or FORMULA.RELEASE.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '404':
+          description: Target specification does not exist.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '422':
+          description: Target specification is not released or is not effective yet.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '503':
+          description: Existing Catalog identity and transactional audit adapter is unavailable.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        '500':
+          description: Request-level persistence failure before or outside per-product processing.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+components:
+  securitySchemes:
+    ExternalAuthProvider:
+      type: apiKey
+      in: header
+      name: X-Auth-Provider
+    ExternalSubject:
+      type: apiKey
+      in: header
+      name: X-External-Subject
+  schemas:
+    BatchAdoptionSummary:
+      type: object
+      additionalProperties: false
+      required: [targetSpecificationVersionId, candidateCount, adoptedCount, skippedCount, failedCount, results]
+      properties:
+        targetSpecificationVersionId: { type: string }
+        candidateCount: { type: integer, minimum: 0 }
+        adoptedCount: { type: integer, minimum: 0 }
+        skippedCount: { type: integer, minimum: 0 }
+        failedCount: { type: integer, minimum: 0 }
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/BatchAdoptionResult' }
+    BatchAdoptionResult:
+      type: object
+      additionalProperties: false
+      required: [productId, status, formulaVersionId, replayed, errorCode, message]
+      properties:
+        productId: { type: string }
+        status: { type: string, enum: [ADOPTED, SKIPPED, FAILED] }
+        formulaVersionId: { type: [string, 'null'] }
+        replayed: { type: boolean }
+        errorCode: { type: [string, 'null'] }
+        message: { type: [string, 'null'] }
+    ApiError:
+      $ref: './allergen-validation-api-v1.yaml#/components/schemas/ApiError'

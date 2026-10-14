@@ -69,6 +69,28 @@ This additive Catalog endpoint does not change the frozen impact API's error
 matrix. Cross-module review remains required before treating this candidate as
 accepted.
 
+## S4 batch adoption
+
+The separate [`s4-catalog-batch-adoption-api-v1.yaml`](s4-catalog-batch-adoption-api-v1.yaml)
+defines `POST /api/catalog/specifications/{specificationVersionId}/formula-adoptions`.
+It discovers only products whose current released formula uses the target
+material, then invokes the existing exact-product adoption boundary with both
+`DATA.MAINTAIN` and `FORMULA.RELEASE` permissions. Each successful product
+commits its new FormulaVersion, release metadata, audit records and
+`formula_adoption_batch_item` replay marker in one transaction. A later request
+for the same product and target returns the original formula ID with
+`replayed: true`. The direct product adoption endpoint above retains its
+existing 201/error behavior; the batch endpoint returns an itemized 200 summary.
+
+Per-product precondition failures use `SKIPPED` (for known conflicts and
+eligibility failures) or `FAILED` (unexpected item failure) with a stable
+`errorCode` and caller-safe message. The overall response distinguishes adopted,
+skipped and failed totals. Authentication, permission and target-path errors
+remain request-level errors. The target must be released and effective; an
+ineligible target returns 422 before candidate discovery, including when the
+batch would otherwise be empty. This candidate was added for SCRUM-85;
+cross-module acceptance remains pending.
+
 ## M1 consumption after adoption
 
 SCRUM-77's relevance port selects `FormulaItem.supplier_material_id` from the
