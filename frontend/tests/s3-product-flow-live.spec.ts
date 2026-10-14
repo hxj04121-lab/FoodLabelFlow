@@ -193,7 +193,7 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
       lastAttempt = { productId: finding.productId, reviewTaskId }
       reachedStage = 'actual first-creation declaration UI'
       const findingCard = renderedResults.locator('article').filter({
-        has: impactPage.getByRole('heading', { name: finding.productId, exact: true }),
+        has: impactPage.getByText(`Product ${finding.productId}`, { exact: true }),
       })
       const initialPath = await findingCard.getByRole('link', { name: 'Prepare replacement label', exact: true }).getAttribute('href')
       expect(initialPath).toContain(`reviewTaskId=${reviewTaskId}`)
