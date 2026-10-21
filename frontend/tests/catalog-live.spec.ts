@@ -19,7 +19,7 @@ test('M1 real read-only product and formula integration',async({page,request})=>
   const traceBody=await trace.json()
   expect(traceBody.formula.product_id).toBe(product.product_id)
   await page.goto('/products')
-  await expect(page.getByText('Connected to the M1 read-only API',{exact:false})).toBeVisible({timeout:30000})
+  await expect(page.getByText('Connected to the food catalog',{exact:false})).toBeVisible({timeout:30000})
   await page.getByRole('textbox',{name:'Search products'}).fill(String(product.fdc_id))
   await page.getByRole('button',{name:`View ${product.product_description}`,exact:true}).click()
   await expect(page.getByRole('dialog')).toContainText(traceBody.trace[0].specification.specification_version_id)

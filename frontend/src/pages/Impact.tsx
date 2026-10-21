@@ -302,7 +302,9 @@ export function Impact() {
             {finding.missingAllergenCodes.length > 0 && <p>Missing declarations: {finding.missingAllergenCodes.join(', ')}</p>}
             {finding.reviewTask && <><p>Review task: {finding.reviewTask.reviewTaskId}</p>
               <Button variant="outline" asChild><Link to={'/labels?' + new URLSearchParams({ productId: finding.productId,
-                reviewTaskId: finding.reviewTask.reviewTaskId, ...(finding.reviewTask.draftLabelVersionId
+                reviewTaskId: finding.reviewTask.reviewTaskId,
+                expectedFormulaVersionId: finding.proposedFormulaVersionId,
+                ...(finding.reviewTask.draftLabelVersionId
                   ? { labelVersionId: finding.reviewTask.draftLabelVersionId } : {}) })}>
                 {finding.reviewTask.draftLabelVersionId ? 'Open bound label draft' : 'Prepare replacement label'}</Link></Button></>}
           </article>)}</div>

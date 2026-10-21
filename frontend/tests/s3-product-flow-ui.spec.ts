@@ -67,6 +67,81 @@ test('records only explicit declarations with the first matching task and curren
   await expect(page.getByText('Declarations are fixed at draft creation.', { exact: false })).toBeVisible()
 })
 
+test('prefills a new replacement draft from the exact prior label and keeps declarations editable', async ({ page }) => {
+  const replacementTask = { reviewTaskId: 'task_prefill', productId: initial.productId,
+    currentLabelVersionId: 'label_previous', draftLabelVersionId: null, targetLabelVersionId: null,
+    status: 'OPEN', decision: null, resolvedAt: null }
+  const previous = { ...initial, labelVersionId: 'label_previous', formulaVersionId: 'formula_1106285_v1',
+    lifecycleStatus: 'PUBLISHED', isCurrentPublished: 'Y' }
+  await page.route('**/api/v1/allergens?*', route => route.fulfill({ json: allergens }))
+  await page.route('**/api/review-tasks/task_prefill', route => route.fulfill({ json: replacementTask }))
+  await page.route('**/api/labels/label_previous', route => route.fulfill({ json: previous }))
+  await page.route('**/api/labels/label_previous/declarations', route => route.fulfill({ json: { ...previous,
+    declarations: [{ allergenId: 'all_soy', declarationType: 'CONTAINS',
+      declarationSource: 'MIGRATED_PUBLIC_LABEL', displayText: 'Contains Soy' }] } }))
+  await page.route('**/api/labels/drafts', async route => {
+    expect(route.request().postDataJSON()).toEqual({ productId: initial.productId, jurisdictionCode: 'US',
+      declarations: [{ allergenId: 'all_wheat', declarationType: 'CONTAINS', displayText: 'Contains Wheat' }],
+      reviewTaskId: replacementTask.reviewTaskId })
+    await route.fulfill({ status: 201, json: initial })
+  })
+
+  await page.goto(`/labels?productId=${initial.productId}&reviewTaskId=${replacementTask.reviewTaskId}&expectedFormulaVersionId=formula_1106285_v1`)
+  await expect(page.getByRole('status').filter({ hasText: 'prefilled from previous label label_previous' })).toBeVisible()
+  await expect(page.getByLabel('Declare Soy (SOY)')).toBeChecked()
+  await expect(page.getByLabel('Declare Wheat (WHEAT)')).not.toBeChecked()
+  await page.getByLabel('Declare Soy (SOY)').uncheck()
+  await page.getByLabel('Declare Wheat (WHEAT)').check()
+  await page.getByRole('checkbox', { name: 'Use the connected identity to create this draft' }).check()
+  await page.getByRole('button', { name: 'Create label draft' }).click()
+  await expect(page.getByRole('region', { name: 'Label draft details' })).toContainText(initial.labelVersionId)
+})
+
+test('warns and blocks creation when the impact handoff formula is stale', async ({ page }) => {
+  const replacementTask = { reviewTaskId: 'task_stale', productId: initial.productId,
+    currentLabelVersionId: 'label_previous', draftLabelVersionId: null, targetLabelVersionId: null,
+    status: 'OPEN', decision: null, resolvedAt: null }
+  const previous = { ...initial, labelVersionId: 'label_previous', formulaVersionId: 'formula_old_published',
+    lifecycleStatus: 'PUBLISHED', isCurrentPublished: 'Y' }
+  await page.route('**/api/v1/allergens?*', route => route.fulfill({ json: allergens }))
+  await page.route('**/api/review-tasks/task_stale', route => route.fulfill({ json: replacementTask }))
+  await page.route('**/api/labels/label_previous', route => route.fulfill({ json: previous }))
+  await page.route('**/api/labels/label_previous/declarations', route => route.fulfill({ json: { ...previous,
+    declarations: [{ allergenId: 'all_soy', declarationType: 'CONTAINS',
+      declarationSource: 'MIGRATED_PUBLIC_LABEL', displayText: 'Contains Soy' }] } }))
+  let writes = 0
+  await page.route('**/api/labels/drafts', route => { writes++; return route.fulfill({ status: 201, json: initial }) })
+
+  await page.goto(`/labels?productId=${initial.productId}&reviewTaskId=${replacementTask.reviewTaskId}&expectedFormulaVersionId=formula_obsolete`)
+  await expect(page.getByRole('alert').filter({ hasText: 'product formula changed after this impact result' })).toBeVisible()
+  await expect(page.getByRole('alert').filter({ hasText: 'previous label uses formula formula_old_published' })).toBeVisible()
+  await expect(page.getByRole('checkbox', { name: 'Use the connected identity to create this draft' })).toBeEnabled()
+  await page.getByRole('checkbox', { name: 'Use the connected identity to create this draft' }).check()
+  await expect(page.getByRole('button', { name: 'Create label draft' })).toBeDisabled()
+  expect(writes).toBe(0)
+})
+
+test('keeps replacement creation disabled when the exact previous declarations cannot be read', async ({ page }) => {
+  const replacementTask = { reviewTaskId: 'task_missing_history', productId: initial.productId,
+    currentLabelVersionId: 'label_previous', draftLabelVersionId: null, targetLabelVersionId: null,
+    status: 'OPEN', decision: null, resolvedAt: null }
+  const previous = { ...initial, labelVersionId: 'label_previous', formulaVersionId: 'formula_1106285_v1',
+    lifecycleStatus: 'PUBLISHED', isCurrentPublished: 'Y' }
+  await page.route('**/api/v1/allergens?*', route => route.fulfill({ json: allergens }))
+  await page.route('**/api/review-tasks/task_missing_history', route => route.fulfill({ json: replacementTask }))
+  await page.route('**/api/labels/label_previous', route => route.fulfill({ json: previous }))
+  await page.route('**/api/labels/label_previous/declarations', route => route.fulfill({ status: 503,
+    json: { code: 'HISTORY_UNAVAILABLE', message: 'Previous declarations unavailable.' } }))
+  let writes = 0
+  await page.route('**/api/labels/drafts', route => { writes++; return route.fulfill({ status: 201, json: initial }) })
+
+  await page.goto(`/labels?productId=${initial.productId}&reviewTaskId=${replacementTask.reviewTaskId}&expectedFormulaVersionId=formula_1106285_v1`)
+  await expect(page.getByRole('alert').filter({ hasText: 'Previous declarations unavailable.' })).toBeVisible()
+  await page.getByRole('checkbox', { name: 'Use the connected identity to create this draft' }).check()
+  await expect(page.getByRole('button', { name: 'Create label draft' })).toBeDisabled()
+  expect(writes).toBe(0)
+})
+
 test('requires exact PASSED validation and preserves the connected workflow identity', async ({ page }) => {
   await page.setExtraHTTPHeaders({ 'X-Auth-Provider': 'DEV_EXTERNAL', 'X-External-Subject': 'fixture-connected-maker' })
   await page.route('**/review-submissions', async route => {

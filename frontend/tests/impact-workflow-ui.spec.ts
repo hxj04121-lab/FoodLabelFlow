@@ -35,10 +35,10 @@ test('renders the actual returned findings and exact task handoff, including an 
   const results = page.getByRole('region', { name: 'Analysis results' })
   await expect(results.locator('article')).toHaveCount(1)
   const first = results.getByRole('link', { name: 'Prepare replacement label' })
-  await expect(first).toHaveAttribute('href', '/labels?productId=prod_usda_1106285&reviewTaskId=task_ui')
+  await expect(first).toHaveAttribute('href', '/labels?productId=prod_usda_1106285&reviewTaskId=task_ui&expectedFormulaVersionId=formula_new')
   await page.getByRole('button', { name: 'Load impact analysis' }).click()
   await expect(results.getByRole('link', { name: 'Open bound label draft' })).toHaveAttribute('href',
-    '/labels?productId=prod_usda_1106285&reviewTaskId=task_ui&labelVersionId=label_bound')
+    '/labels?productId=prod_usda_1106285&reviewTaskId=task_ui&expectedFormulaVersionId=formula_new&labelVersionId=label_bound')
 })
 
 test('uses frozen product display names and filters findings by impact outcome', async ({ page }) => {

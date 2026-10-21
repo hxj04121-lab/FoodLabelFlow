@@ -101,7 +101,7 @@ export function LabelWorkflowPanel({ draft, validationRun, reviewTaskId, onDraft
         <p>Declarations are fixed at draft creation. Review submission requires the latest validation to pass. Approval requires an authorized person other than the maker; publication requires its own permission.</p>
         <label className="demo-consent"><input type="checkbox" checked={connectedIdentityEnabled} disabled={disabled}
           onChange={event => setConnectedIdentityEnabled(event.target.checked)} />Use the connected identity for review and publication</label>
-        <p>A trusted maker, reviewer or publisher identity must be supplied by the connected environment. This form does not select an identity or assign permissions.</p>
+        <p>The active identity is selected in the application header. This consent enables workflow actions under that identity; it does not grant permissions.</p>
         {!independent && draft.lifecycleStatus === 'PENDING_REVIEW' && <p>Your connected identity created this label. An independent reviewer must make the decision.</p>}
         {!validationPassed && draft.lifecycleStatus === 'DRAFT' && <p>Run or load a PASSED validation for this exact label and rule set before submitting.</p>}
         <Button disabled={disabled || !connectedIdentityEnabled || !validationPassed || !identity.hasPermission('LABEL.SUBMIT_REVIEW') || draft.lifecycleStatus !== 'DRAFT'}
