@@ -45,3 +45,19 @@ An earlier run of this test change reached 11 publications, then failed at the p
 ## Limits
 
 The test actors are local DEV_EXTERNAL fixtures, not real human sign-in. This one local run does not substitute for a second team member's independent reset/replay, formal security risk acceptance, or remaining Jira acceptance. The successful CI previously associated with `ef2c8e8` did not run this newly added local browser assertion; this increment still needs CI on its own commit.
+
+## Same-page identity isolation follow-up
+
+The tested tree was based on `621ce7e31f8e9da6de807aad52ebb1eeb75be09c`, with changes to `frontend/tests/scrum84-identity-live.spec.ts` and `backend/src/test/java/com/spectrace/workflow/S3ProductFlowBrowserHarness.java`. The harness was run on 2026-10-21 from 15:04:14 to 15:08:31 UTC with JDK 25.0.4, MySQL 8.4.11 in a fresh Testcontainers container, random-port Spring, loopback Vite (`127.0.0.1:62383`), and a real Playwright Chromium context.
+
+```powershell
+$env:JAVA_HOME='C:\Program Files\Java\jdk-25.0.4'
+$env:Path="$env:JAVA_HOME\bin;$env:Path"
+mvn -Dtest=S3ProductFlowBrowserHarness test `
+  '-Ds3.checkout=..' `
+  '-Ds3.browser.evidence=C:\Users\rcncai\Documents\Codex\2026-10-21\task-2\FOOD-M5-identity-evidence-r3'
+```
+
+Result: Maven harness 1/1 passed with 0 failures/errors/skips. All five nested real-browser specs passed 1/1, including the new identity isolation test (7.2 seconds). In one page and browser context, Maker selected unsaved `SOY` and draft consent, then switched to Checker. The route stayed on the same product, the Maker-only fields were cleared, Checker had neither `LABEL.CREATE` nor `AUDIT.READ`, and the real local history endpoint returned 403 `AUTHORIZATION_DENIED`. Switching back to Maker did not restore either unsaved value. No `POST /api/labels/drafts` was sent. The identity test makes no business-record writes; other existing harness cases write only to this run's ephemeral database.
+
+Raw JSON: `../FOOD-M5-identity-evidence-r3/identity-switch-isolation.json` (SHA-256 `06175ff3efbb00654f0eeed7c9f82d3a337993fc44478bf78ebe0f10d618d37f`). This is evidence from the local DEV_EXTERNAL demo identities, not real human authentication. CI for this new increment has not been checked by this task.
