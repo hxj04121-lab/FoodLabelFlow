@@ -171,12 +171,13 @@ public class ChangeImpactAnalysisService {
                 : findings.findByRunId(run.impactAnalysisRunId());
         Function<String, Optional<ReviewTaskLinkage>> taskLookup = replay
                 ? reviewTasks::findByFindingIdForReplay : reviewTasks::findByFindingId;
+        var displayNames = discovery.displayNames(loaded.stream().map(ImpactFinding::productId).toList());
         List<FindingView> views = loaded.stream()
                 .map(finding -> new FindingView(finding, finding.requiresReviewTask()
                         ? taskLookup.apply(finding.impactFindingId())
                                 .orElseThrow(() -> new IllegalStateException(
                                         "REVIEW_REQUIRED finding " + finding.impactFindingId() + " has no review task"))
-                        : null))
+                        : null, displayNames.get(finding.productId())))
                 .toList();
         return new ImpactAnalysisView(run, views, false);
     }
@@ -197,11 +198,12 @@ public class ChangeImpactAnalysisService {
         return tasks;
     }
 
-    private static List<FindingView> views(List<ImpactFinding> newFindings, List<ReviewTaskLinkage> tasks) {
+    private List<FindingView> views(List<ImpactFinding> newFindings, List<ReviewTaskLinkage> tasks) {
+        var displayNames = discovery.displayNames(newFindings.stream().map(ImpactFinding::productId).toList());
         return newFindings.stream()
                 .map(finding -> new FindingView(finding, tasks.stream()
                         .filter(task -> task.impactFindingId().equals(finding.impactFindingId()))
-                        .findFirst().orElse(null)))
+                        .findFirst().orElse(null), displayNames.get(finding.productId())))
                 .toList();
     }
 }

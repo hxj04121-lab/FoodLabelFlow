@@ -32,6 +32,14 @@ public class CatalogService {
                 "Identity and transactional audit adapter must be configured before catalog writes");
         return adapter;
     }
+    public void requireBatchAdoptionPermission() {
+        var adapter = integration();
+        adapter.requireActor("DATA.MAINTAIN");
+        adapter.requireActor("FORMULA.RELEASE");
+    }
+    public void requireBatchAdoptionTarget(Map<String, Object> target) {
+        releasedAndEffective(target);
+    }
     public List<Map<String, Object>> list(CatalogStore.Kind kind, int limit, int offset) {
         if (limit < 1 || limit > 100 || offset < 0) throw CatalogFailure.invalid("limit must be 1..100; offset must be nonnegative");
         return store.list(kind, limit, offset);

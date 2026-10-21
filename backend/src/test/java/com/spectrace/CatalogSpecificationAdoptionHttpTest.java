@@ -1,5 +1,6 @@
 package com.spectrace;
 
+import com.spectrace.catalog.application.BatchSpecificationAdoptionService;
 import com.spectrace.catalog.application.CatalogService;
 import com.spectrace.catalog.domain.CatalogCommands.AdoptSpecification;
 import com.spectrace.catalog.domain.CatalogFailure;
@@ -50,7 +51,8 @@ class CatalogSpecificationAdoptionHttpTest {
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     private final CatalogService service = mock(CatalogService.class);
-    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new CatalogController(service))
+    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new CatalogController(service,
+            mock(BatchSpecificationAdoptionService.class)))
             .setControllerAdvice(new CatalogErrors())
             .build();
 
