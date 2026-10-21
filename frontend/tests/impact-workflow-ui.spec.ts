@@ -4,7 +4,7 @@ import { test, expect } from './catalog-fixture'
 const change = { changeRequestId: 'change_ui', changeType: 'INGREDIENT_SPEC', supplierMaterialId: 'mat_chocolate_base',
   previousSpecificationVersionId: 'spec_chocolate_v1', targetSpecificationVersionId: 'spec_chocolate_v2',
   description: 'Recorded soy change', status: 'SUBMITTED', createdAt: '2026-10-08T00:00:00Z' }
-const finding = { impactFindingId: 'finding_ui', productId: 'prod_usda_1106285', outcome: 'REVIEW_REQUIRED',
+const finding = { impactFindingId: 'finding_ui', productId: 'prod_usda_1106285', productDisplayName: 'Demo Chocolate Bar', outcome: 'REVIEW_REQUIRED',
   currentFormulaVersionId: 'formula_old', proposedFormulaVersionId: 'formula_new', currentLabelVersionId: 'label_old',
   missingAllergenCodes: ['SOY'], explanation: 'Soy must be declared.', reviewTask: { reviewTaskId: 'task_ui',
     impactFindingId: 'finding_ui', productId: 'prod_usda_1106285', currentFormulaVersionId: 'formula_old',
@@ -39,6 +39,29 @@ test('renders the actual returned findings and exact task handoff, including an 
   await page.getByRole('button', { name: 'Load impact analysis' }).click()
   await expect(results.getByRole('link', { name: 'Open bound label draft' })).toHaveAttribute('href',
     '/labels?productId=prod_usda_1106285&reviewTaskId=task_ui&labelVersionId=label_bound')
+})
+
+test('uses frozen product display names and filters findings by impact outcome', async ({ page }) => {
+  const noAction = { impactFindingId: 'finding_no_action', productId: 'prod_usda_1106963',
+    productDisplayName: 'Neutral Base Snack', outcome: 'NO_ACTION', currentFormulaVersionId: 'formula_current',
+    proposedFormulaVersionId: 'formula_proposed', currentLabelVersionId: 'label_current',
+    missingAllergenCodes: [], explanation: 'No declaration change.', reviewTask: null }
+  const twoFindings = { ...run, relevantProductCount: 2, noActionCount: 1, findings: [noAction, finding] }
+  await page.route('**/impact-analyses', route => route.fulfill({ status: 201, json: twoFindings }))
+  await page.goto('/impact')
+  await page.getByRole('checkbox', { name: 'Use the connected identity for impact writes' }).check()
+  await page.getByRole('button', { name: 'Run impact analysis', exact: true }).click()
+  const results = page.getByRole('region', { name: 'Analysis results' })
+  await expect(results).toContainText('Demo Chocolate Bar')
+  await expect(results).toContainText('Neutral Base Snack')
+  await results.getByLabel('Filter findings').selectOption('REVIEW_REQUIRED')
+  await expect(results.locator('article')).toHaveCount(1)
+  await expect(results).toContainText('Demo Chocolate Bar')
+  await expect(results).not.toContainText('Neutral Base Snack')
+  await results.getByLabel('Filter findings').selectOption('NO_ACTION')
+  await expect(results.locator('article')).toHaveCount(1)
+  await expect(results).toContainText('Neutral Base Snack')
+  await expect(results).not.toContainText('Demo Chocolate Bar')
 })
 
 test('keeps the captured change and rule set after a malformed analysis response and permits only the same replay', async ({ page }) => {
