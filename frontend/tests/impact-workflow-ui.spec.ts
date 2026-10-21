@@ -41,7 +41,7 @@ test('renders the actual returned findings and exact task handoff, including an 
     '/labels?productId=prod_usda_1106285&reviewTaskId=task_ui&expectedFormulaVersionId=formula_new&labelVersionId=label_bound')
 })
 
-test('uses frozen product display names and filters findings by impact outcome', async ({ page }) => {
+test('uses current catalog product display names and filters findings by impact outcome', async ({ page }) => {
   const noAction = { impactFindingId: 'finding_no_action', productId: 'prod_usda_1106963',
     productDisplayName: 'Neutral Base Snack', outcome: 'NO_ACTION', currentFormulaVersionId: 'formula_current',
     proposedFormulaVersionId: 'formula_proposed', currentLabelVersionId: 'label_current',
@@ -62,6 +62,73 @@ test('uses frozen product display names and filters findings by impact outcome',
   await expect(results.locator('article')).toHaveCount(1)
   await expect(results).toContainText('Neutral Base Snack')
   await expect(results).not.toContainText('Demo Chocolate Bar')
+})
+
+test('prefills the published label on an impact handoff without guessing missing allergens', async ({ page }) => {
+  let identityChanged = false
+  let releasePreviousDeclarations!: () => void
+  const previousDeclarationsRead = new Promise<void>(resolve => { releasePreviousDeclarations = resolve })
+  await page.route('**/api/identity/current', route => {
+    if (identityChanged) return route.fulfill({ json: {
+      userId: 'user_data_admin', username: 'data.admin', displayName: 'Demo Data Admin', roles: ['DATA_ADMIN'],
+      permissions: ['DATA.MAINTAIN', 'FORMULA.RELEASE'],
+    } })
+    return route.fulfill({ json: {
+      userId: 'user_change_manager', username: 'change.manager', displayName: 'Demo Change Manager',
+      roles: ['CHANGE_MANAGER'], permissions: ['CHANGE_REQUEST.CREATE', 'IMPACT.RUN'],
+    } })
+  })
+
+  const previousLabel = { labelVersionId: 'label_old', productId: finding.productId,
+    formulaVersionId: finding.currentFormulaVersionId, ruleSetVersionId: run.ruleSetVersionId,
+    jurisdictionCode: 'US', versionNumber: 3, rawIngredientText: 'Wheat flour', lifecycleStatus: 'PUBLISHED',
+    isCurrentPublished: 'Y', createdByUserId: 'user_label_officer', createdAt: '2026-10-08T00:00:00',
+    dataProvenanceId: 'prov_project_seed' }
+  const openTask = { ...finding.reviewTask, currentLabelVersionId: previousLabel.labelVersionId,
+    draftLabelVersionId: null, targetLabelVersionId: null, status: 'OPEN', decision: null, resolvedAt: null }
+  const allergenOptions = [
+    { allergenId: 'all_soy', allergenCode: 'SOY', displayName: 'Soy', jurisdictionCode: 'US' },
+    { allergenId: 'all_wheat', allergenCode: 'WHEAT', displayName: 'Wheat', jurisdictionCode: 'US' },
+  ]
+  let holdPreviousRead = true
+  await page.route('**/api/v1/allergens?*', route => route.fulfill({ json: allergenOptions }))
+  await page.route('**/impact-analyses', route => route.fulfill({ status: 201, json: run }))
+  await page.route('**/api/catalog/products/' + finding.productId, route => route.fulfill({ json: {
+    product_id: finding.productId, product_description: finding.productDisplayName,
+    current_formula_version_id: finding.proposedFormulaVersionId,
+  } }))
+  await page.route('**/api/review-tasks/' + openTask.reviewTaskId, route => route.fulfill({ json: openTask }))
+  await page.route('**/api/labels/' + previousLabel.labelVersionId, route => route.fulfill({ json: previousLabel }))
+  await page.route('**/api/labels/' + previousLabel.labelVersionId + '/declarations', async route => {
+    if (holdPreviousRead) await previousDeclarationsRead
+    return route.fulfill({ json: { ...previousLabel, declarations: [{ allergenId: 'all_wheat',
+      declarationType: 'CONTAINS', declarationSource: 'MIGRATED_PUBLIC_LABEL', displayText: 'Contains Wheat' }] } })
+  })
+
+  await page.goto('/impact')
+  await page.getByRole('checkbox', { name: 'Use the connected identity for impact writes' }).check()
+  await page.getByRole('button', { name: 'Run impact analysis', exact: true }).click()
+  await page.getByRole('link', { name: 'Prepare replacement label' }).click()
+
+  await expect(page.getByText('Loading declarations from the previous label')).toBeVisible()
+  await expect(page.getByLabel('Declare Wheat (WHEAT)')).toBeVisible()
+  await expect(page.getByLabel('Declare Wheat (WHEAT)')).toBeDisabled()
+  holdPreviousRead = false
+  releasePreviousDeclarations()
+  await expect(page.getByRole('status').filter({ hasText: 'prefilled from previous label label_old' })).toBeVisible()
+  await expect(page.getByLabel('Declare Wheat (WHEAT)')).toBeChecked()
+  await expect(page.getByLabel('Declare Soy (SOY)')).not.toBeChecked()
+  await expect(page.getByRole('alert').filter({ hasText: 'Missing declarations: SOY' })).toHaveCount(0)
+
+  await page.getByLabel('Declare Soy (SOY)').check()
+  await expect(page.getByLabel('Declare Wheat (WHEAT)')).toBeChecked()
+  await expect(page.getByLabel('Declare Soy (SOY)')).toBeChecked()
+  identityChanged = true
+  await page.getByRole('button', { name: 'Refresh connected identity' }).click()
+  await expect(page.getByRole('region', { name: 'Connected identity' })).toContainText('Demo Data Admin')
+  await expect(page.getByRole('status').filter({ hasText: 'prefilled from previous label label_old' })).toBeVisible()
+  await expect(page.getByLabel('Declare Wheat (WHEAT)')).toBeChecked()
+  await expect(page.getByLabel('Declare Soy (SOY)')).not.toBeChecked()
 })
 
 test('keeps the captured change and rule set after a malformed analysis response and permits only the same replay', async ({ page }) => {
