@@ -91,11 +91,14 @@ public class ProductLabelHistoryReadService {
                        CAST(event.event_payload AS CHAR) AS event_payload
                 FROM audit_event event
                 JOIN user_account actor ON actor.user_id = event.actor_user_id
-                WHERE event.entity_id IN (
-                  SELECT label_version_id FROM label_version WHERE product_id = ?
-                  UNION
-                  SELECT review_task_id FROM review_task WHERE product_id = ?
-                )
+                WHERE (event.entity_type = 'LABEL_VERSION'
+                       AND event.entity_id IN (
+                         SELECT label_version_id FROM label_version WHERE product_id = ?
+                       ))
+                   OR (event.entity_type = 'REVIEW_TASK'
+                       AND event.entity_id IN (
+                         SELECT review_task_id FROM review_task WHERE product_id = ?
+                       ))
                 ORDER BY event.event_at, event.audit_event_id
                 """, (result, row) -> new AuditEvent(
                 result.getString("audit_event_id"), result.getString("event_type"),

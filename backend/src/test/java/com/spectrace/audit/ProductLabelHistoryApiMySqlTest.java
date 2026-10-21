@@ -37,16 +37,19 @@ class ProductLabelHistoryApiMySqlTest extends MySqlIntegrationTestSupport {
 
     @BeforeEach
     void seedIsolatedHistoryRows() {
-        cleanFixture(TARGET);
         cleanFixture(OTHER);
+        cleanFixture(TARGET);
         seedProductHistory(TARGET, PRODUCT_ID, "formula_1106285_v1", "label_1106285_v1", "all_soy");
-        seedProductHistory(OTHER, OTHER_PRODUCT_ID, "formula_1106963_v1", "label_1106963_v1", "all_milk");
+        seedProductHistory(OTHER, OTHER_PRODUCT_ID, "formula_1106963_v1", "label_1106963_v1", "all_milk",
+                TARGET + "_label_v2");
+        insertAuditEvent(TARGET + "_event_non_label_collision", "FORMULA_VERSION_UPDATED", "FORMULA_VERSION",
+                TARGET + "_label_v2", "user_admin", "2026-10-02 10:45:00");
     }
 
     @AfterEach
     void removeOnlyFixtureRows() {
-        cleanFixture(TARGET);
         cleanFixture(OTHER);
+        cleanFixture(TARGET);
     }
 
     @Test
@@ -111,6 +114,13 @@ class ProductLabelHistoryApiMySqlTest extends MySqlIntegrationTestSupport {
         String serialized = body.toString();
         assertThat(serialized).doesNotContain(OTHER + "_label_v2", OTHER + "_approval", OTHER + "_event_label",
                 OTHER + "_event_review", OTHER + "_event_publish");
+
+        var otherResponse = request("/api/audit/products/" + OTHER_PRODUCT_ID + "/label-history", AUDITOR);
+        assertThat(otherResponse.statusCode()).as(otherResponse.body()).isEqualTo(200);
+        JsonNode otherBody = JSON.readTree(otherResponse.body());
+        assertThat(nodes(otherBody.get("auditEvents")))
+                .extracting(event -> event.get("auditEventId").stringValue())
+                .contains(OTHER + "_event_review");
     }
 
     @Test
@@ -130,11 +140,16 @@ class ProductLabelHistoryApiMySqlTest extends MySqlIntegrationTestSupport {
 
     private void seedProductHistory(String prefix, String productId, String formulaVersionId,
                                     String currentLabelVersionId, String allergenId) {
+        seedProductHistory(prefix, productId, formulaVersionId, currentLabelVersionId, allergenId,
+                prefix + "_review_task");
+    }
+
+    private void seedProductHistory(String prefix, String productId, String formulaVersionId,
+                                    String currentLabelVersionId, String allergenId, String reviewTaskId) {
         String labelId = prefix + "_label_v2";
         String changeRequestId = prefix + "_change_request";
         String runId = prefix + "_impact_run";
         String findingId = prefix + "_impact_finding";
-        String reviewTaskId = prefix + "_review_task";
 
         jdbc.update("""
                 INSERT INTO label_version (label_version_id, product_id, formula_version_id, rule_set_version_id,
@@ -200,16 +215,21 @@ class ProductLabelHistoryApiMySqlTest extends MySqlIntegrationTestSupport {
     }
 
     private void cleanFixture(String prefix) {
-        jdbc.update("DELETE FROM audit_event WHERE audit_event_id IN (?, ?, ?)",
-                prefix + "_event_label", prefix + "_event_review", prefix + "_event_publish");
+        jdbc.update("DELETE FROM audit_event WHERE audit_event_id IN (?, ?, ?, ?)",
+                prefix + "_event_label", prefix + "_event_review", prefix + "_event_publish",
+                prefix + "_event_non_label_collision");
         jdbc.update("DELETE FROM publication_record WHERE publication_record_id = ?", prefix + "_publication");
         jdbc.update("DELETE FROM approval_record WHERE approval_record_id = ?", prefix + "_approval");
-        jdbc.update("DELETE FROM review_task WHERE review_task_id = ?", prefix + "_review_task");
+        jdbc.update("DELETE FROM review_task WHERE review_task_id = ?", reviewTaskId(prefix));
         jdbc.update("DELETE FROM impact_finding WHERE impact_finding_id = ?", prefix + "_impact_finding");
         jdbc.update("DELETE FROM impact_analysis_run WHERE impact_analysis_run_id = ?", prefix + "_impact_run");
         jdbc.update("DELETE FROM change_request WHERE change_request_id = ?", prefix + "_change_request");
         jdbc.update("DELETE FROM label_allergen_declaration WHERE label_allergen_declaration_id = ?", prefix + "_declaration");
         jdbc.update("DELETE FROM label_version WHERE label_version_id = ?", prefix + "_label_v2");
+    }
+
+    private static String reviewTaskId(String prefix) {
+        return prefix.equals(OTHER) ? TARGET + "_label_v2" : prefix + "_review_task";
     }
 
     private HttpResponse<String> request(String path, String subject) throws Exception {
