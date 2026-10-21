@@ -1,20 +1,26 @@
-# FOOD M3/M4 Local Increment and Acceptance Evidence - 2026-10-21
+# FOOD M3/M4 Increment and Acceptance Evidence - 2026-10-21
 
 Repository: `hxj04121-lab/FoodLabelFlow` monolith. This note records candidate test evidence and branch status; it does not claim Jira acceptance or completed demo acceptance.
 
-- Current increment status: The M3/M4 code and tests are committed on the independent branch `codex/food-m3-m4-on-pr91`, based on PR #91's `codex/scrum-85-batch-adoption-impact` branch at `49ddf8b43820a941ae2831b0add2372aa0c858c4`. This branch is not merged. The increment contains 12 code/test paths plus this evidence file. Full demo acceptance and another member's replay are incomplete.
+## Current PR status
 
-## PR #91 review state
+- PR #91 has merged to `main` as `b93e278c55d8acd98e200603e89dca1d89ed0cf7`. Its pre-merge branch head was `49ddf8b43820a941ae2831b0add2372aa0c858c4`.
+- PR #92 is open and Draft on `codex/food-m3-m4-on-pr91`, with `main` as its base. It remains unmerged and depends on the changes now included in #91's merge commit.
+- The current comparison against `main` contains 15 changed paths: the original 13-path M3/M4 increment, plus two browser-test corrections found while running CI (`frontend/tests/scrum84-identity-live.spec.ts` and `frontend/tests/s3-product-flow-live.spec.ts`). The batch-adoption UI test also uses the shared catalog fixture. The current diff against merged `main` does not reintroduce #91's changes.
+- The impacted local UI tests passed 14/14 after those corrections. This targeted local result does not replace the latest exact-head GitHub CI result; use PR #92's checks for that status.
+- Complete demo acceptance, an independent member's replay, and independent security review or formal risk acceptance remain incomplete. No Jira issue is marked Done from this evidence.
 
-- Current PR #91 head is `49ddf8b43820a941ae2831b0add2372aa0c858c4`, Open and not merged. The exact head was independently approved in review `5595159213`; approval applies only to this SHA. The latest GitHub CLI check reports all six checks successful.
+## PR #91 upstream fix (historical review evidence)
+
+- Before merge, PR #91 was reviewed at head `49ddf8b43820a941ae2831b0add2372aa0c858c4`. Review `5595159213` approved that exact SHA; the approval and checks below are historical pre-merge evidence.
 - The fix locks the product before the first nonlocking replay lookup. The MySQL regression is a deterministic two-transaction interleaving test, not a latch or parallel-thread test.
-- GitHub CI on this exact head reported 684 backend tests with 0 failures/errors/skips; focused batch MySQL (2), service (9), and S4 golden path (3) passed. These are upstream results, not local-candidate test counts.
+- GitHub CI on that exact pre-merge head reported 684 backend tests with 0 failures/errors/skips; focused batch MySQL (2), service (9), and S4 golden path (3) passed. These are upstream results, not local-candidate test counts.
 - Earlier Request changes review `5595005514` was on old head `52478cf...`; it was superseded by the author's fix.
 
-## Exact-base M3/M4 local increment
+## Original exact-base M3/M4 increment
 
 - Local worktree: `C:\Users\rcncai\AppData\Local\Temp\FoodLabelFlow-m3-m4-apply-check-20261021`.
-- Branch: `codex/food-m3-m4-on-pr91`, parent is the exact PR #91 head `49ddf8b43820a941ae2831b0add2372aa0c858c4`; the M3/M4 increment changes 13 paths. Old-base candidate `codex/food-m3-m4-delta-local` at `527e982...` and full recovery backup `bb2b2cc...` are preserved separately.
+- Original branch: `codex/food-m3-m4-on-pr91`, created from PR #91 head `49ddf8b43820a941ae2831b0add2372aa0c858c4`; the original M3/M4 increment changed 13 paths. The branch now targets `main`, which contains #91's merge. Old-base candidate `codex/food-m3-m4-delta-local` at `527e982...` and full recovery backup `bb2b2cc...` are preserved separately.
 - Read-only GitHub data confirmed PR #91 has 29 changed paths and the local 13-path delta has no path overlap with that PR. Commit `49ddf8b...` itself changes only `BatchSpecificationAdoptionService.java`, `BatchSpecificationAdoptionMySqlTest.java`, `BatchSpecificationAdoptionServiceTest.java`, and the M1 A07 evidence file; none is in the M3/M4 delta.
 - To make the precise base verifiable despite local Git DNS failure, I fetched the four exact blobs and commit metadata through the approved GitHub read-only connector. Reconstructing the tree from parent `52478cf...` yielded remote tree SHA `bd9e1b52d89ef15678dab0682b6dbf01835eedb5`; reconstructing the unsigned commit object yielded exact SHA `49ddf8b...`. The new local delta commit is based on this verified object. No remote write occurred during this reconstruction step; the later GitHub web-editor commits are recorded below.
 - Key changes: development identity endpoint and fixture tests add Data Admin / Change Manager demo actors without grants; frontend identity switch checks minimum permissions; new batch-adoption client validates counts, target, and per-product results; new panel lists released/effective targets, gates the action on permissions, and pins ambiguous replay to the same target; impact requires and renders frozen `productDisplayName` and filters by outcome; human-acceptance API fixture now creates/releases a formula through the normal API before reading audit history.
@@ -47,7 +53,7 @@ Repository: `hxj04121-lab/FoodLabelFlow` monolith. This note records candidate t
 
 ## Acceptance still required
 
-- The 12 M3/M4 code/test paths and this evidence file are on independent branch `codex/food-m3-m4-on-pr91`, based on #91's `codex/scrum-85-batch-adoption-impact` branch at `49ddf8b43820a941ae2831b0add2372aa0c858c4`. The increment remains unmerged and depends on #91; do not merge without separate authorization.
+- The M3/M4 increment and this evidence file are on open Draft PR #92 from `codex/food-m3-m4-on-pr91` to `main`. It remains unmerged; #91 was merged at `b93e278c55d8acd98e200603e89dca1d89ed0cf7`. The current branch has 15 changed paths versus `main`, including two CI-driven test corrections beyond the original 13-path increment.
 - Complete fresh M3 SOY browser journey, replacement-draft prefill/edit/stale notice, and another member's replay of the exact RC SHA.
 - Complete M4 history/publication checks across Data Admin / Change Manager, negative permission tests, and independent security review or formal risk acceptance.
 - Complete M5 reset/regression on the exact final RC with first-failure and SHA-to-CI/Sonar/security/browser evidence, plus another member's replay.
