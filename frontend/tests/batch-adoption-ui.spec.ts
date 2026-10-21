@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './catalog-fixture'
 
 const dataAdmin = { userId: 'user_admin', username: 'data.admin', displayName: 'Demo Admin/Data Maintenance',
   roles: ['ADMIN_DATA_MAINTENANCE'], permissions: ['DATA.MAINTAIN', 'FORMULA.RELEASE', 'RULE_SET.MAINTAIN'] }
