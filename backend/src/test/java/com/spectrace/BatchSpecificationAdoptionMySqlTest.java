@@ -12,6 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.util.AopTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -158,6 +159,63 @@ class BatchSpecificationAdoptionMySqlTest extends MySqlIntegrationTestSupport {
             jdbc.update("DELETE FROM spec_component WHERE specification_version_id=?", targetSpecificationId);
             jdbc.update("DELETE FROM ingredient_specification_version WHERE specification_version_id=?", targetSpecificationId);
         });
+    }
+
+    /**
+     * Cai's review of PR #91: a competing transaction commits a new current formula while the
+     * batch waits for the product lock. Under REPEATABLE READ the batch must not have opened its
+     * snapshot before that lock, or the new formula's items are invisible and adoption fails.
+     */
+    @Test
+    void aFormulaCommittedBeforeTheProductLockIsAdoptedWithItsItems() throws Exception {
+        switchCurrentFormula.set(false);
+        failReplayMarker.set(false);
+        String racedProductId = candidates.get(2);
+        String racedFormulaId = "s4-batch-race-formula-" + token;
+        AtomicBoolean commitCompetingFormula = new AtomicBoolean(true);
+        doAnswer(invocation -> {
+            if (commitCompetingFormula.compareAndSet(true, false)) {
+                // A separate, committed transaction, interleaved inside the batch's product transaction.
+                TransactionTemplate competing = new TransactionTemplate(transactionManager);
+                competing.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                competing.executeWithoutResult(transaction ->
+                        makeCurrent(racedProductId, racedFormulaId, "s4-batch-race-fi-" + token + "-"));
+            }
+            return invocation.callRealMethod();
+        }).when(store).get(eq(CatalogStore.Kind.PRODUCT), eq(racedProductId), eq(true));
+
+        JsonNode summary = postBatch();
+
+        JsonNode raced = result(summary, racedProductId);
+        assertThat(raced.path("status").stringValue()).as(raced.toString()).isEqualTo("ADOPTED");
+        assertThat(summary.path("failedCount").intValue()).isZero();
+        assertThat(jdbc.queryForObject("SELECT source_formula_version_id FROM formula_adoption_batch_item WHERE product_id=? AND target_specification_version_id=?",
+                String.class, racedProductId, targetSpecificationId)).isEqualTo(racedFormulaId);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM formula_item WHERE formula_version_id=? AND specification_version_id=?",
+                Integer.class, raced.path("formulaVersionId").stringValue(), targetSpecificationId)).isEqualTo(1);
+    }
+
+    /** A released copy of the product's current formula, with its items, made current. */
+    private void makeCurrent(String productId, String formulaId, String itemPrefix) {
+        String current = jdbc.queryForObject("SELECT current_formula_version_id FROM product WHERE product_id=?",
+                String.class, productId);
+        jdbc.update("""
+                INSERT INTO formula_version(formula_version_id,product_id,version_number,lifecycle_status,
+                  is_current_released,created_by_user_id,released_by_user_id,released_at,data_provenance_id)
+                SELECT ?,product_id,version_number+1,'RELEASED','N','user_admin','user_admin',
+                       UTC_TIMESTAMP(),'prov_project_seed'
+                FROM formula_version WHERE formula_version_id=?
+                """, formulaId, current);
+        jdbc.update("""
+                INSERT INTO formula_item(formula_item_id,formula_version_id,supplier_material_id,
+                  specification_version_id,sequence_no,quantity_value,quantity_unit)
+                SELECT CONCAT(?, sequence_no), ?, supplier_material_id,
+                       specification_version_id,sequence_no,quantity_value,quantity_unit
+                FROM formula_item WHERE formula_version_id=?
+                """, itemPrefix, formulaId, current);
+        jdbc.update("UPDATE formula_version SET is_current_released='N' WHERE product_id=? AND is_current_released='Y'", productId);
+        jdbc.update("UPDATE formula_version SET is_current_released='Y' WHERE formula_version_id=?", formulaId);
+        jdbc.update("UPDATE product SET current_formula_version_id=? WHERE product_id=?", formulaId, productId);
     }
 
     @Test

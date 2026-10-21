@@ -86,10 +86,13 @@ public class BatchSpecificationAdoptionService {
     }
 
     private Result adoptOne(String productId, String targetId) {
+        // Lock the product before any nonlocking read. Under REPEATABLE READ the first plain SELECT
+        // fixes the snapshot; taken after the lock, it includes every formula committed by whoever
+        // held the lock before us, so the current formula's items can never be hidden from it.
+        Map<String, Object> product = store.get(PRODUCT, productId, true);
         Map<String, Object> prior = store.findBatchAdoption(productId, targetId);
         if (prior != null) return Result.adopted(productId, (String) prior.get("formula_version_id"), true);
-        // Re-read under the product lock: the formula current now is the one adopted, not the one discovered.
-        Map<String, Object> product = store.get(PRODUCT, productId, true);
+        // The formula current now, under the lock, is the one adopted, not the one discovered.
         String sourceId = (String) product.get("current_formula_version_id");
         if (sourceId == null) {
             return new Result(productId, SKIPPED, null, false, "NO_CURRENT_FORMULA",

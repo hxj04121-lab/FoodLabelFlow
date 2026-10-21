@@ -30,8 +30,9 @@ supplier material, with one request.
 1. Select the candidates: products whose current released FormulaVersion has a
    FormulaItem for the target material. Historical formulas never match.
 2. For each candidate, in productId order, in its own transaction:
-   1. Return the saved result if the product already has a replay marker for this target.
-   2. Lock the product and read its current formula again, under the lock.
+   1. Lock the product, before any other read in the transaction.
+   2. Return the saved result if the product already has a replay marker for this target.
+      Otherwise use the formula that is current under the lock.
    3. Run M2's single-product adoption: create, release and audit N+1. N stays RELEASED
       and keeps backing the published label.
    4. Write the `(product, target)` replay marker in the same transaction.
@@ -46,8 +47,12 @@ or none of them do. One product's failure never rolls back another product.
 - *Current formula changed after discovery:* the product is adopted from the formula that
   is current under the lock. If that formula no longer uses the material, or already pins
   the target, the product is `SKIPPED` with M2's error code (404, 409 or 422).
-- *Concurrent identical request:* the loser fails its lock check, rolls back, re-reads the
-  winner's marker and reports `ADOPTED`, `replayed=true`.
+- *Concurrent identical request:* the loser waits on the product lock, then finds the
+  winner's marker and reports `ADOPTED`, `replayed=true`. The lock is taken before any
+  plain read. Under MySQL REPEATABLE READ, the first plain read fixes the snapshot. Taken
+  earlier, that snapshot could see the winner's new current formula ID (through the
+  locking read) but not its items, and the adoption would fail. M2 found this in review
+  of PR #91; `aFormulaCommittedBeforeTheProductLockIsAdoptedWithItsItems` covers it.
 - *Unexpected failure* (for example, the marker insert fails): that product is `FAILED`
   and rolled back, with a caller-safe message. The server log keeps the cause. A retry
   adopts it, and the committed products replay.
@@ -215,11 +220,12 @@ sequenceDiagram
     batch->>store: currentProductsUsingMaterial(material)
     loop each candidate, by productId
         Note over batch,store: REQUIRES_NEW transaction per product
+        batch->>store: get(PRODUCT, id, lock)
+        Note right of store: lock first; the snapshot starts after it
         batch->>store: findBatchAdoption(product, target)
         alt marker exists
             batch-->>batch: ADOPTED, replayed
         else first adoption
-            batch->>store: get(PRODUCT, id, lock)
             batch->>cat: adoptSpecification(product, current N → target)
             cat-->>batch: N+1 (created, released, audited)
             batch->>store: recordBatchAdoption(...)

@@ -47,7 +47,11 @@ class BatchSpecificationAdoptionServiceTest {
         assertThat(summary.results()).containsExactly(new BatchSpecificationAdoptionService.Result(
                 PRODUCT, "ADOPTED", RESULT, false, null, null));
         verify(catalog).requireBatchAdoptionPermission();
-        verify(catalog).adoptSpecification(PRODUCT, new AdoptSpecification(SOURCE, TARGET));
+        // The product lock precedes the first nonlocking read, which fixes the REPEATABLE READ snapshot.
+        var order = inOrder(store, catalog);
+        order.verify(store).get(CatalogStore.Kind.PRODUCT, PRODUCT, true);
+        order.verify(store).findBatchAdoption(PRODUCT, TARGET);
+        order.verify(catalog).adoptSpecification(PRODUCT, new AdoptSpecification(SOURCE, TARGET));
         verify(store).recordBatchAdoption(PRODUCT, SOURCE, TARGET, RESULT);
         verify(transactions).commit(any());
         verify(transactions, never()).rollback(any());
