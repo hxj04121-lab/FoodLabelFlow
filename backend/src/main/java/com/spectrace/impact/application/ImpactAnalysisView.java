@@ -9,6 +9,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
+import static com.spectrace.shared.contract.ContractValues.requiredText;
+
 /**
  * A completed run with its findings ordered by productId. created is false for an
  * idempotent replay, so the web adapter can answer 200 instead of 201.
@@ -26,10 +28,14 @@ public record ImpactAnalysisView(ImpactAnalysisRun run, List<FindingView> findin
         return findings.stream().filter(view -> view.finding().classification() == classification).count();
     }
 
-    /** reviewTask is present exactly for a REVIEW_REQUIRED finding. */
-    public record FindingView(ImpactFinding finding, ReviewTaskLinkage reviewTask) {
+    /**
+     * reviewTask is present exactly for a REVIEW_REQUIRED finding. productDisplayName is the
+     * product's current catalog description, read at response time rather than stored on the finding.
+     */
+    public record FindingView(ImpactFinding finding, ReviewTaskLinkage reviewTask, String productDisplayName) {
         public FindingView {
             Objects.requireNonNull(finding, "finding");
+            productDisplayName = requiredText(productDisplayName, "productDisplayName");
             if (finding.requiresReviewTask() != (reviewTask != null)) {
                 throw new IllegalStateException("Finding " + finding.impactFindingId()
                         + " must have a review task exactly when it is REVIEW_REQUIRED");

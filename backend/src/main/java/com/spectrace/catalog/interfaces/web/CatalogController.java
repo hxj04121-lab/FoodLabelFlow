@@ -1,5 +1,6 @@
 package com.spectrace.catalog.interfaces.web;
 
+import com.spectrace.catalog.application.BatchSpecificationAdoptionService;
 import com.spectrace.catalog.application.CatalogService;
 import com.spectrace.catalog.domain.CatalogCommands.*;
 import org.springframework.http.HttpStatus;
@@ -14,7 +15,10 @@ import static com.spectrace.catalog.infrastructure.CatalogStore.Kind.*;
 @RequestMapping("/api/catalog")
 public class CatalogController {
     private final CatalogService service;
-    public CatalogController(CatalogService service) { this.service = service; }
+    private final BatchSpecificationAdoptionService batchAdoptions;
+    public CatalogController(CatalogService service, BatchSpecificationAdoptionService batchAdoptions) {
+        this.service = service; this.batchAdoptions = batchAdoptions;
+    }
 
     @GetMapping("/suppliers")
     public List<Map<String, Object>> suppliers(@RequestParam(defaultValue="50") int limit, @RequestParam(defaultValue="0") int offset) {
@@ -41,6 +45,11 @@ public class CatalogController {
     public Map<String, Object> specification(@RequestBody Specification body) { return service.create(body); }
     @PostMapping("/specifications/{id}/release")
     public Map<String, Object> releaseSpecification(@PathVariable String id) { return service.releaseSpecification(id); }
+
+    @PostMapping("/specifications/{id}/formula-adoptions")
+    public BatchSpecificationAdoptionService.BatchSummary adoptSpecificationForCurrentProducts(@PathVariable String id) {
+        return batchAdoptions.adopt(id);
+    }
 
     @GetMapping("/products")
     public List<Map<String, Object>> products(@RequestParam(defaultValue="50") int limit, @RequestParam(defaultValue="0") int offset) {

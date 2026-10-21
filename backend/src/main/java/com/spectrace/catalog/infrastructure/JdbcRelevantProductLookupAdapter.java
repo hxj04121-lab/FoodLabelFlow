@@ -2,12 +2,14 @@ package com.spectrace.catalog.infrastructure;
 
 import com.spectrace.catalog.application.port.RelevantProductLookupPort;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static com.spectrace.shared.contract.ContractValues.requiredText;
 
@@ -68,6 +70,18 @@ public class JdbcRelevantProductLookupAdapter implements RelevantProductLookupPo
                         entry.getValue().labelVersionId(),
                         entry.getValue().formulaItemIds()))
                 .toList();
+    }
+
+    @Override
+    public Map<String, String> findProductDisplayNames(List<String> productIds) {
+        List<String> ids = productIds.stream().distinct().toList();
+        if (ids.isEmpty()) return Map.of();
+        String placeholders = ids.stream().map(ignored -> "?").collect(Collectors.joining(", "));
+        var names = new LinkedHashMap<String, String>();
+        RowCallbackHandler collect = row -> names.put(row.getString("product_id"), row.getString("product_description"));
+        jdbc.query("SELECT product_id, product_description FROM product WHERE product_id IN (" + placeholders + ")",
+                collect, ids.toArray());
+        return Map.copyOf(names);
     }
 
     private record ProductRows(String formulaVersionId, String labelVersionId, List<String> formulaItemIds) {

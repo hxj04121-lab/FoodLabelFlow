@@ -6,6 +6,7 @@ import com.spectrace.catalog.application.port.RelevantProductLookupPort.Relevant
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import static com.spectrace.shared.contract.ContractValues.requiredText;
@@ -54,5 +55,14 @@ public class RelevantProductDiscovery {
                         product.matchingFormulaItemIds()))
                 .sorted(Comparator.comparing(RelevantProductTarget::productId))
                 .toList();
+    }
+
+    public Map<String, String> displayNames(List<String> productIds) {
+        List<String> ids = productIds.stream().distinct().toList();
+        Map<String, String> names = lookup.findProductDisplayNames(ids);
+        if (!names.keySet().containsAll(ids)) {
+            throw new IllegalStateException("The catalog returned no display name for an impact finding product");
+        }
+        return names;
     }
 }

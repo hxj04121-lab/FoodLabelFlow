@@ -2,6 +2,7 @@ package com.spectrace.catalog.application.port;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import static com.spectrace.shared.contract.ContractValues.requiredText;
@@ -20,6 +21,9 @@ public interface RelevantProductLookupPort {
      * Joins the caller's transaction.
      */
     List<RelevantProduct> findProductsUsingMaterial(String supplierMaterialId);
+
+    /** Current human-readable product descriptions for findings already stored in an analysis. */
+    Map<String, String> findProductDisplayNames(List<String> productIds);
 
     /**
      * currentPublishedLabelVersionId is null when the product has no published label;

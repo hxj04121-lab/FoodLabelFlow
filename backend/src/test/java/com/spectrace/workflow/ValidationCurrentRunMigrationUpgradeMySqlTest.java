@@ -48,7 +48,7 @@ class ValidationCurrentRunMigrationUpgradeMySqlTest {
         insertRun(jdbc, "11111111_all_pass_tie", allPassTie, "PASSED", "2026-10-08 12:00:00");
         var historyBefore = S3CompoundMakerFixture.allRows(jdbc);
         String oldHistorySha = sha(JsonMapper.builder().build().writeValueAsString(historyBefore));
-        Flyway.configure().dataSource(dataSource).load().migrate();
+        Flyway.configure().dataSource(dataSource).target("10").load().migrate();
         var historyAfterUpgrade = S3CompoundMakerFixture.allRows(jdbc);
         assertThat(historyAfterUpgrade).as("V10 cannot rewrite any original business or identity row").isEqualTo(historyBefore);
         assertThat(sha(JsonMapper.builder().build().writeValueAsString(historyAfterUpgrade))).isEqualTo(oldHistorySha);
