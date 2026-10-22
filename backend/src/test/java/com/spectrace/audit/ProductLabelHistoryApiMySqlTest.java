@@ -173,6 +173,15 @@ class ProductLabelHistoryApiMySqlTest extends MySqlIntegrationTestSupport {
         assertThat(JSON.readTree(missing.body()).get("code").stringValue()).isEqualTo("RESOURCE_NOT_FOUND");
     }
 
+    @Test
+    void s4ChangeManagerAndDataAdminDemoIdentitiesCanReadHistory() throws Exception {
+        for (String subject : List.of("dev-external-change-manager", "dev-external-admin")) {
+            var response = request("/api/audit/products/" + targetProductId + "/label-history", subject);
+            assertThat(response.statusCode()).as(subject + ": " + response.body()).isEqualTo(200);
+            assertThat(JSON.readTree(response.body()).get("productId").stringValue()).isEqualTo(targetProductId);
+        }
+    }
+
     private void reproduceSharedDatabaseV2State() {
         Integer existingVersionTwo = jdbc.queryForObject("""
                 SELECT COUNT(*) FROM label_version

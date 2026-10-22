@@ -40,8 +40,8 @@ test('live demo identity switching resets unsaved label edits and reauthorizes a
     ['MAKER', ['LABEL.CREATE', 'LABEL.VALIDATE', 'LABEL.SUBMIT_REVIEW']],
     ['CHECKER', ['LABEL.APPROVE', 'LABEL.REQUEST_CHANGES']],
     ['PUBLISHER', ['LABEL.PUBLISH']],
-    ['DATA_ADMIN', ['DATA.MAINTAIN', 'FORMULA.RELEASE']],
-    ['CHANGE_MANAGER', ['CHANGE_REQUEST.CREATE', 'IMPACT.RUN']],
+    ['DATA_ADMIN', ['DATA.MAINTAIN', 'FORMULA.RELEASE', 'AUDIT.READ']],
+    ['CHANGE_MANAGER', ['CHANGE_REQUEST.CREATE', 'IMPACT.RUN', 'AUDIT.READ']],
   ] as const
   expect(options.map(option => option.key).sort()).toEqual(expected.map(([key]) => key).sort())
 
