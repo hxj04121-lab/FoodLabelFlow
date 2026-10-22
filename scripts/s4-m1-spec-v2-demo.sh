@@ -2,6 +2,7 @@
 # SCRUM-85 demo path for the first half of the SOY story, over the public API only (no SQL).
 #
 #   reset           fresh Compose stack: drop the demo MySQL volume, rebuild, wait until healthy
+#   fresh           reset, then spec-v2: the demo starts from released Spec V2 and nothing else
 #   spec-v2         Data Admin creates and releases Chocolate Base Spec V2 (V1 + Soy lecithin);
 #                   this is the only seeded input — no adoption, finding, task or publication
 #   adopt SPEC      Data Admin adopts SPEC into FormulaVersion N+1 for every current product
@@ -10,9 +11,11 @@
 #   all             spec-v2, adopt, change, impact; prints the summary counts
 #
 # Uses the local development header identities, so only run it against a loopback demo stack.
+# reset publishes MySQL, API and web on 127.0.0.1 only (ports from MYSQL_HOST_PORT,
+# BACKEND_HOST_PORT and FRONTEND_HOST_PORT; defaults 3307, 8080 and 5173).
 set -euo pipefail
 
-API="${SPECTRACE_API:-http://127.0.0.1:8080}"
+API="${SPECTRACE_API:-http://127.0.0.1:${BACKEND_HOST_PORT:-8080}}"
 DATA_ADMIN="dev-external-admin"
 CHANGE_MANAGER="dev-external-change-manager"
 RULE_SET="ruleset_us_falcpa_demo_v1"
@@ -64,14 +67,33 @@ impact() {
   call "$CHANGE_MANAGER" POST "/api/v1/change-requests/$1/impact-analyses" "{\"ruleSetVersionId\":\"$RULE_SET\"}"
 }
 
+compose() {
+  if docker compose version >/dev/null 2>&1; then docker compose "$@"; else docker-compose "$@"; fi
+}
+
+reset() {
+  local port
+  for port in MYSQL_HOST_PORT BACKEND_HOST_PORT FRONTEND_HOST_PORT; do
+    if [[ -n "${!port:-}" && ! "${!port}" =~ ^[0-9]{1,5}$ ]]; then
+      echo "$port must be a bare port number" >&2; exit 64
+    fi
+  done
+  export MYSQL_HOST_PORT="127.0.0.1:${MYSQL_HOST_PORT:-3307}" BACKEND_HOST_PORT="127.0.0.1:${BACKEND_HOST_PORT:-8080}" \
+    FRONTEND_HOST_PORT="127.0.0.1:${FRONTEND_HOST_PORT:-5173}"
+  compose down -v --remove-orphans
+  compose up -d --build --wait
+}
+
 summary() {
   python3 -c 'import json,sys; d=json.load(sys.stdin); print(" ".join(f"{k}={d[k]}" for k in sys.argv[1:]))' "$@"
 }
 
 case "${1:-}" in
-  reset)
-    docker compose down -v --remove-orphans
-    docker compose up -d --build --wait
+  reset) reset ;;
+  fresh)
+    reset
+    spec="$(spec_v2)"; echo "Spec V2 released: $spec"
+    echo "Demo ready: http://$FRONTEND_HOST_PORT"
     ;;
   spec-v2) spec_v2 ;;
   adopt) adopt "${2:?specification id}" ;;
@@ -83,5 +105,5 @@ case "${1:-}" in
     cr="$(change "$spec")"; echo "ChangeRequest: $cr"
     impact "$cr" | summary impactAnalysisId relevantProductCount noActionCount reviewRequiredCount
     ;;
-  *) sed -n '2,12p' "$0"; exit 64 ;;
+  *) sed -n '2,15p' "$0"; exit 64 ;;
 esac
