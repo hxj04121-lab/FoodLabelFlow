@@ -98,19 +98,44 @@ impact() {
 }
 
 compose() {
-  if docker compose version >/dev/null 2>&1; then docker compose "$@"; else docker-compose "$@"; fi
+  # Resource checks below describe this file, not COMPOSE_FILE or an implicit override.
+  if docker compose version >/dev/null 2>&1; then
+    docker compose -f docker-compose.yml "$@"
+  else
+    docker-compose -f docker-compose.yml "$@"
+  fi
+}
+
+check_project_resources() {
+  local project="$1" mode="$2" kind key expected entries name owner logical
+  for kind in volume network; do
+    if [[ "$kind" == volume ]]; then key=spectrace_mysql_data; else key=default; fi
+    expected="${project}_${key}"
+    # List actual names too: label-filtered discovery misses unlabelled/foreign collisions.
+    # A failed read must abort before any Compose mutation.
+    entries="$(docker "$kind" ls --format "{{.Name}}|{{.Label \"com.docker.compose.project\"}}|{{.Label \"com.docker.compose.$kind\"}}")"
+    while IFS='|' read -r name owner logical; do
+      if [[ "$mode" == fresh && ( "$name" == "$expected" || "$owner" == "$project" ) ]]; then
+        echo "Existing $kind '$name' conflicts with fresh project '$project'; choose a new project name." >&2
+        exit 73
+      fi
+      if [[ "$mode" == owned && "$name" == "$expected" && ( "$owner" != "$project" || "$logical" != "$key" ) ]]; then
+        echo "Refusing cleanup: $kind '$name' is not labelled as '$key' owned by '$project'." >&2
+        exit 73
+      fi
+    done <<< "$entries"
+  done
 }
 
 assert_fresh_project() {
-  local containers volumes networks
+  local containers
   require_demo_project_name "$COMPOSE_PROJECT_NAME"
   containers="$(docker ps -aq --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME")"
-  volumes="$(docker volume ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME")"
-  networks="$(docker network ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME")"
-  if [[ -n "$containers$volumes$networks" ]]; then
+  if [[ -n "$containers" ]]; then
     echo "Compose project '$COMPOSE_PROJECT_NAME' already has containers, volumes or networks; choose a new project name. Existing data was not changed." >&2
     exit 73
   fi
+  check_project_resources "$COMPOSE_PROJECT_NAME" fresh
 }
 
 # A project still counts after `down` while its data volume exists.
@@ -122,12 +147,14 @@ demo_projects() {
 # Earlier stacks hold the same loopback ports. Stopping keeps their containers and
 # volume for inspection; only `purge PROJECT` deletes data.
 stop_previous() {
-  local project
-  for project in $(docker ps --format '{{.Label "com.docker.compose.project"}}' | grep '^spectrace-s4-' | sort -u); do
+  local project projects
+  projects="$(docker ps --format '{{.Label "com.docker.compose.project"}}' | sort -u)"
+  while IFS= read -r project; do
+    demo_project_name_supported "$project" || continue
     [[ "$project" == "$COMPOSE_PROJECT_NAME" ]] && continue
     echo "Stopping earlier demo project $project (containers and volume are kept)" >&2
     compose -p "$project" stop >&2
-  done
+  done <<< "$projects"
 }
 
 reset() {
@@ -183,11 +210,13 @@ case "${1:-}" in
     ;;
   down)
     project="${2:?project name from list}"; require_demo_project_name "$project"
+    check_project_resources "$project" owned
     compose -p "$project" down --remove-orphans
     echo "Removed the containers of $project; its database volume is kept. Delete it with: $0 purge $project" >&2
     ;;
   purge)
     project="${2:?project name from list}"; require_demo_project_name "$project"
+    check_project_resources "$project" owned
     if [[ "${3:-}" != "--confirm=$project" ]]; then
       if [[ ! -t 0 ]]; then
         echo "purge deletes the database volume of $project. Re-run with --confirm=$project to proceed." >&2; exit 65

@@ -29,6 +29,14 @@ has containers, volumes or networks is refused. Ports bind to `127.0.0.1` only.
 Override numeric `MYSQL_HOST_PORT`, `BACKEND_HOST_PORT`, and
 `FRONTEND_HOST_PORT` (defaults 3307, 8080 and 5173).
 
+The script pins the repository's `docker-compose.yml`; `COMPOSE_FILE` and
+implicit override files do not redirect its resource operations. Fresh startup
+checks actual volume/network names as well as project labels. Cleanup refuses
+an existing expected volume/network unless both its project and logical
+resource labels match; a failed discovery query stops before mutation. Choose
+a new project name when an unowned resource collides instead of relabelling it
+to force cleanup. Run one demo resource operation at a time.
+
 Use `fresh` when rehearsing the M5 fixture: it resets and creates/releases Spec
 V2 through the public API. Use `fresh-ui` for the full browser story below.
 
@@ -75,3 +83,25 @@ Record the final source SHA, its matching CI run (backend, frontend, security,
 containers and Sonar), the `fresh-ui` browser run, saved screenshots/logs/IDs,
 and the name of another member who independently rehearsed the final build.
 Keep failed first attempts with their cause.
+
+## 5. Explicit local browser harness
+
+After installing frontend dependencies and Chromium, the separate owned-stack
+launcher can be run from the repository root:
+
+```bash
+mvn -B -ntp -f backend/pom.xml -Dtest=S3ProductFlowBrowserHarness test
+```
+
+It creates its own MySQL Testcontainer and Spring/Vite processes. Its initial
+Chocolate Base catalog must contain only V1; the S3 browser creates/releases
+V2 itself. Do not preload the released-Spec-V2 SQL fixture into this path.
+`fresh-browser-baseline.json`, browser observations and persisted-state proofs
+describe the actual run. The dedicated compound identity remains explicit
+test setup, not a production user or business-output seed.
+
+CI runs this explicit entry in the containers job after releasing its own
+Compose stacks and uploads the harness evidence plus Surefire reports. This
+closes the coverage gap from the ordinary Maven name patterns excluding
+`*Harness`. It is still isolated acceptance evidence, not cloud-deployment
+evidence or another person's independent rehearsal.
