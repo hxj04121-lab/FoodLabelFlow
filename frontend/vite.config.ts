@@ -5,7 +5,10 @@ import istanbul from 'vite-plugin-istanbul'
 import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), istanbul({ include: 'src/**/*', requireEnv: true })],
+  plugins: [react(), tailwindcss(), istanbul({
+    include: 'src/**/*', requireEnv: true,
+    forceBuildInstrument: process.env.VITE_COVERAGE === 'true',
+  })],
   build: { sourcemap: process.env.VITE_COVERAGE === 'true' },
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: {

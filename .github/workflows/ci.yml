@@ -56,6 +56,11 @@ jobs:
       - name: Verify SCRUM-84 controlled identity switching and stale response isolation
         working-directory: frontend
         run: npx playwright test tests/scrum84-identity-switch.spec.ts tests/scrum84-returned-revision-ui.spec.ts --workers=1
+      - name: Verify hosted course demo origin policy and UI fixtures
+        working-directory: frontend
+        run: |
+          npx playwright test tests/demo-origin-policy.spec.ts --workers=1
+          npx playwright test --config playwright.demo-origin.config.ts
       - name: Upload SCRUM-84 browser failure evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -240,6 +245,7 @@ jobs:
         run: |
           npx playwright install chromium
           npx playwright test --grep-invert 'captures.*live'
+          npx playwright test --config playwright.demo-origin.config.ts
           npx nyc report --reporter=lcov --reporter=text-summary
       - name: Cache SonarQube packages
         uses: actions/cache@v4

@@ -1,4 +1,5 @@
 import { Panel } from '@/components/catalog-shared'
+import { isLocalDemoHost } from '@/lib/local-demo'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -59,6 +60,7 @@ export function Shell() {
   const location = useLocation()
   const navigate = useNavigate()
   const identity = useCurrentIdentity()
+  const workspaceName = isLocalDemoHost() ? 'Course demo' : 'Connected workspace'
   useEffect(() => {
     setMobile(false)
   }, [location.pathname])
@@ -78,7 +80,7 @@ export function Shell() {
         <div className="topbar-right">
           <span className="environment">
             <span />
-            Local workspace
+            {workspaceName}
           </span>
           <button aria-label="Help" onClick={() => setHelp(true)}>
             <CircleHelp size={19} />
@@ -209,7 +211,7 @@ export function Shell() {
           </Routes>
           <footer className="page-footer">
             <span>SpecTrace · Food label change control</span>
-            <span>Local workspace / Single-market MVP</span>
+            <span>{workspaceName} / Single-market MVP</span>
           </footer>
         </main>
       </div>
@@ -226,7 +228,7 @@ export function Shell() {
             <li>Use the detail tabs to view formula items, version history and sources.</li>
             <li>Browse suppliers and materials to inspect specifications and components.</li>
             <li>Catalog pages read from the M1 API. Refresh to reload; failed requests never fall back to offline data.</li>
-            <li>The preview profile is not a signed-in account. On localhost, the formula editor can explicitly enable the course demo identity for saving and publishing. Label approvals remain a separate workflow.</li>
+            <li>The preview profile is not a signed-in account. In an enabled course demo, the formula editor requires explicit Data Admin consent for saving and publishing. Label approvals use the separately verified connected identity.</li>
           </ol>
         </DialogContent>
       </Dialog>

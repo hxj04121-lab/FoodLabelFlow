@@ -1,4 +1,5 @@
 import { getCurrentIdentity, getDemoIdentityOptions, type CurrentIdentity } from '@/api/identity'
+import { isLocalDemoHost } from '@/lib/local-demo'
 import {
   demoIdentityChoices,
   getIdentitySessionSnapshot,
@@ -55,7 +56,7 @@ export function CurrentIdentityPanel({ state, onRefresh }: { state: CurrentIdent
 
 export function ControlledDemoIdentitySwitcher({ showStatus = true }: { showStatus?: boolean }) {
   const identity = useCurrentIdentity()
-  const localDemoHost = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname)
+  const localDemoHost = isLocalDemoHost()
   if (!localDemoHost) return null
 
   return <label className="identity-switcher">

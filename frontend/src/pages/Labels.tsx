@@ -1,3 +1,4 @@
+import { demoOriginDisabledMessage, isLocalDemoHost } from '@/lib/local-demo'
 import {
   createLabelDraft,
   createReturnedLabelRevision,
@@ -85,7 +86,7 @@ export function Labels() {
     declarations: Array<{ allergenId: string; declarationType: 'CONTAINS'; displayText: string }>
   } | null>(null)
   const writeLock = useRef(false)
-  const local = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname)
+  const local = isLocalDemoHost()
   const identity = useCurrentIdentity()
   const connected = identity.state.status === 'ready'
   const canCreate = connected && identity.hasPermission('LABEL.CREATE')
@@ -385,7 +386,7 @@ export function Labels() {
   }
 
   async function saveReturnedRevision(declarations: EditableDeclaration[]) {
-    if (!reviewTask || !draft || !identity.hasPermission('LABEL.CREATE') || revisionBusy || busy || writeLock.current) return
+    if (!local || !reviewTask || !draft || !identity.hasPermission('LABEL.CREATE') || revisionBusy || busy || writeLock.current) return
     if (reviewTask.status !== 'OPEN' || reviewTask.decision !== 'REQUEST_CHANGES'
         || reviewTask.targetLabelVersionId !== draft.labelVersionId) return
     writeLock.current = true
@@ -534,7 +535,7 @@ export function Labels() {
           </label>
           {!local && (
             <p role="alert">
-              Draft writes are disabled outside localhost. Configure approved authentication before deployment.
+              {demoOriginDisabledMessage}
             </p>
           )}
 
@@ -677,7 +678,7 @@ export function Labels() {
         draft={draft}
         allergens={allergenState.status === 'ready' ? allergenState.allergens : []}
         revisionAllowed={Boolean(
-          draft && reviewTask && canCreate && !uncertain &&
+          local && draft && reviewTask && canCreate && !uncertain &&
           reviewTask.status === 'OPEN' && reviewTask.decision === 'REQUEST_CHANGES' &&
           reviewTask.targetLabelVersionId === draft.labelVersionId &&
           reviewTask.draftLabelVersionId === draft.labelVersionId &&

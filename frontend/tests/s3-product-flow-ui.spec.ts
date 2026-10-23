@@ -146,6 +146,8 @@ test('uses a bound-task read to recover exact declared draft creation without an
   await page.route('**/api/labels/*/declarations', route => route.fulfill({ json: { ...initial,
     declarations: [{ allergenId: 'all_soy', declarationType: 'CONTAINS', declarationSource: 'USER_ENTERED', displayText: 'Contains Soy' }] } }))
   await page.goto('/labels?productId=' + initial.productId + '&reviewTaskId=' + task.reviewTaskId)
+  // Initial task hydration prefills declarations; edit only after that read is complete.
+  await expect(page.getByText(`Loaded ${initial.labelVersionId} from review task ${task.reviewTaskId}.`, { exact: true })).toBeVisible()
   await page.getByLabel('Declare Soy (SOY)').check()
   await page.getByRole('checkbox', { name: 'Use the connected identity to create this draft' }).check()
   await page.getByRole('button', { name: 'Create label draft' }).click()

@@ -6,7 +6,7 @@ async function preview(page:import('@playwright/test').Page) {
   await page.getByLabel('Supplier material *').selectOption('mat_chocolate_base')
   await page.getByLabel('Specification version *').selectOption('spec_chocolate_v1')
   await page.getByRole('button',{name:'Preview formula',exact:true}).click()
-  await page.getByRole('checkbox',{name:'Enable local demo identity for this form'}).check()
+  await page.getByRole('checkbox',{name:'Enable course Data Admin identity for this form'}).check()
 }
 test('503 preserves entries and prevents automatic duplicate creation',async({page})=>{
   let writes=0

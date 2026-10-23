@@ -38,6 +38,8 @@ services:
   frontend:
     build:
       context: ./frontend
+      args:
+        VITE_DEMO_ALLOWED_ORIGINS: ${VITE_DEMO_ALLOWED_ORIGINS:-}
     depends_on:
       backend:
         condition: service_healthy
