@@ -11,6 +11,7 @@ import {
 import { Catalog } from '@/pages/Catalog'
 import { HealthPage } from '@/pages/HealthPage'
 import { Impact } from '@/pages/Impact'
+import { LabelHistory } from '@/pages/LabelHistory'
 import { Labels } from '@/pages/Labels'
 import { Reviews } from '@/pages/Reviews'
 import { Materials } from '@/pages/Materials'
@@ -25,6 +26,7 @@ import {
   FileText,
   FlaskConical,
   GitBranch,
+  History,
   Layers3,
   LayoutDashboard,
   Menu,
@@ -51,6 +53,7 @@ const navigation = [
   { path: '/labels', label: 'Labels', icon: FileText },
   { path: '/impact', label: 'Change impact', icon: GitBranch },
   { path: '/reviews', label: 'Review workspace', icon: ClipboardCheck },
+  { path: '/label-history', label: 'Label history', icon: History },
 ]
 import { CatalogConnection } from '@/components/CatalogConnection'
 import { ControlledDemoIdentitySwitcher, useCurrentIdentity } from '@/components/CurrentIdentityPanel'
@@ -198,6 +201,7 @@ export function Shell() {
             <Route path="/labels" element={<CatalogConnection><Labels /></CatalogConnection>} />
             <Route path="/impact" element={<CatalogConnection><Impact /></CatalogConnection>} />
             <Route path="/reviews" element={<Reviews />} />
+            <Route path="/label-history" element={<LabelHistory />} />
             <Route path="/health" element={<HealthPage />} />
             <Route
               path="*"

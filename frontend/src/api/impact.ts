@@ -13,6 +13,7 @@ export type ChangeRequest = {
 export type ImpactFinding = {
   impactFindingId: string
   productId: string
+  productDisplayName: string
   outcome: 'NO_ACTION' | 'REVIEW_REQUIRED'
   currentFormulaVersionId: string
   proposedFormulaVersionId: string
@@ -53,7 +54,7 @@ function isChange(value: unknown): value is ChangeRequest {
     [...(value.description as string)].length <= 1000 && Number.isFinite(Date.parse(value.createdAt as string))
 }
 function isFinding(value: unknown): value is ImpactFinding {
-  if (!record(value) || !texts(value, ['impactFindingId', 'productId', 'currentFormulaVersionId',
+  if (!record(value) || !texts(value, ['impactFindingId', 'productId', 'productDisplayName', 'currentFormulaVersionId',
     'proposedFormulaVersionId', 'currentLabelVersionId', 'explanation']) ||
     !Array.isArray(value.missingAllergenCodes) || !value.missingAllergenCodes.every(code => typeof code === 'string')) return false
   if (value.outcome === 'NO_ACTION') return value.missingAllergenCodes.length === 0 &&

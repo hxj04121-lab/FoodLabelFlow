@@ -22,6 +22,12 @@ removes the fixture. The impact read-model change below answers item 2 on the ba
 FormulaVersion N+1 for every product whose *current* released formula uses the target's
 supplier material, with one request.
 
+**Entry point:** in the browser, the actor selects **Data Admin** in the demo identity
+switch and uses the *Batch specification adoption* panel on Change impact (PR #92,
+SCRUM-87/88). The panel's button stays disabled unless the connected identity holds both
+permissions. That is a usability hint only: the backend check below decides, and a direct
+call without them gets 403.
+
 **Preconditions:**
 - The actor holds both permissions. The service checks this before it reads any product.
 - The target specification exists (404 otherwise), is RELEASED and is effective (422 otherwise).

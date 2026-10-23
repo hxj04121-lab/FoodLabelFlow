@@ -7,7 +7,14 @@ const actors = {
   'dev-external-label-officer': { userId: 'user_label_officer', username: 'label.officer', displayName: 'Demo Label Officer', roles: ['LABEL_OFFICER'], permissions: ['LABEL.CREATE', 'LABEL.VALIDATE', 'LABEL.SUBMIT_REVIEW'] },
   'dev-external-qa-approver': { userId: 'user_approver', username: 'qa.approver', displayName: 'Demo Approver', roles: ['APPROVER'], permissions: ['LABEL.APPROVE', 'LABEL.REQUEST_CHANGES'] },
   'dev-external-publisher': { userId: 'user_publisher', username: 'publication.manager', displayName: 'Demo Publisher', roles: ['PUBLISHER'], permissions: ['LABEL.PUBLISH'] },
+  'dev-external-admin': { userId: 'user_admin', username: 'data.admin', displayName: 'Demo Data Admin', roles: ['ADMIN_DATA_MAINTENANCE'], permissions: ['DATA.MAINTAIN', 'FORMULA.RELEASE', 'AUDIT.READ'] },
+  'dev-external-change-manager': { userId: 'user_change_manager', username: 'change.manager', displayName: 'Demo Change Manager', roles: ['CHANGE_MANAGER'], permissions: ['CHANGE_REQUEST.CREATE', 'IMPACT.RUN', 'AUDIT.READ'] },
 } as const
+const identityKeys: Record<keyof typeof actors, string> = {
+  'dev-external-label-officer': 'MAKER', 'dev-external-qa-approver': 'CHECKER',
+  'dev-external-publisher': 'PUBLISHER', 'dev-external-admin': 'DATA_ADMIN',
+  'dev-external-change-manager': 'CHANGE_MANAGER',
+}
 const draft = {
   labelVersionId: 'label_hosted_fixture_v2', productId: 'prod_usda_1106285',
   formulaVersionId: 'formula_1106285_v1', ruleSetVersionId: 'ruleset_us_falcpa_demo_v1', jurisdictionCode: 'US',
@@ -36,7 +43,7 @@ test.beforeEach(async ({ page }) => {
       : route.fulfill({ status: 401, json: { code: 'AUTHENTICATION_REQUIRED' } })
   })
   await page.route('**/api/identity/demo-options', route => route.fulfill({ json: Object.entries(actors).map(([subject, actor]) => ({
-    key: subject.includes('label-officer') ? 'MAKER' : subject.includes('qa-approver') ? 'CHECKER' : 'PUBLISHER', subject, actor,
+    key: identityKeys[subject as keyof typeof actors], subject, actor,
   })) }))
   await page.route('**/api/v1/allergens?*', route => route.fulfill({ json: [] }))
   await page.route('**/api/labels/' + draft.labelVersionId, route => route.fulfill({ json: draft }))
@@ -107,6 +114,107 @@ test('configured HTTPS formula writes retain explicit Data Admin consent and the
   await page.getByRole('button', { name: 'Save draft', exact: true }).click()
   await expect(page.getByText('Draft V2 saved to the server.')).toBeVisible()
   expect(writes).toBe(1)
+})
+
+test('hosted Data Admin creates and explicitly releases a supplier specification', async ({ page, baseURL }) => {
+  const subjects: string[] = []
+  await page.route('**/api/catalog/specifications', route => {
+    if (route.request().method() !== 'POST') return route.fallback()
+    subjects.push(route.request().headers()['x-external-subject'])
+    expect(route.request().postDataJSON()).toMatchObject({ materialId: 'mat_chocolate_base',
+      components: expect.arrayContaining([expect.objectContaining({ ingredientId: 'ing_soy_lecithin', rawPhrase: 'Soy lecithin' })]) })
+    return route.fulfill({ status: 201, json: { specification_version_id: 'spec_hosted_v2', supplier_material_id: 'mat_chocolate_base',
+      version_number: 2, lifecycle_status: 'DRAFT', effective_date: route.request().postDataJSON().effectiveDate } })
+  })
+  await page.route('**/api/catalog/specifications/spec_hosted_v2/release', route => {
+    subjects.push(route.request().headers()['x-external-subject'])
+    return route.fulfill({ json: { specification_version_id: 'spec_hosted_v2', supplier_material_id: 'mat_chocolate_base',
+      version_number: 2, lifecycle_status: 'RELEASED', effective_date: '2026-01-01' } })
+  })
+  await interceptHostedOrigin(page, approved, baseURL!)
+  await page.goto(approved + '/materials')
+  await page.getByRole('combobox', { name: 'Demo identity' }).selectOption('DATA_ADMIN')
+  await page.getByRole('button', { name: 'Create supplier specification' }).click()
+  await page.getByLabel('Supplier material *').selectOption('mat_chocolate_base')
+  await page.getByRole('button', { name: 'Add ingredient' }).click()
+  await page.getByLabel('Ingredient *').nth(2).selectOption('ing_soy_lecithin')
+  await page.getByLabel('Supplier wording *').nth(2).fill('Soy lecithin')
+  await page.getByLabel('Matching evidence *').nth(2).fill('Hosted course supplier evidence')
+  await page.getByRole('button', { name: 'Save specification draft' }).click()
+  await expect(page.getByRole('heading', { name: 'Specification V2 · DRAFT' })).toBeVisible()
+  await page.getByRole('button', { name: 'Release specification' }).click()
+  await expect(page.getByRole('heading', { name: 'Specification V2 · RELEASED' })).toBeVisible()
+  expect(subjects).toEqual(['dev-external-admin', 'dev-external-admin'])
+})
+
+test('hosted batch adoption permits Data Admin and stays disabled for Change Manager', async ({ page, baseURL }) => {
+  const target = { specification_version_id: 'spec_hosted_v2', supplier_material_id: 'mat_chocolate_base',
+    version_number: 2, lifecycle_status: 'RELEASED', effective_date: '2026-01-01' }
+  let posts = 0
+  await page.route('**/api/v1/change-requests?*', route => route.fulfill({ json: [] }))
+  await page.route('**/api/catalog/specifications?*', route => route.fulfill({ json: [target] }))
+  await page.route('**/api/catalog/specifications/spec_hosted_v2/formula-adoptions', route => {
+    posts++
+    expect(route.request().headers()['x-external-subject']).toBe('dev-external-admin')
+    return route.fulfill({ json: { targetSpecificationVersionId: target.specification_version_id,
+      candidateCount: 1, adoptedCount: 1, skippedCount: 0, failedCount: 0,
+      results: [{ productId: draft.productId, status: 'ADOPTED', formulaVersionId: 'formula_hosted_adopted_v2', replayed: false, errorCode: null, message: null }] } })
+  })
+  await interceptHostedOrigin(page, approved, baseURL!)
+  await page.goto(approved + '/impact')
+  const switcher = page.getByRole('combobox', { name: 'Demo identity' })
+  await switcher.selectOption('DATA_ADMIN')
+  const panel = page.getByRole('region', { name: 'Batch specification adoption' })
+  await panel.getByRole('combobox', { name: 'Released specification' }).selectOption(target.specification_version_id)
+  await panel.getByRole('button', { name: 'Adopt for current products' }).click()
+  await expect(panel).toContainText('1 adopted, 0 skipped, 0 failed')
+  await switcher.selectOption('CHANGE_MANAGER')
+  await panel.getByRole('combobox', { name: 'Released specification' }).selectOption(target.specification_version_id)
+  await expect(panel.getByRole('button', { name: 'Adopt for current products' })).toBeDisabled()
+  expect(posts).toBe(1)
+})
+
+test('hosted Change Manager creates a change request and runs impact analysis', async ({ page, baseURL }) => {
+  const change = { changeRequestId: 'change_hosted', changeType: 'INGREDIENT_SPEC', supplierMaterialId: 'mat_chocolate_base',
+    previousSpecificationVersionId: 'spec_chocolate_v1', targetSpecificationVersionId: 'spec_hosted_v2',
+    description: 'Hosted supplier change', status: 'SUBMITTED', createdAt: '2026-10-24T00:00:00Z' }
+  const analysis = { impactAnalysisId: 'impact_hosted', changeRequestId: change.changeRequestId,
+    ruleSetVersionId: draft.ruleSetVersionId, status: 'COMPLETED', completedAt: '2026-10-24T00:01:00Z',
+    relevantProductCount: 0, noActionCount: 0, reviewRequiredCount: 0, findings: [] }
+  const subjects: string[] = []
+  await page.route('**/api/catalog/specifications?*', route => route.fulfill({ json: [
+    { specification_version_id: 'spec_chocolate_v1', supplier_material_id: 'mat_chocolate_base', version_number: 1, lifecycle_status: 'RELEASED', effective_date: '2026-01-01' },
+    { specification_version_id: 'spec_hosted_v2', supplier_material_id: 'mat_chocolate_base', version_number: 2, lifecycle_status: 'RELEASED', effective_date: '2026-01-01' },
+  ] }))
+  await page.route('**/api/v1/change-requests?*', route => route.fulfill({ json: [] }))
+  await page.route('**/api/v1/change-requests', route => {
+    subjects.push(route.request().headers()['x-external-subject'])
+    expect(route.request().postDataJSON()).toMatchObject({ supplierMaterialId: change.supplierMaterialId,
+      previousSpecificationVersionId: change.previousSpecificationVersionId, targetSpecificationVersionId: change.targetSpecificationVersionId, description: change.description })
+    return route.fulfill({ status: 201, json: change })
+  })
+  await page.route('**/api/v1/change-requests/change_hosted', route => route.fulfill({ json: change }))
+  await page.route('**/api/v1/change-requests/change_hosted/impact-analyses', route => {
+    subjects.push(route.request().headers()['x-external-subject'])
+    expect(route.request().postDataJSON()).toEqual({ ruleSetVersionId: draft.ruleSetVersionId })
+    return route.fulfill({ status: 201, json: analysis })
+  })
+  await page.route('**/api/v1/impact-analyses/impact_hosted', route => route.fulfill({ json: analysis }))
+  await interceptHostedOrigin(page, approved, baseURL!)
+  await page.goto(approved + '/impact')
+  await page.getByRole('combobox', { name: 'Demo identity' }).selectOption('CHANGE_MANAGER')
+  await page.getByText('Create a specification change request', { exact: true }).click()
+  await page.getByLabel('Supplier material', { exact: true }).selectOption(change.supplierMaterialId)
+  await page.getByLabel('Previous specification', { exact: true }).selectOption(change.previousSpecificationVersionId)
+  await page.getByLabel('Target specification', { exact: true }).selectOption(change.targetSpecificationVersionId)
+  await page.getByLabel('Change description').fill(change.description)
+  await page.getByRole('checkbox', { name: 'Use the connected identity for impact writes' }).check()
+  await page.getByRole('button', { name: 'Create change request', exact: true }).click()
+  await expect(page.getByRole('combobox', { name: 'Change request', exact: true })).toHaveValue(change.changeRequestId)
+  await page.getByRole('checkbox', { name: 'Use the connected identity for impact writes' }).check()
+  await page.getByRole('button', { name: 'Run impact analysis', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'Analysis results' })).toContainText(analysis.impactAnalysisId)
+  expect(subjects).toEqual(['dev-external-change-manager', 'dev-external-change-manager'])
 })
 
 for (const origin of ['http://spectrace.52zzx.top', 'https://spectrace.52zzx.top:8443', 'https://spectrace.52zzx.top.example.invalid', 'https://*.52zzx.top']) {

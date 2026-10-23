@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { data } from '@/data/catalog'
 import { catalogList } from '@/api/catalog'
 import { CurrentIdentityPanel, useCurrentIdentity } from '@/components/CurrentIdentityPanel'
+import { BatchAdoptionPanel } from '@/components/BatchAdoptionPanel'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
@@ -19,6 +20,8 @@ export function Impact() {
   const [ruleSetId, setRuleSetId] = useState(searchParams.get('ruleSetVersionId') ?? 'ruleset_us_falcpa_demo_v1')
   const [runId, setRunId] = useState(searchParams.get('impactAnalysisId') ?? '')
   const [analysis, setAnalysis] = useState<ImpactAnalysis | null>(null)
+  const [findingFilter, setFindingFilter] = useState<'ALL' | 'NO_ACTION' | 'REVIEW_REQUIRED'>('ALL')
+  const visibleFindings = analysis?.findings.filter(finding => findingFilter === 'ALL' || finding.outcome === findingFilter) ?? []
   const [materialId, setMaterialId] = useState(data.supplier_material[0]?.supplier_material_id ?? '')
   const [previousId, setPreviousId] = useState('')
   const [targetId, setTargetId] = useState('')
@@ -47,6 +50,15 @@ export function Impact() {
   const identityGeneration = identity.session.generation
   const activeIdentity = useRef(identityGeneration)
   activeIdentity.current = identityGeneration
+  // A filter chosen for one run must not hide findings of a different one; re-reading the same run keeps it.
+  const filteredRunId = useRef('')
+  useEffect(() => {
+    const id = analysis?.impactAnalysisId
+    if (!id) return
+    if (filteredRunId.current && filteredRunId.current !== id) setFindingFilter('ALL')
+    filteredRunId.current = id
+  }, [analysis?.impactAnalysisId])
+
   useEffect(() => {
     contextVersion.current++
     manualRead.current?.abort()
@@ -241,6 +253,7 @@ export function Impact() {
       <p>Analyze a specification change and continue each required review with its actual task.</p></div>
       <Badge variant="outline">Live impact APIs</Badge></div>
     <p className="source-notice">A connected, authorized identity is required. Analysis preserves published label history; replacement labels require separate validation, independent review and publication.</p>
+    <BatchAdoptionPanel />
     <div className="impact-layout"><Panel><SectionHead title="Specification change" />
       <div className="impact-content">
         <CurrentIdentityPanel state={identity.state} onRefresh={identity.refresh} />
@@ -290,16 +303,24 @@ export function Impact() {
         {!analysis && <><h3>No analysis loaded</h3><p>Run or load an exact analysis. This empty state does not mean no products are affected.</p></>}
         {analysis && <><h3>{analysis.impactAnalysisId}</h3><p>{analysis.relevantProductCount} findings · {analysis.noActionCount} no action · {analysis.reviewRequiredCount} review required</p>
           <p>Change {analysis.changeRequestId} · Rule set {analysis.ruleSetVersionId}</p>
-          <div className="impact-findings">{analysis.findings.map(finding => <article key={finding.impactFindingId}>
-            <h4>{finding.productId}</h4><Badge variant="outline">{finding.outcome}</Badge><p>{finding.explanation}</p>
+          <label htmlFor="impact-outcome-filter">Filter findings</label>
+          <select id="impact-outcome-filter" value={findingFilter} onChange={event => setFindingFilter(event.target.value as typeof findingFilter)}>
+            <option value="ALL">All outcomes</option><option value="NO_ACTION">No action</option><option value="REVIEW_REQUIRED">Review required</option>
+          </select>
+          <div className="impact-findings">{visibleFindings.map(finding => <article key={finding.impactFindingId}>
+            <h4>{finding.productDisplayName}</h4><p className="muted">{finding.productId}</p><Badge variant="outline">{finding.outcome}</Badge><p>{finding.explanation}</p>
             <p>Current formula: {finding.currentFormulaVersionId}<br />Proposed formula: {finding.proposedFormulaVersionId}</p>
             {finding.missingAllergenCodes.length > 0 && <p>Missing declarations: {finding.missingAllergenCodes.join(', ')}</p>}
             {finding.reviewTask && <><p>Review task: {finding.reviewTask.reviewTaskId}</p>
               <Button variant="outline" asChild><Link to={'/labels?' + new URLSearchParams({ productId: finding.productId,
-                reviewTaskId: finding.reviewTask.reviewTaskId, ...(finding.reviewTask.draftLabelVersionId
+                reviewTaskId: finding.reviewTask.reviewTaskId,
+                expectedFormulaVersionId: finding.proposedFormulaVersionId,
+                ...(finding.reviewTask.draftLabelVersionId
                   ? { labelVersionId: finding.reviewTask.draftLabelVersionId } : {}) })}>
                 {finding.reviewTask.draftLabelVersionId ? 'Open bound label draft' : 'Prepare replacement label'}</Link></Button></>}
-          </article>)}</div></>}
+          </article>)}</div>
+          {visibleFindings.length === 0 && <p>No findings match this outcome filter.</p>}
+        </>}
       </section></Panel></div>
   </div>
 }

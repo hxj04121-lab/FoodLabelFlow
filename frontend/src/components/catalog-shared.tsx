@@ -37,12 +37,12 @@ export function SourceBadge() {
     </Badge>
   )
 }
-export function ReadOnlyNotice() {
+export function CatalogSourceNotice() {
   return (
     <div className="source-notice">
       <Database size={15} />
       <span>
-        Data loaded from the catalog API. Formula writes use the local course identity and are not production sign-in.
+        Data loaded from the catalog API. Formula and specification writes use the selected demo identity and are not production sign-in.
       </span>
     </div>
   )

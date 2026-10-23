@@ -1,7 +1,7 @@
 import {
   exportProducts,
   Panel,
-  ReadOnlyNotice,
+  CatalogSourceNotice,
   SectionHead,
 } from '@/components/catalog-shared'
 import { Badge } from '@/components/ui/badge'
@@ -54,7 +54,7 @@ export function Overview() {
           <ArrowDownToLine size={16} /> Export data
         </Button>
       </div>
-      <ReadOnlyNotice />
+      <CatalogSourceNotice />
       <div className="metrics-grid">
         {[
           {
