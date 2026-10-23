@@ -42,8 +42,9 @@ require_demo_project_name() {
   fi
 }
 
-# Validate the configured name before any Docker CLI call, including list/reset.
-require_demo_project_name "$COMPOSE_PROJECT_NAME"
+# Only Compose-touching commands check names: reset checks COMPOSE_PROJECT_NAME (in
+# assert_fresh_project) and down/purge check their argument, all before any Docker call.
+# API-only commands and list ignore COMPOSE_PROJECT_NAME, so an exported everyday name is fine.
 DEMO_PREFIX="${DEMO_PREFIX:-FOOD-S4-$(date -u +%Y%m%d%H%M%S)-$$-${RANDOM}}"
 export DEMO_PREFIX
 if [[ ! "$DEMO_PREFIX" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*$ ]]; then
@@ -118,10 +119,6 @@ demo_projects() {
     docker volume ls --format '{{.Label "com.docker.compose.project"}}'; } | grep '^spectrace-s4-' | sort -u || true
 }
 
-demo_project_arg() {
-  require_demo_project_name "$1"
-}
-
 # Earlier stacks hold the same loopback ports. Stopping keeps their containers and
 # volume for inspection; only `purge PROJECT` deletes data.
 stop_previous() {
@@ -185,12 +182,12 @@ case "${1:-}" in
     done
     ;;
   down)
-    project="${2:?project name from list}"; demo_project_arg "$project"
+    project="${2:?project name from list}"; require_demo_project_name "$project"
     compose -p "$project" down --remove-orphans
     echo "Removed the containers of $project; its database volume is kept. Delete it with: $0 purge $project" >&2
     ;;
   purge)
-    project="${2:?project name from list}"; demo_project_arg "$project"
+    project="${2:?project name from list}"; require_demo_project_name "$project"
     if [[ "${3:-}" != "--confirm=$project" ]]; then
       if [[ ! -t 0 ]]; then
         echo "purge deletes the database volume of $project. Re-run with --confirm=$project to proceed." >&2; exit 65
