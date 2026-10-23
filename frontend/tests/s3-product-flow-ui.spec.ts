@@ -97,6 +97,32 @@ test('prefills a new replacement draft from the exact prior label and keeps decl
   await expect(page.getByRole('region', { name: 'Label draft details' })).toContainText(initial.labelVersionId)
 })
 
+test('an in-place handoff to another product prefills that product and product changes stay in the URL', async ({ page }) => {
+  const replacementTask = { reviewTaskId: 'task_prefill', productId: initial.productId,
+    currentLabelVersionId: 'label_previous', draftLabelVersionId: null, targetLabelVersionId: null,
+    status: 'OPEN', decision: null, resolvedAt: null }
+  const previous = { ...initial, labelVersionId: 'label_previous', lifecycleStatus: 'PUBLISHED', isCurrentPublished: 'Y' }
+  await page.route('**/api/v1/allergens?*', route => route.fulfill({ json: allergens }))
+  await page.route('**/api/review-tasks/task_prefill', route => route.fulfill({ json: replacementTask }))
+  await page.route('**/api/labels/label_previous', route => route.fulfill({ json: previous }))
+  await page.route('**/api/labels/label_previous/declarations', route => route.fulfill({ json: { ...previous,
+    declarations: [{ allergenId: 'all_soy', declarationType: 'CONTAINS',
+      declarationSource: 'MIGRATED_PUBLIC_LABEL', displayText: 'Contains Soy' }] } }))
+
+  await page.goto('/labels?productId=prod_usda_1106963')
+  await expect(page.getByLabel('Product', { exact: true })).toHaveValue('prod_usda_1106963')
+  // A same-page history entry (for example browser back/forward) names another product's task.
+  await page.evaluate(url => { history.pushState({}, '', url); dispatchEvent(new PopStateEvent('popstate')) },
+    `/labels?productId=${initial.productId}&reviewTaskId=${replacementTask.reviewTaskId}`)
+  await expect(page.getByRole('status').filter({ hasText: 'prefilled from previous label label_previous' })).toBeVisible()
+  await expect(page.getByLabel('Product', { exact: true })).toHaveValue(initial.productId)
+  await expect(page.getByText('The review task belongs to a different product.')).toHaveCount(0)
+
+  await page.getByLabel('Product', { exact: true }).selectOption('prod_usda_1106963')
+  await expect(page).toHaveURL(url => url.searchParams.get('productId') === 'prod_usda_1106963' &&
+    !url.searchParams.has('reviewTaskId'))
+})
+
 test('warns and blocks creation when the impact handoff formula is stale', async ({ page }) => {
   const replacementTask = { reviewTaskId: 'task_stale', productId: initial.productId,
     currentLabelVersionId: 'label_previous', draftLabelVersionId: null, targetLabelVersionId: null,
@@ -114,7 +140,8 @@ test('warns and blocks creation when the impact handoff formula is stale', async
 
   await page.goto(`/labels?productId=${initial.productId}&reviewTaskId=${replacementTask.reviewTaskId}&expectedFormulaVersionId=formula_obsolete`)
   await expect(page.getByRole('alert').filter({ hasText: 'product formula changed after this impact result' })).toBeVisible()
-  await expect(page.getByRole('alert').filter({ hasText: 'previous label uses formula formula_old_published' })).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: 'copied declarations belong to formula formula_old_published' })).toBeVisible()
+  await expect(page.getByRole('alert').filter({ hasText: 'formula_old_published' })).toHaveCount(0)
   await expect(page.getByRole('checkbox', { name: 'Use the connected identity to create this draft' })).toBeEnabled()
   await page.getByRole('checkbox', { name: 'Use the connected identity to create this draft' }).check()
   await expect(page.getByRole('button', { name: 'Create label draft' })).toBeDisabled()

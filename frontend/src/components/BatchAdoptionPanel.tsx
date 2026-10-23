@@ -1,5 +1,7 @@
 import { adoptSpecificationForCurrentProducts, catalogList, type BatchAdoptionSummary } from '@/api/catalog'
+import { isLocalDemoHost } from '@/lib/local-demo'
 import { LabelApiError } from '@/api/labels'
+import { data } from '@/data/catalog'
 import { Panel, SectionHead } from '@/components/catalog-shared'
 import { Button } from '@/components/ui/button'
 import { useCurrentIdentity } from '@/components/CurrentIdentityPanel'
@@ -21,6 +23,10 @@ function effectiveCalendarDate(value: unknown): string | null {
   return Number.isNaN(parsed.valueOf()) || parsed.toISOString().slice(0, 10) !== date ? null : date
 }
 
+function productName(productId: string) {
+  return data.product.find(product => product.product_id === productId)?.product_description ?? productId
+}
+
 function isReleasedTarget(row: Record<string, unknown>, today: string): row is Record<string, unknown> & TargetSpecification {
   const effectiveDate = effectiveCalendarDate(row.effective_date)
   return typeof row.specification_version_id === 'string' &&
@@ -38,7 +44,7 @@ export function BatchAdoptionPanel() {
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const local = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname)
+  const local = isLocalDemoHost()
   const authorized = identity.hasPermission('DATA.MAINTAIN') && identity.hasPermission('FORMULA.RELEASE')
 
   useEffect(() => {
@@ -102,7 +108,7 @@ export function BatchAdoptionPanel() {
       {summary && <div aria-live="polite" className="batch-adoption-summary">
         <p>Target {summary.targetSpecificationVersionId}: {summary.adoptedCount} adopted, {summary.skippedCount} skipped, {summary.failedCount} failed ({summary.candidateCount} candidates).</p>
         {summary.results.length > 0 && <ul>{summary.results.map(result => <li key={result.productId}>
-          {result.productId}: {result.status}{result.formulaVersionId ? ` · ${result.formulaVersionId}` : ''}
+          {productName(result.productId) !== result.productId && <><strong>{productName(result.productId)}</strong> · </>}{result.productId}: {result.status}{result.formulaVersionId ? ` · ${result.formulaVersionId}` : ''}
           {result.replayed ? ' · replayed' : ''}{result.errorCode ? ` · ${result.errorCode}` : ''}
         </li>)}</ul>}
       </div>}

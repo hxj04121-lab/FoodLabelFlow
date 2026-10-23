@@ -282,8 +282,8 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
       if (releaseHeldCurrentFormula) {
         releaseHeldCurrentFormula()
         releaseHeldCurrentFormula = null
-        await expect(page.getByRole('alert')).toContainText(
-          `The previous label uses formula ${before.get(finding.productId)!.label.formulaVersionId}, while the product now uses ${adopted.get(finding.productId)}. Review the copied declarations against the current formula.`)
+        await expect(page.getByText(
+          `The copied declarations belong to formula ${before.get(finding.productId)!.label.formulaVersionId}; the product now uses ${adopted.get(finding.productId)}.`)).toBeVisible()
         for (const allergenId of expectedAllergenIds) {
           const allergen = catalogAllergens.find((entry: any) => entry.allergenId === allergenId)
           await expect(page.getByRole('checkbox', {

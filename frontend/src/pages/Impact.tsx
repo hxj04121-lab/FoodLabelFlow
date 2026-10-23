@@ -1,3 +1,4 @@
+import { isLocalDemoHost } from '@/lib/local-demo'
 import { createChangeRequest, getChangeRequest, getImpactAnalysis, listChangeRequests, runImpactAnalysis,
   type ChangeRequest, type ImpactAnalysis } from '@/api/impact'
 import { LabelApiError } from '@/api/labels'
@@ -20,6 +21,7 @@ export function Impact() {
   const [runId, setRunId] = useState(searchParams.get('impactAnalysisId') ?? '')
   const [analysis, setAnalysis] = useState<ImpactAnalysis | null>(null)
   const [findingFilter, setFindingFilter] = useState<'ALL' | 'NO_ACTION' | 'REVIEW_REQUIRED'>('ALL')
+  const visibleFindings = analysis?.findings.filter(finding => findingFilter === 'ALL' || finding.outcome === findingFilter) ?? []
   const [materialId, setMaterialId] = useState(data.supplier_material[0]?.supplier_material_id ?? '')
   const [previousId, setPreviousId] = useState('')
   const [targetId, setTargetId] = useState('')
@@ -43,11 +45,20 @@ export function Impact() {
   const manualRead = useRef<AbortController | null>(null)
   const [restoring, setRestoring] = useState(false)
   const [exactChange, setExactChange] = useState<ChangeRequest | null>(null)
-  const local = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname)
+  const local = isLocalDemoHost()
   const identity = useCurrentIdentity()
   const identityGeneration = identity.session.generation
   const activeIdentity = useRef(identityGeneration)
   activeIdentity.current = identityGeneration
+  // A filter chosen for one run must not hide findings of a different one; re-reading the same run keeps it.
+  const filteredRunId = useRef('')
+  useEffect(() => {
+    const id = analysis?.impactAnalysisId
+    if (!id) return
+    if (filteredRunId.current && filteredRunId.current !== id) setFindingFilter('ALL')
+    filteredRunId.current = id
+  }, [analysis?.impactAnalysisId])
+
   useEffect(() => {
     contextVersion.current++
     manualRead.current?.abort()
@@ -296,7 +307,7 @@ export function Impact() {
           <select id="impact-outcome-filter" value={findingFilter} onChange={event => setFindingFilter(event.target.value as typeof findingFilter)}>
             <option value="ALL">All outcomes</option><option value="NO_ACTION">No action</option><option value="REVIEW_REQUIRED">Review required</option>
           </select>
-          <div className="impact-findings">{analysis.findings.filter(finding => findingFilter === 'ALL' || finding.outcome === findingFilter).map(finding => <article key={finding.impactFindingId}>
+          <div className="impact-findings">{visibleFindings.map(finding => <article key={finding.impactFindingId}>
             <h4>{finding.productDisplayName}</h4><p className="muted">{finding.productId}</p><Badge variant="outline">{finding.outcome}</Badge><p>{finding.explanation}</p>
             <p>Current formula: {finding.currentFormulaVersionId}<br />Proposed formula: {finding.proposedFormulaVersionId}</p>
             {finding.missingAllergenCodes.length > 0 && <p>Missing declarations: {finding.missingAllergenCodes.join(', ')}</p>}
@@ -308,7 +319,7 @@ export function Impact() {
                   ? { labelVersionId: finding.reviewTask.draftLabelVersionId } : {}) })}>
                 {finding.reviewTask.draftLabelVersionId ? 'Open bound label draft' : 'Prepare replacement label'}</Link></Button></>}
           </article>)}</div>
-          {analysis.findings.filter(finding => findingFilter === 'ALL' || finding.outcome === findingFilter).length === 0 && <p>No findings match this outcome filter.</p>}
+          {visibleFindings.length === 0 && <p>No findings match this outcome filter.</p>}
         </>}
       </section></Panel></div>
   </div>

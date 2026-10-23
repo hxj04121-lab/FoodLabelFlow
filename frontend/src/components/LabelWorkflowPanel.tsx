@@ -1,4 +1,5 @@
 import { getLabelDraft, LabelApiError, type LabelDraft, type ValidationRun } from '@/api/labels'
+import { isLocalDemoHost } from '@/lib/local-demo'
 import { decideLabelReview, publishReviewTaskLabel, requireWorkflowTarget, submitLabelForReview,
   type ReviewDecision } from '@/api/label-workflow'
 import { Panel, SectionHead } from './catalog-shared'
@@ -25,7 +26,7 @@ export function LabelWorkflowPanel({ draft, validationRun, reviewTaskId, onDraft
   const lock = useRef(false)
   const currentId = useRef(draft?.labelVersionId)
   currentId.current = draft?.labelVersionId
-  const local = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname)
+  const local = isLocalDemoHost()
   const independent = identity.state.status === 'ready' && identity.state.actor.userId !== draft?.createdByUserId
   const validationPassed = validationRun?.labelVersionId === draft?.labelVersionId &&
     validationRun?.ruleSetVersionId === draft?.ruleSetVersionId && validationRun?.status === 'PASSED'

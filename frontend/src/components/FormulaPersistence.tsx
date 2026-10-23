@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { Button } from './ui/button'
+import { isLocalDemoHost } from '@/lib/local-demo'
 import { CatalogRequestError, createFormula, getCatalogProduct, getFormulaHistory, releaseFormula, type CreateFormulaRequest, type FormulaVersion } from '@/api/client'
 
 export function FormulaPersistence({request,onSaved,onBusy}: {
@@ -16,7 +17,7 @@ export function FormulaPersistence({request,onSaved,onBusy}: {
   const [uncertain,setUncertain]=useState(false)
   const [conflict,setConflict]=useState(false)
   const [confirm,setConfirm]=useState(false)
-  const local=['127.0.0.1','localhost','[::1]'].includes(location.hostname)
+  const local=isLocalDemoHost()
   async function run(operation:()=>Promise<void>, mutation=false) {
     if(lock.current)return
     lock.current=true;setBusy(true);onBusy(true);setError('')

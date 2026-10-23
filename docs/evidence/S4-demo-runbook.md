@@ -11,9 +11,11 @@ scripts/s4-m1-spec-v2-demo.sh fresh-ui
 ```
 
 `fresh-ui` creates a new, uniquely named Compose project and its own MySQL
-volume. It never removes earlier projects or volumes. If an interrupted attempt
-left resources behind, rerun with a new project name and unused loopback ports;
-the old resources remain available for inspection. The script prints its
+volume. Before starting, it stops any earlier `spectrace-s4-*` demo project so the
+loopback ports are free; stopped projects keep their containers and volume for
+inspection. `scripts/s4-m1-spec-v2-demo.sh list` shows them, and
+`scripts/s4-m1-spec-v2-demo.sh down PROJECT` deletes one, including its
+database volume, once its evidence is recorded. The script prints its
 project and a unique `DEMO_PREFIX`. You may provide a validated `DEMO_PREFIX`
 before invoking it.
 

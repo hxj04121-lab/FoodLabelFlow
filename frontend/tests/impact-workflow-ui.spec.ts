@@ -64,6 +64,28 @@ test('uses current catalog product display names and filters findings by impact 
   await expect(results).not.toContainText('Demo Chocolate Bar')
 })
 
+test('a new analysis run starts unfiltered', async ({ page }) => {
+  const noAction = { impactFindingId: 'finding_no_action', productId: 'prod_usda_1106963',
+    productDisplayName: 'Neutral Base Snack', outcome: 'NO_ACTION', currentFormulaVersionId: 'formula_current',
+    proposedFormulaVersionId: 'formula_proposed', currentLabelVersionId: 'label_current',
+    missingAllergenCodes: [], explanation: 'No declaration change.', reviewTask: null }
+  let runs = 0
+  await page.route('**/impact-analyses', route => route.fulfill({ status: 201, json: {
+    ...run, impactAnalysisId: `impact_run_${++runs}`, relevantProductCount: 2, noActionCount: 1, findings: [noAction, finding],
+  } }))
+  await page.goto('/impact')
+  await page.getByRole('checkbox', { name: 'Use the connected identity for impact writes' }).check()
+  await page.getByRole('button', { name: 'Run impact analysis', exact: true }).click()
+  const results = page.getByRole('region', { name: 'Analysis results' })
+  await results.getByLabel('Filter findings').selectOption('NO_ACTION')
+  await expect(results.locator('article')).toHaveCount(1)
+  await page.getByRole('checkbox', { name: 'Use the connected identity for impact writes' }).check()
+  await page.getByRole('button', { name: 'Run impact analysis', exact: true }).click()
+  await expect(results.getByRole('heading', { name: 'impact_run_2' })).toBeVisible()
+  await expect(results.getByLabel('Filter findings')).toHaveValue('ALL')
+  await expect(results.locator('article')).toHaveCount(2)
+})
+
 test('prefills the published label on an impact handoff without guessing missing allergens', async ({ page }) => {
   let identityChanged = false
   let releasePreviousDeclarations!: () => void

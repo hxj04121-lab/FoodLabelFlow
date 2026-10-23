@@ -1,3 +1,4 @@
+import { isLocalDemoHost } from '@/lib/local-demo'
 import {
   getValidationRun,
   LabelApiError,
@@ -39,7 +40,7 @@ export function LabelValidationPanel({ draft, onRunChange, identityState }: {
   const [error, setError] = useState('')
   const [uncertain, setUncertain] = useState(false)
   const writeLock = useRef(false)
-  const local = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname)
+  const local = isLocalDemoHost()
   const connected = identityState?.status === 'ready'
   const canValidate = connected && identityState?.status === 'ready' && identityState.actor.permissions.includes('LABEL.VALIDATE')
 

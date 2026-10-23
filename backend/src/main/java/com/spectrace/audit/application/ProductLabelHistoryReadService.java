@@ -27,7 +27,24 @@ public class ProductLabelHistoryReadService {
                 (result, row) -> result.getString("product_description"), productId);
         if (displayNames.isEmpty()) throw new ProductLabelHistoryNotFoundException(productId);
 
-        List<Version> versionRows = jdbc.query("""
+        // Declarations are read first so each Version is built once, complete.
+        Map<String, List<Declaration>> declarations = new LinkedHashMap<>();
+        jdbc.query("""
+                SELECT declaration.label_version_id, allergen.allergen_code, declaration.declaration_type,
+                       declaration.declaration_source, declaration.display_text
+                FROM label_version version
+                JOIN label_allergen_declaration declaration ON declaration.label_version_id = version.label_version_id
+                JOIN allergen ON allergen.allergen_id = declaration.allergen_id
+                WHERE version.product_id = ?
+                ORDER BY version.jurisdiction_code, version.version_number, allergen.allergen_code,
+                         declaration.declaration_type
+                """, result -> {
+            declarations.computeIfAbsent(result.getString("label_version_id"), ignored -> new ArrayList<>())
+                    .add(new Declaration(result.getString("allergen_code"), result.getString("declaration_type"),
+                            result.getString("declaration_source"), result.getString("display_text")));
+        }, productId);
+
+        List<Version> versions = jdbc.query("""
                 SELECT lv.label_version_id, lv.version_number, lv.jurisdiction_code, lv.lifecycle_status,
                        lv.formula_version_id, lv.rule_set_version_id, lv.created_at,
                        lv.created_by_user_id, creator.display_name AS created_by_display_name,
@@ -46,29 +63,8 @@ public class ProductLabelHistoryReadService {
                 localDateTime(result.getTimestamp("created_at")), result.getString("created_by_user_id"),
                 result.getString("created_by_display_name"), localDateTime(result.getTimestamp("published_at")),
                 result.getString("published_by_user_id"), result.getString("published_by_display_name"),
-                result.getString("publication_channel"), List.of()), productId);
-
-        Map<String, List<Declaration>> declarations = new LinkedHashMap<>();
-        jdbc.query("""
-                SELECT declaration.label_version_id, allergen.allergen_code, declaration.declaration_type,
-                       declaration.declaration_source, declaration.display_text
-                FROM label_version version
-                JOIN label_allergen_declaration declaration ON declaration.label_version_id = version.label_version_id
-                JOIN allergen ON allergen.allergen_id = declaration.allergen_id
-                WHERE version.product_id = ?
-                ORDER BY version.jurisdiction_code, version.version_number, allergen.allergen_code,
-                         declaration.declaration_type
-                """, result -> {
-            declarations.computeIfAbsent(result.getString("label_version_id"), ignored -> new ArrayList<>())
-                    .add(new Declaration(result.getString("allergen_code"), result.getString("declaration_type"),
-                            result.getString("declaration_source"), result.getString("display_text")));
-        }, productId);
-        List<Version> versions = versionRows.stream().map(version -> new Version(
-                version.labelVersionId(), version.versionNumber(), version.jurisdictionCode(), version.lifecycleStatus(),
-                version.formulaVersionId(), version.ruleSetVersionId(), version.createdAt(), version.createdByUserId(),
-                version.createdByDisplayName(), version.publishedAt(), version.publishedByUserId(),
-                version.publishedByDisplayName(), version.publicationChannel(),
-                declarations.getOrDefault(version.labelVersionId(), List.of()))).toList();
+                result.getString("publication_channel"),
+                declarations.getOrDefault(result.getString("label_version_id"), List.of())), productId);
 
         List<Approval> approvals = jdbc.query("""
                 SELECT approval.approval_record_id, approval.label_version_id, approval.review_task_id,

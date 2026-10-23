@@ -1,4 +1,5 @@
 import { expect, test } from './catalog-fixture'
+import seed from '../src/data/seed-preview.json' with { type: 'json' }
 
 const dataAdmin = { userId: 'user_admin', username: 'data.admin', displayName: 'Demo Admin/Data Maintenance',
   roles: ['ADMIN_DATA_MAINTENANCE'], permissions: ['DATA.MAINTAIN', 'FORMULA.RELEASE', 'RULE_SET.MAINTAIN'] }
@@ -8,7 +9,7 @@ const target = { specification_version_id: 'spec_chocolate_v2', supplier_materia
   version_number: 2, lifecycle_status: 'RELEASED', effective_date: '2026-01-01' }
 const summary = { targetSpecificationVersionId: target.specification_version_id, candidateCount: 2,
   adoptedCount: 1, skippedCount: 1, failedCount: 0, results: [
-    { productId: 'product-one', status: 'ADOPTED', formulaVersionId: 'formula-one-v2', replayed: false, errorCode: null, message: null },
+    { productId: seed.product[0].product_id, status: 'ADOPTED', formulaVersionId: 'formula-one-v2', replayed: false, errorCode: null, message: null },
     { productId: 'product-two', status: 'SKIPPED', formulaVersionId: null, replayed: false, errorCode: 'NO_CURRENT_FORMULA', message: 'No current formula.' },
   ] }
 
@@ -41,7 +42,7 @@ test('Data Admin can adopt a released specification and inspect per-product resu
   await panel.getByRole('combobox', { name: 'Released specification' }).selectOption(target.specification_version_id)
   await panel.getByRole('button', { name: 'Adopt for current products' }).click()
   await expect(panel).toContainText('1 adopted, 1 skipped, 0 failed (2 candidates)')
-  await expect(panel).toContainText('product-one: ADOPTED')
+  await expect(panel).toContainText(`${seed.product[0].product_description} · ${seed.product[0].product_id}: ADOPTED`)
   await expect(panel).toContainText('product-two: SKIPPED')
   expect(posts).toEqual([{ path: `/api/catalog/specifications/${target.specification_version_id}/formula-adoptions`, subject: 'dev-external-admin' }])
 })

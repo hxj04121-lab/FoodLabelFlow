@@ -1,3 +1,4 @@
+import { isLocalDemoHost } from '@/lib/local-demo'
 import {
   createLabelDraft,
   createReturnedLabelRevision,
@@ -92,14 +93,14 @@ export function Labels() {
     declarations: Array<{ allergenId: string; declarationType: 'CONTAINS'; displayText: string }>
   } | null>(null)
   const writeLock = useRef(false)
-  const local = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname)
+  const local = isLocalDemoHost()
   const identity = useCurrentIdentity()
   const connected = identity.state.status === 'ready'
   const canCreate = connected && identity.hasPermission('LABEL.CREATE')
   const expectedFormulaVersionId = searchParams.get('expectedFormulaVersionId')?.trim() ?? ''
   const impactFormulaIsRelevant = Boolean(expectedFormulaVersionId && reviewTask && reviewTask.reviewTaskId === reviewTaskId.trim())
   const staleImpactFormula = Boolean(impactFormulaIsRelevant && currentFormulaId && expectedFormulaVersionId !== currentFormulaId)
-  const stalePrefillFormula = Boolean(replacementPrefill && currentFormulaId && replacementPrefill.formulaVersionId !== currentFormulaId)
+  const prefillFromOlderFormula = Boolean(replacementPrefill && currentFormulaId && replacementPrefill.formulaVersionId !== currentFormulaId)
 
   const product = useMemo(
     () => data.product.find((candidate) => candidate.product_id === productId),
@@ -123,10 +124,10 @@ export function Labels() {
     if (declarations) setDeclarationIds(declarations.map(row => row.allergenId))
   }
 
-  async function prefillReplacementDeclarations(task: ReviewTask, signal?: AbortSignal) {
+  async function prefillReplacementDeclarations(task: ReviewTask, expectedProductId: string, signal?: AbortSignal) {
     setReplacementPrefillStatus('loading')
     setReplacementPrefill(null)
-    if (task.productId !== productId) {
+    if (task.productId !== expectedProductId) {
       throw new LabelApiError('REVIEW_TASK_PRODUCT_MISMATCH', 'The review task belongs to a different product.', 409)
     }
     const previous = await getLabelDraft(task.currentLabelVersionId, signal)
@@ -188,9 +189,12 @@ export function Labels() {
   useEffect(() => {
     const exactTaskId = searchParams.get('reviewTaskId')?.trim()
     if (!exactTaskId) return
+    // The URL names the handoff's product; state can still hold the product of an earlier entry.
+    const handoffProductId = searchParams.get('productId')?.trim() || productId
     const controller = new AbortController()
     let active = true
     let replacementPrefillStarted = false
+    setProductId(handoffProductId)
     setReviewTaskId(exactTaskId)
     setReviewTask(null)
     setDraft(null)
@@ -205,7 +209,7 @@ export function Labels() {
       setReviewTask(task)
       if (!task.draftLabelVersionId) {
         replacementPrefillStarted = true
-        await prefillReplacementDeclarations(task, controller.signal)
+        await prefillReplacementDeclarations(task, handoffProductId, controller.signal)
         return
       }
       const requestedLabelId = searchParams.get('labelVersionId')?.trim()
@@ -265,6 +269,7 @@ export function Labels() {
     next.delete('reviewTaskId')
     next.delete('labelVersionId')
     next.delete('expectedFormulaVersionId')
+    next.set('productId', nextProductId)
     setSearchParams(next, { replace: true })
     setProductId(nextProductId)
     setDraft(null)
@@ -383,7 +388,7 @@ export function Labels() {
       setReviewTask(task)
       if (!task.draftLabelVersionId) {
         replacementPrefillStarted = true
-        await prefillReplacementDeclarations(task)
+        await prefillReplacementDeclarations(task, productId)
         setMessage(`Review task ${exactTaskId} has no bound draft. Previous-label declarations are ready to edit.` + (uncertain ? ` ${UNCONFIRMED_DRAFT_MESSAGE}` : ''))
         return
       }
@@ -565,7 +570,7 @@ export function Labels() {
           {staleImpactFormula && <p className="error-notice" role="alert">The product formula changed after this impact result. Refresh the impact analysis before creating a replacement label.</p>}
           {replacementPrefillStatus === 'loading' && <p role="status">Loading declarations from the previous label…</p>}
           {replacementPrefill && <p role="status">Declarations were prefilled from previous label {replacementPrefill.labelVersionId}; review and edit them before draft creation.</p>}
-          {stalePrefillFormula && <p className="error-notice" role="alert">The previous label uses formula {replacementPrefill?.formulaVersionId}, while the product now uses {currentFormulaId}. Review the copied declarations against the current formula.</p>}
+          {prefillFromOlderFormula && <p role="status">The copied declarations belong to formula {replacementPrefill?.formulaVersionId}; the product now uses {currentFormulaId}. Validation checks the edited selection against the current formula.</p>}
           {replacementPrefillStatus === 'failed' && <p className="error-notice" role="alert">Previous-label declarations could not be loaded. Draft creation for this review task remains disabled until the exact source label and declarations can be read.</p>}
           <fieldset className="declaration-entry" disabled={busy}>
             <legend>Declarations for the new draft</legend>

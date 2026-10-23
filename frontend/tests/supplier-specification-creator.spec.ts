@@ -47,6 +47,13 @@ test('Data Admin creates a specification draft with a new allergen ingredient an
   expect(writes.map(write => write.path)).toEqual([
     '/api/catalog/specifications', '/api/catalog/specifications/spec_test_soy_v2/release',
   ])
+
+  // Closing a released result any way (not only Done) starts the next specification from an empty form.
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Create supplier specification' }).click()
+  await expect(page.getByRole('heading', { name: 'Specification V2 · RELEASED' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Save specification draft' })).toBeEnabled()
+  await expect(page.getByLabel('Supplier material *')).toHaveValue('')
 })
 
 test('catalog identities without DATA.MAINTAIN cannot create a supplier specification', async ({ page }) => {

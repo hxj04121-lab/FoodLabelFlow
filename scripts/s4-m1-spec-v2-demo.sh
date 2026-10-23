@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SCRUM-85 demo path for the first half of the SOY story, over the public API only (no SQL).
 #
-#   reset           start a new isolated Compose stack without deleting existing volumes
+#   reset           stop earlier demo stacks (kept for inspection), then start a new isolated one
 #   fresh           reset, then spec-v2: the demo starts from released Spec V2 and nothing else
 #   fresh-ui        reset to the untouched baseline; create and release Spec V2 from the browser
 #   spec-v2         Data Admin creates and releases Chocolate Base Spec V2 (V1 + Soy lecithin);
@@ -10,6 +10,8 @@
 #   change SPEC     Change Manager records the INGREDIENT_SPEC ChangeRequest V1 -> SPEC
 #   impact CR       Change Manager runs impact analysis for CR
 #   all             spec-v2, adopt, change, impact; prints the summary counts
+#   list            show earlier demo projects (spectrace-s4-*) and their state
+#   down PROJECT    remove one earlier demo project, including its database volume
 #
 # Uses the local development header identities, so only run it against a loopback demo stack.
 # reset publishes MySQL, API and web on 127.0.0.1 only (ports from MYSQL_HOST_PORT,
@@ -97,6 +99,21 @@ assert_fresh_project() {
   fi
 }
 
+demo_projects() {
+  docker ps -a --format '{{.Label "com.docker.compose.project"}}' | grep '^spectrace-s4-' | sort -u || true
+}
+
+# Earlier stacks hold the same loopback ports. Stopping keeps their containers and
+# volume for inspection; only `down PROJECT` deletes data.
+stop_previous() {
+  local project
+  for project in $(docker ps --format '{{.Label "com.docker.compose.project"}}' | grep '^spectrace-s4-' | sort -u); do
+    [[ "$project" == "$COMPOSE_PROJECT_NAME" ]] && continue
+    echo "Stopping earlier demo project $project (containers and volume are kept)" >&2
+    compose -p "$project" stop >&2
+  done
+}
+
 reset() {
   local port
   for port in MYSQL_HOST_PORT BACKEND_HOST_PORT FRONTEND_HOST_PORT; do
@@ -107,6 +124,7 @@ reset() {
   export MYSQL_HOST_PORT="127.0.0.1:${MYSQL_HOST_PORT:-3307}" BACKEND_HOST_PORT="127.0.0.1:${BACKEND_HOST_PORT:-8080}" \
     FRONTEND_HOST_PORT="127.0.0.1:${FRONTEND_HOST_PORT:-5173}"
   assert_fresh_project
+  stop_previous
   compose up -d --build --wait
 }
 
@@ -140,5 +158,17 @@ case "${1:-}" in
     cr="$(change "$spec")"; echo "ChangeRequest: $cr"
     impact "$cr" | summary impactAnalysisId relevantProductCount noActionCount reviewRequiredCount
     ;;
-  *) sed -n '2,15p' "$0"; exit 64 ;;
+  list)
+    for project in $(demo_projects); do
+      echo "$project $(docker ps -a --filter "label=com.docker.compose.project=$project" --format '{{.State}}' | sort | uniq -c | xargs)"
+    done
+    ;;
+  down)
+    project="${2:?project name from list}"
+    if [[ ! "$project" =~ ^spectrace-s4-[a-z0-9_-]+$ ]]; then
+      echo "down only removes spectrace-s4-* demo projects" >&2; exit 64
+    fi
+    compose -p "$project" down -v --remove-orphans
+    ;;
+  *) sed -n '2,18p' "$0"; exit 64 ;;
 esac

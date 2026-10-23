@@ -1,7 +1,7 @@
 import {
   exportProducts,
   Panel,
-  ReadOnlyNotice,
+  CatalogSourceNotice,
 } from '@/components/catalog-shared'
 import { FormulaCreator } from '@/components/FormulaCreator'
 import { Button } from '@/components/ui/button'
@@ -53,7 +53,7 @@ export function Catalog({ formulas = false }: { formulas?: boolean }) {
           <ArrowDownToLine size={16} /> Export list
         </Button>
       </div>
-      <ReadOnlyNotice />
+      <CatalogSourceNotice />
       {formulas && (
         <div className="formula-entry">
           <FormulaCreator />

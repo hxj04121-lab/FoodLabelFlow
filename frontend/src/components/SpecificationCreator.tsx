@@ -2,6 +2,7 @@ import { data } from '@/data/catalog'
 import { createSpecification, releaseSpecification, type SpecificationComponentInput, type SpecificationRecord } from '@/api/catalog'
 import { LabelApiError } from '@/api/labels'
 import { useCurrentIdentity } from '@/components/CurrentIdentityPanel'
+import { isLocalDemoHost } from '@/lib/local-demo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Plus, Trash2 } from 'lucide-react'
@@ -33,7 +34,8 @@ export function SpecificationCreator() {
   const [created, setCreated] = useState<SpecificationRecord | null>(null)
   const [released, setReleased] = useState(false)
 
-  const authorized = identity.hasPermission('DATA.MAINTAIN')
+  const local = isLocalDemoHost()
+  const authorized = local && identity.hasPermission('DATA.MAINTAIN')
   const materialOptions = data.supplier_material.map(material => ({
     ...material,
     supplierName: data.supplier.find(supplier => supplier.supplier_id === material.supplier_id)?.supplier_name ?? material.supplier_id,
@@ -126,6 +128,15 @@ export function SpecificationCreator() {
     }
   }
 
+  function close() {
+    setOpen(false)
+    if (!released) return
+    setMaterialId(''); setEffectiveDate(today()); setProvenanceId('prov_project_seed')
+    setComponents([{ rowId: 1, ingredientId: '', rawPhrase: '', matchRule: '' }]); setNextRowId(2)
+    setErrors({}); setFeedback(''); setCreated(null); setReleased(false)
+    window.dispatchEvent(new Event('catalog-updated'))
+  }
+
   function addComponent() {
     setComponents(current => [...current, { rowId: nextRowId, ingredientId: '', rawPhrase: '', matchRule: '' }])
     setNextRowId(current => current + 1)
@@ -135,8 +146,9 @@ export function SpecificationCreator() {
     <Button onClick={() => setOpen(true)} disabled={!authorized}>
       <Plus size={16} /> Create supplier specification
     </Button>
-    {!authorized && <p role="status" className="muted">Specification create and release requires DATA.MAINTAIN. Switch to the connected Data Admin identity.</p>}
-    <Dialog open={open} onOpenChange={value => { if (!busy) setOpen(value) }}>
+    {!local && <p role="alert">Specification writes are disabled outside localhost until approved authentication is connected.</p>}
+    {local && !authorized && <p role="status" className="muted">Specification create and release requires DATA.MAINTAIN. Switch to the connected Data Admin identity.</p>}
+    <Dialog open={open} onOpenChange={value => { if (busy) return; if (value) setOpen(true); else close() }}>
       <DialogContent className="formula-creator">
         <DialogHeader>
           <DialogTitle>Create supplier specification</DialogTitle>
@@ -157,7 +169,7 @@ export function SpecificationCreator() {
           </div>
           {uncertain && <Button type="button" variant="outline" onClick={() => window.location.reload()}>Reload catalog to inspect the saved version</Button>}
           {!released && <Button type="button" disabled={busy || uncertain} onClick={() => void releaseDraft()}>Release specification</Button>}
-          {released && <Button type="button" variant="outline" onClick={() => { setOpen(false); window.dispatchEvent(new Event('catalog-updated')) }}>Done</Button>}
+          {released && <Button type="button" variant="outline" onClick={close}>Done</Button>}
         </section> : <form noValidate onSubmit={event => void saveDraft(event)}>
           <section className="formula-section">
             <h3>01 · Supplier material</h3>
