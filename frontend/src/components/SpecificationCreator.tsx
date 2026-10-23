@@ -57,7 +57,7 @@ export function SpecificationCreator() {
           matchRule: component.match_rule,
         }))
       : [{ rowId: 1, ingredientId: '', rawPhrase: '', matchRule: '' }])
-    setNextRowId(existing.length + 1)
+    setNextRowId(Math.max(existing.length + 1, 2))
     setErrors({})
     setFeedback(existing.length ? 'Copied the latest specification components. Edit or add ingredients before saving.' : '')
   }

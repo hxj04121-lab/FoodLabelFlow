@@ -30,6 +30,20 @@ if [[ -z "${COMPOSE_PROJECT_NAME:-}" ]]; then
   COMPOSE_PROJECT_NAME="spectrace-s4-$(date -u +%Y%m%d%H%M%S)-$$-${RANDOM}"
 fi
 export COMPOSE_PROJECT_NAME
+
+demo_project_name_supported() {
+  [[ "$1" =~ ^spectrace-s4-[a-z0-9][a-z0-9_-]*$ ]]
+}
+
+require_demo_project_name() {
+  if ! demo_project_name_supported "$1"; then
+    echo "only spectrace-s4-* demo projects are supported; see list" >&2
+    exit 64
+  fi
+}
+
+# Validate the configured name before any Docker CLI call, including list/reset.
+require_demo_project_name "$COMPOSE_PROJECT_NAME"
 DEMO_PREFIX="${DEMO_PREFIX:-FOOD-S4-$(date -u +%Y%m%d%H%M%S)-$$-${RANDOM}}"
 export DEMO_PREFIX
 if [[ ! "$DEMO_PREFIX" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*$ ]]; then
@@ -88,10 +102,7 @@ compose() {
 
 assert_fresh_project() {
   local containers volumes networks
-  if [[ ! "$COMPOSE_PROJECT_NAME" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
-    echo "COMPOSE_PROJECT_NAME must contain only lowercase letters, digits, underscores or hyphens and start with a letter or digit" >&2
-    exit 64
-  fi
+  require_demo_project_name "$COMPOSE_PROJECT_NAME"
   containers="$(docker ps -aq --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME")"
   volumes="$(docker volume ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME")"
   networks="$(docker network ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME")"
@@ -108,9 +119,7 @@ demo_projects() {
 }
 
 demo_project_arg() {
-  if [[ ! "$1" =~ ^spectrace-s4-[a-z0-9_-]+$ ]]; then
-    echo "only spectrace-s4-* demo projects can be removed; see list" >&2; exit 64
-  fi
+  require_demo_project_name "$1"
 }
 
 # Earlier stacks hold the same loopback ports. Stopping keeps their containers and

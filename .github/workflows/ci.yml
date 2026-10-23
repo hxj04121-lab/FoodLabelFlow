@@ -70,6 +70,8 @@ jobs:
     needs: [backend, frontend]
     steps:
       - uses: actions/checkout@v4
+      - name: Verify S4 demo project namespace guard without Docker
+        run: bash scripts/tests/s4-m1-spec-v2-demo-project-scope.test.sh
       - name: Validate Compose configuration
         run: docker compose config --quiet
       - name: Build application images

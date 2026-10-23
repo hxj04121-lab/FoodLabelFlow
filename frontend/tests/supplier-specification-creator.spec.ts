@@ -1,4 +1,5 @@
 import { test, expect } from './catalog-fixture'
+import seed from '../src/data/seed-preview.json' with { type: 'json' }
 
 test('Data Admin creates a specification draft with a new allergen ingredient and releases it explicitly', async ({ page }) => {
   const writes: Array<{ method: string; path: string; body?: unknown }> = []
@@ -61,4 +62,59 @@ test('catalog identities without DATA.MAINTAIN cannot create a supplier specific
   const create = page.getByRole('button', { name: 'Create supplier specification' })
   await expect(create).toBeDisabled()
   await expect(page.getByRole('status')).toContainText('requires DATA.MAINTAIN')
+})
+
+test('materials without specification history get unique editable rows that delete independently', async ({ page }) => {
+  await page.route('**/api/identity/current', route => route.fulfill({ json: {
+    userId: 'user_admin', username: 'data.admin', displayName: 'Demo Admin/Data Maintenance',
+    roles: ['ADMIN_DATA_MAINTENANCE'], permissions: ['DATA.MAINTAIN'],
+  } }))
+  await page.route('**/api/catalog/materials**', async route => {
+    const materials = [
+      ...seed.supplier_material,
+      {
+        supplier_material_id: 'mat_creator_no_history',
+        supplier_id: seed.supplier[0].supplier_id,
+        material_name: 'No history regression material',
+      },
+    ]
+    await route.fulfill({ json: materials })
+  })
+
+  await page.goto('/materials')
+  await page.getByRole('button', { name: 'Create supplier specification' }).click()
+  await page.getByLabel('Supplier material *').selectOption('mat_creator_no_history')
+
+  const ingredients = page.locator('select[id^="specification-ingredient-"]')
+  await expect(ingredients).toHaveCount(1)
+  await expect(ingredients.first()).toHaveValue('')
+  await page.getByRole('button', { name: 'Add ingredient' }).click()
+  await expect(ingredients).toHaveCount(2)
+
+  const ids = await ingredients.evaluateAll(nodes => nodes.map(node => (node as HTMLSelectElement).id))
+  expect(new Set(ids).size).toBe(2)
+
+  await ingredients.nth(0).selectOption('ing_cocoa')
+  await ingredients.nth(1).selectOption('ing_soy_lecithin')
+  const phrases = page.locator('input[id^="specification-phrase-"]')
+  const matches = page.locator('input[id^="specification-match-"]')
+  await phrases.nth(0).fill('first supplier wording')
+  await phrases.nth(1).fill('second supplier wording')
+  await matches.nth(0).fill('first component evidence')
+  await matches.nth(1).fill('second component evidence')
+
+  await expect(ingredients.nth(0)).toHaveValue('ing_cocoa')
+  await expect(ingredients.nth(1)).toHaveValue('ing_soy_lecithin')
+  await expect(phrases.nth(0)).toHaveValue('first supplier wording')
+  await expect(phrases.nth(1)).toHaveValue('second supplier wording')
+  await expect(matches.nth(0)).toHaveValue('first component evidence')
+  await expect(matches.nth(1)).toHaveValue('second component evidence')
+
+  await page.getByRole('button', { name: 'Remove ingredient 1' }).click()
+  await expect(ingredients).toHaveCount(1)
+  await expect(ingredients.first()).toHaveValue('ing_soy_lecithin')
+  await expect(phrases).toHaveCount(1)
+  await expect(phrases.first()).toHaveValue('second supplier wording')
+  await expect(matches).toHaveCount(1)
+  await expect(matches.first()).toHaveValue('second component evidence')
 })
