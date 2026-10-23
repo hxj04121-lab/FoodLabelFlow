@@ -10,8 +10,10 @@
 #   change SPEC     Change Manager records the INGREDIENT_SPEC ChangeRequest V1 -> SPEC
 #   impact CR       Change Manager runs impact analysis for CR
 #   all             spec-v2, adopt, change, impact; prints the summary counts
-#   list            show earlier demo projects (spectrace-s4-*) and their state
-#   down PROJECT    remove one earlier demo project, including its database volume
+#   list            show earlier demo projects (spectrace-s4-*), their containers and data volume
+#   down PROJECT    remove one earlier project's containers and network; its database volume is kept
+#   purge PROJECT   delete that project's database volume too; asks you to retype the project name
+#                   (non-interactive: purge PROJECT --confirm=PROJECT)
 #
 # Uses the local development header identities, so only run it against a loopback demo stack.
 # reset publishes MySQL, API and web on 127.0.0.1 only (ports from MYSQL_HOST_PORT,
@@ -99,12 +101,20 @@ assert_fresh_project() {
   fi
 }
 
+# A project still counts after `down` while its data volume exists.
 demo_projects() {
-  docker ps -a --format '{{.Label "com.docker.compose.project"}}' | grep '^spectrace-s4-' | sort -u || true
+  { docker ps -a --format '{{.Label "com.docker.compose.project"}}'
+    docker volume ls --format '{{.Label "com.docker.compose.project"}}'; } | grep '^spectrace-s4-' | sort -u || true
+}
+
+demo_project_arg() {
+  if [[ ! "$1" =~ ^spectrace-s4-[a-z0-9_-]+$ ]]; then
+    echo "only spectrace-s4-* demo projects can be removed; see list" >&2; exit 64
+  fi
 }
 
 # Earlier stacks hold the same loopback ports. Stopping keeps their containers and
-# volume for inspection; only `down PROJECT` deletes data.
+# volume for inspection; only `purge PROJECT` deletes data.
 stop_previous() {
   local project
   for project in $(docker ps --format '{{.Label "com.docker.compose.project"}}' | grep '^spectrace-s4-' | sort -u); do
@@ -160,15 +170,26 @@ case "${1:-}" in
     ;;
   list)
     for project in $(demo_projects); do
-      echo "$project $(docker ps -a --filter "label=com.docker.compose.project=$project" --format '{{.State}}' | sort | uniq -c | xargs)"
+      containers="$(docker ps -a --filter "label=com.docker.compose.project=$project" --format '{{.State}}' | sort | uniq -c | xargs)"
+      volumes="$(docker volume ls -q --filter "label=com.docker.compose.project=$project" | xargs)"
+      echo "$project containers: ${containers:-none} · data volume: ${volumes:-none}"
     done
     ;;
   down)
-    project="${2:?project name from list}"
-    if [[ ! "$project" =~ ^spectrace-s4-[a-z0-9_-]+$ ]]; then
-      echo "down only removes spectrace-s4-* demo projects" >&2; exit 64
+    project="${2:?project name from list}"; demo_project_arg "$project"
+    compose -p "$project" down --remove-orphans
+    echo "Removed the containers of $project; its database volume is kept. Delete it with: $0 purge $project" >&2
+    ;;
+  purge)
+    project="${2:?project name from list}"; demo_project_arg "$project"
+    if [[ "${3:-}" != "--confirm=$project" ]]; then
+      if [[ ! -t 0 ]]; then
+        echo "purge deletes the database volume of $project. Re-run with --confirm=$project to proceed." >&2; exit 65
+      fi
+      read -r -p "This permanently deletes the database volume of $project. Type the project name to confirm: " answer
+      if [[ "$answer" != "$project" ]]; then echo "Not confirmed; nothing was deleted." >&2; exit 65; fi
     fi
     compose -p "$project" down -v --remove-orphans
     ;;
-  *) sed -n '2,18p' "$0"; exit 64 ;;
+  *) sed -n '2,21p' "$0"; exit 64 ;;
 esac

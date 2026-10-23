@@ -109,18 +109,24 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
       })
     }
     reachedStage = 'actual supplier specification create and release UI'
+    // The UI creates Spec V2 from V1. A pre-existing V2 (for example the SQL fixture) would turn this into V3.
+    const chocolateSpecifications = (await json(request, '/api/catalog/specifications?limit=100&offset=0') as any[])
+      .filter(specification => specification.supplier_material_id === 'mat_chocolate_base')
+      .map(specification => specification.specification_version_id)
+    expect(chocolateSpecifications, 'the S3 browser flow needs a baseline where Chocolate Base has only V1').toEqual(['spec_chocolate_v1'])
     const specificationPage = await adminContext.newPage()
     await specificationPage.goto('/materials')
     await specificationPage.getByRole('button', { name: 'Create supplier specification' }).click()
     await specificationPage.getByLabel('Supplier material *').selectOption('mat_chocolate_base')
     await expect(specificationPage.getByLabel('Ingredient *').first()).toHaveValue('ing_cocoa')
     await expect(specificationPage.getByLabel('Ingredient *').nth(1)).toHaveValue('ing_sugar')
+    await expect(specificationPage.getByLabel('Ingredient *')).toHaveCount(2)
     await specificationPage.getByRole('button', { name: 'Add ingredient' }).click()
     await specificationPage.getByLabel('Ingredient *').nth(2).selectOption('ing_soy_lecithin')
     await specificationPage.getByLabel('Supplier wording *').nth(2).fill('Soy lecithin')
     await specificationPage.getByLabel('Matching evidence *').nth(2).fill(`${testPrefix} supplier specification evidence`)
     const createSpecificationResponse = specificationPage.waitForResponse(response => response.request().method() === 'POST'
-      && new URL(response.url()).pathname === '/api/catalog/specifications')
+      && new URL(response.url()).pathname === '/api/catalog/specifications', { timeout: 30_000 })
     await specificationPage.getByRole('button', { name: 'Save specification draft' }).click()
     const createdSpecification = await createSpecificationResponse
     expect(createdSpecification.status()).toBe(201)
@@ -253,7 +259,7 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
       await expect(page.getByLabel('Product', { exact: true })).toHaveValue(finding.productId)
       await expect(page.getByLabel('Review task ID')).toHaveValue(reviewTaskId)
       const previousLabelId = before.get(finding.productId)!.label.labelVersionId
-      await expect(page.getByRole('status')).toContainText(
+      await expect(page.getByRole('status').filter({ hasText: 'Declarations were prefilled from previous label' })).toContainText(
         `Declarations were prefilled from previous label ${previousLabelId}; review and edit them before draft creation.`)
       if (formulaRequestStarted) await formulaRequestStarted
       if (isCompoundMaker) {
