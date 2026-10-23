@@ -18,8 +18,8 @@ async function batch<T,R>(items:T[], task:(item:T)=>Promise<R>):Promise<R[]> {
   return out
 }
 export async function loadCatalog(signal: AbortSignal) {
-  const [suppliers, materials, specifications, products] = await Promise.all(['/suppliers','/materials','/specifications','/products'].map(p=>catalogList(p,signal)))
-  for(const [rows,id] of [[suppliers,'supplier_id'],[materials,'supplier_material_id'],[specifications,'specification_version_id'],[products,'product_id']] as const) {
+  const [suppliers, materials, specifications, products, ingredients] = await Promise.all(['/suppliers','/materials','/specifications','/products','/ingredients'].map(p=>catalogList(p,signal)))
+  for(const [rows,id] of [[suppliers,'supplier_id'],[materials,'supplier_material_id'],[specifications,'specification_version_id'],[products,'product_id'],[ingredients,'ingredient_id']] as const) {
     if(rows.some(r=>typeof r[id]!=='string')) throw new Error(`API response is missing a valid ${id}`)
   }
   const specDetails = await batch(specifications, async s => await catalogGet(`/specifications/${encodeURIComponent(String(s.specification_version_id))}`, signal) as Record<string,unknown>)
@@ -29,7 +29,7 @@ export async function loadCatalog(signal: AbortSignal) {
   if(signal.aborted) return
   const rows = (r:Record<string,unknown>[])=>r.map(normalize)
   // Canonical snake_case is retained; numeric SQL values are normalized for existing presentation types.
-  data = { ...seed, supplier:rows(suppliers), supplier_material:rows(materials), ingredient_specification_version:rows(specifications), product:rows(products), formula_version:rows(formulas), formula_item:rows(details.flatMap(d=>records(d.items))), spec_component:rows(specDetails.flatMap(s=>records(s.components))), ingredient:[] } as unknown as CatalogData
+  data = { ...seed, supplier:rows(suppliers), supplier_material:rows(materials), ingredient_specification_version:rows(specifications), product:rows(products), formula_version:rows(formulas), formula_item:rows(details.flatMap(d=>records(d.items))), spec_component:rows(specDetails.flatMap(s=>records(s.components))), ingredient:rows(ingredients) } as unknown as CatalogData
   loadedAt = new Date().toLocaleTimeString('en-GB')
 }
 export type Material = (typeof data.supplier_material)[number]

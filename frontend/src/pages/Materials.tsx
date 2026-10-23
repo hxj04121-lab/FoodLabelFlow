@@ -16,6 +16,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { type Material } from '@/data/catalog'
 import { data } from '@/data/catalog'
+import { SpecificationCreator } from '@/components/SpecificationCreator'
 import { ArrowUpRight, Check, Search, Truck } from 'lucide-react'
 import { useState } from 'react'
 export function Materials({ suppliers = false }: { suppliers?: boolean }) {
@@ -37,6 +38,7 @@ export function Materials({ suppliers = false }: { suppliers?: boolean }) {
         <SourceBadge />
       </div>
       <ReadOnlyNotice />
+      {!suppliers && <div className="section-head"><div><h2>Supplier specifications</h2><p>Create a version from the existing supplier material, then review and release it.</p></div><SpecificationCreator /></div>}
       {suppliers ? (
         <div className="supplier-grid">
           {data.supplier.map((s, i) => (

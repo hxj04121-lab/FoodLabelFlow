@@ -46,6 +46,23 @@ test('Data Admin can adopt a released specification and inspect per-product resu
   expect(posts).toEqual([{ path: `/api/catalog/specifications/${target.specification_version_id}/formula-adoptions`, subject: 'dev-external-admin' }])
 })
 
+test('a released specification effective today remains available when the API returns a timestamp', async ({ page }) => {
+  await setup(page, dataAdmin)
+  const today = new Date().toISOString().slice(0, 10)
+  const effectiveToday = { ...target, effective_date: `${today}T00:00:00Z` }
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const effectiveTomorrow = { ...target, specification_version_id: 'spec-effective-tomorrow', version_number: 3,
+    effective_date: `${tomorrow}T00:00:00Z` }
+  await page.route('**/api/catalog/specifications?*', route => route.fulfill({ json: [effectiveToday, effectiveTomorrow] }))
+
+  await page.goto('/impact')
+
+  const targets = page.getByRole('region', { name: 'Batch specification adoption' })
+    .getByRole('combobox', { name: 'Released specification' })
+  await expect(targets).toContainText(target.specification_version_id)
+  await expect(targets).not.toContainText(effectiveTomorrow.specification_version_id)
+})
+
 test('Change Manager lacks batch adoption permission and cannot send the write', async ({ page }) => {
   await setup(page, changeManager)
   let postCount = 0

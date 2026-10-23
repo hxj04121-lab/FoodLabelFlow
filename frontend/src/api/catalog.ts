@@ -21,6 +21,50 @@ export async function catalogList(path: string, signal: AbortSignal): Promise<Re
   throw new Error('The catalog exceeds the client loading limit. Partial totals cannot be displayed.')
 }
 
+export type SpecificationComponentInput = {
+  ingredientId: string
+  rawPhrase: string
+  matchRule: string
+}
+
+export type SpecificationInput = {
+  materialId: string
+  effectiveDate: string
+  provenanceId: string
+  components: SpecificationComponentInput[]
+}
+
+export type SpecificationRecord = Record<string, unknown> & {
+  specification_version_id: string
+  lifecycle_status: string
+  supplier_material_id: string
+  version_number: number
+}
+
+function parseSpecification(value: unknown): SpecificationRecord {
+  if (!object(value) || typeof value.specification_version_id !== 'string' ||
+      typeof value.lifecycle_status !== 'string' || typeof value.supplier_material_id !== 'string' ||
+      !Number.isSafeInteger(value.version_number)) {
+    throw new LabelApiError('INVALID_RESPONSE', 'The specification API returned an incomplete record.', 200)
+  }
+  return value as SpecificationRecord
+}
+
+export async function createSpecification(input: SpecificationInput): Promise<SpecificationRecord> {
+  return parseSpecification(await requestLabelJson('/api/catalog/specifications', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  }))
+}
+
+export async function releaseSpecification(specificationVersionId: string): Promise<SpecificationRecord> {
+  return parseSpecification(await requestLabelJson(
+    `/api/catalog/specifications/${encodeURIComponent(specificationVersionId)}/release`,
+    { method: 'POST' },
+  ))
+}
+
 export type BatchAdoptionResult = {
   productId: string
   status: 'ADOPTED' | 'SKIPPED' | 'FAILED'

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # SCRUM-85 demo path for the first half of the SOY story, over the public API only (no SQL).
 #
-#   reset           fresh Compose stack: drop the demo MySQL volume, rebuild, wait until healthy
+#   reset           start a new isolated Compose stack without deleting existing volumes
 #   fresh           reset, then spec-v2: the demo starts from released Spec V2 and nothing else
+#   fresh-ui        reset to the untouched baseline; create and release Spec V2 from the browser
 #   spec-v2         Data Admin creates and releases Chocolate Base Spec V2 (V1 + Soy lecithin);
 #                   this is the only seeded input — no adoption, finding, task or publication
 #   adopt SPEC      Data Admin adopts SPEC into FormulaVersion N+1 for every current product
@@ -19,8 +20,18 @@ API="${SPECTRACE_API:-http://127.0.0.1:${BACKEND_HOST_PORT:-8080}}"
 DATA_ADMIN="dev-external-admin"
 CHANGE_MANAGER="dev-external-change-manager"
 RULE_SET="ruleset_us_falcpa_demo_v1"
-# A separate project, so a reset never drops the everyday development volume.
-export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-spectrace-s4-demo}"
+# Each reset gets a new project by default. Existing project names are never
+# reused because doing so could attach the demo to an earlier database volume.
+if [[ -z "${COMPOSE_PROJECT_NAME:-}" ]]; then
+  COMPOSE_PROJECT_NAME="spectrace-s4-$(date -u +%Y%m%d%H%M%S)-$$-${RANDOM}"
+fi
+export COMPOSE_PROJECT_NAME
+DEMO_PREFIX="${DEMO_PREFIX:-FOOD-S4-$(date -u +%Y%m%d%H%M%S)-$$-${RANDOM}}"
+export DEMO_PREFIX
+if [[ ! "$DEMO_PREFIX" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*$ ]]; then
+  echo "DEMO_PREFIX must contain only letters, digits, underscores or hyphens and start with a letter or digit" >&2
+  exit 64
+fi
 cd "$(dirname "$0")/.."
 
 call() {
@@ -43,7 +54,7 @@ v1 = json.load(sys.stdin)
 components = [{"ingredientId": c["ingredient_id"], "rawPhrase": c["raw_phrase"], "matchRule": c["match_rule"]}
               for c in v1["components"]]
 components.append({"ingredientId": "ing_soy_lecithin", "rawPhrase": "Soy lecithin",
-                   "matchRule": "Supplier Spec V2 declaration"})
+                   "matchRule": __import__("os").environ["DEMO_PREFIX"] + " Supplier Spec V2 declaration"})
 print(json.dumps({"materialId": "mat_chocolate_base", "provenanceId": "prov_project_seed",
                   "effectiveDate": datetime.datetime.now(datetime.timezone.utc).date().isoformat(),
                   "components": components}))' <<<"$v1")"
@@ -59,7 +70,7 @@ adopt() {
 change() {
   call "$CHANGE_MANAGER" POST /api/v1/change-requests "$(printf '{"changeType":"INGREDIENT_SPEC",
     "supplierMaterialId":"mat_chocolate_base","previousSpecificationVersionId":"spec_chocolate_v1",
-    "targetSpecificationVersionId":"%s","description":"Chocolate Base Spec V2 adds Soy Lecithin"}' "$1")" \
+    "targetSpecificationVersionId":"%s","description":"%s: Chocolate Base Spec V2 adds Soy Lecithin"}' "$1" "$DEMO_PREFIX")" \
     | field changeRequestId
 }
 
@@ -71,6 +82,21 @@ compose() {
   if docker compose version >/dev/null 2>&1; then docker compose "$@"; else docker-compose "$@"; fi
 }
 
+assert_fresh_project() {
+  local containers volumes networks
+  if [[ ! "$COMPOSE_PROJECT_NAME" =~ ^[a-z0-9][a-z0-9_-]*$ ]]; then
+    echo "COMPOSE_PROJECT_NAME must contain only lowercase letters, digits, underscores or hyphens and start with a letter or digit" >&2
+    exit 64
+  fi
+  containers="$(docker ps -aq --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME")"
+  volumes="$(docker volume ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME")"
+  networks="$(docker network ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME")"
+  if [[ -n "$containers$volumes$networks" ]]; then
+    echo "Compose project '$COMPOSE_PROJECT_NAME' already has containers, volumes or networks; choose a new project name. Existing data was not changed." >&2
+    exit 73
+  fi
+}
+
 reset() {
   local port
   for port in MYSQL_HOST_PORT BACKEND_HOST_PORT FRONTEND_HOST_PORT; do
@@ -80,7 +106,7 @@ reset() {
   done
   export MYSQL_HOST_PORT="127.0.0.1:${MYSQL_HOST_PORT:-3307}" BACKEND_HOST_PORT="127.0.0.1:${BACKEND_HOST_PORT:-8080}" \
     FRONTEND_HOST_PORT="127.0.0.1:${FRONTEND_HOST_PORT:-5173}"
-  compose down -v --remove-orphans
+  assert_fresh_project
   compose up -d --build --wait
 }
 
@@ -93,6 +119,15 @@ case "${1:-}" in
   fresh)
     reset
     spec="$(spec_v2)"; echo "Spec V2 released: $spec"
+    echo "Compose project: $COMPOSE_PROJECT_NAME"
+    echo "Demo prefix: $DEMO_PREFIX"
+    echo "Demo ready: http://$FRONTEND_HOST_PORT"
+    ;;
+  fresh-ui)
+    reset
+    echo "Fresh browser baseline ready; no S4 specification or business records were written by this script."
+    echo "Compose project: $COMPOSE_PROJECT_NAME"
+    echo "Demo prefix: $DEMO_PREFIX"
     echo "Demo ready: http://$FRONTEND_HOST_PORT"
     ;;
   spec-v2) spec_v2 ;;

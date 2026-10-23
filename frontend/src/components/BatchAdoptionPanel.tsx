@@ -13,11 +13,20 @@ type TargetSpecification = {
   effective_date: string
 }
 
+function effectiveCalendarDate(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const date = value.slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null
+  const parsed = new Date(`${date}T00:00:00.000Z`)
+  return Number.isNaN(parsed.valueOf()) || parsed.toISOString().slice(0, 10) !== date ? null : date
+}
+
 function isReleasedTarget(row: Record<string, unknown>, today: string): row is Record<string, unknown> & TargetSpecification {
+  const effectiveDate = effectiveCalendarDate(row.effective_date)
   return typeof row.specification_version_id === 'string' &&
     typeof row.supplier_material_id === 'string' &&
     typeof row.version_number === 'number' && Number.isInteger(row.version_number) && row.lifecycle_status === 'RELEASED' &&
-    typeof row.effective_date === 'string' && row.effective_date <= today
+    effectiveDate !== null && effectiveDate <= today
 }
 
 export function BatchAdoptionPanel() {
