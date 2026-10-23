@@ -75,6 +75,8 @@ jobs:
     needs: [backend, frontend]
     steps:
       - uses: actions/checkout@v4
+      - name: Verify S4 demo project namespace guard without Docker
+        run: bash scripts/tests/s4-m1-spec-v2-demo-project-scope.test.sh
       - name: Validate Compose configuration
         run: docker compose config --quiet
       - name: Build application images
@@ -89,18 +91,8 @@ jobs:
         run: npm ci && npx playwright install --with-deps chromium
       - name: Start full stack
         run: docker compose up -d mysql backend frontend
-      - name: Seed only released specification input for the S3 browser scenario
-        shell: bash
-        run: |
-          set -euo pipefail
-          fixture_input="$(mktemp)"
-          sed '/^INSERT INTO formula_version/,$d' backend/src/test/resources/fixtures/s3-soy-spec-v2-adoption.sql > "$fixture_input"
-          test -s "$fixture_input"
-          if grep -Eiq 'INSERT INTO (formula_version|label_version|label_allergen_declaration|validation_run|review_task)' "$fixture_input"; then
-            echo "The S3 input fixture must not seed business outputs."
-            exit 1
-          fi
-          docker compose exec -T mysql sh -c 'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD" spectrace' < "$fixture_input"
+      # No SQL Spec V2 here: the S3 browser flow creates and releases it through the
+      # Data Admin specification UI, so this stack starts from the Flyway baseline.
       - name: Verify SCRUM-84 real demo identity switching against isolated stack
         working-directory: frontend
         env:

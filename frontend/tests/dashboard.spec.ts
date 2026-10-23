@@ -7,7 +7,7 @@ test('overview, chart switching and CSV export', async ({ page }) => {
   await expect(
     page.getByRole('heading', { name: 'Overview', exact: true }),
   ).toBeVisible()
-  await expect(page.getByText('Connected to the M1 read-only API', { exact: false })).toBeVisible()
+  await expect(page.getByText('Connected to the food catalog', { exact: false })).toBeVisible()
   await page.getByRole('button', { name: 'By group', exact: true }).click()
   await expect(page.locator('.bar-chart')).toHaveAttribute('aria-label', /Soy declared: 20/)
   await page.getByRole('button', { name: 'By material', exact: true }).click()

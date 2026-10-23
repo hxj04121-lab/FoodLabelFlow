@@ -10,7 +10,7 @@ export type CurrentIdentity = {
 }
 
 export type DemoIdentityOption = {
-  key: 'MAKER' | 'CHECKER' | 'PUBLISHER'
+  key: 'MAKER' | 'CHECKER' | 'PUBLISHER' | 'DATA_ADMIN' | 'CHANGE_MANAGER'
   subject: string
   actor: CurrentIdentity
 }
@@ -39,7 +39,7 @@ export async function getDemoIdentityOptions(signal?: AbortSignal): Promise<Demo
   if (!Array.isArray(value) || value.some(option => {
     if (!option || typeof option !== 'object') return true
     const candidate = option as Partial<DemoIdentityOption>
-    return !['MAKER', 'CHECKER', 'PUBLISHER'].includes(candidate.key ?? '')
+    return !['MAKER', 'CHECKER', 'PUBLISHER', 'DATA_ADMIN', 'CHANGE_MANAGER'].includes(candidate.key ?? '')
       || typeof candidate.subject !== 'string'
       || !candidate.actor || typeof candidate.actor !== 'object'
       || typeof candidate.actor.userId !== 'string'

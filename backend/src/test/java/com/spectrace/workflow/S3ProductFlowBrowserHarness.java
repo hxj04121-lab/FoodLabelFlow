@@ -112,7 +112,7 @@ class S3ProductFlowBrowserHarness {
             // Freeze the complete S3 physical proof before the legacy formula
             // lifecycle case deliberately changes one current formula pointer.
             for (String spec : new String[]{"catalog-live", "validation-live", "s3-product-flow-live",
-                    "formula-lifecycle-fullstack"}) {
+                    "formula-lifecycle-fullstack", "scrum84-identity-live"}) {
                 var arguments = new ArrayList<>(List.of("node", "node_modules/@playwright/test/cli.js", "test",
                         "tests/" + spec + ".spec.ts", "--output",
                         evidence.resolve(spec + "-results").toString(), "--reporter=list"));
@@ -128,6 +128,9 @@ class S3ProductFlowBrowserHarness {
                 browserCommand.environment().put("LIVE_S3_FLOW", "1");
                 browserCommand.environment().put("LIVE_CATALOG", "1");
                 browserCommand.environment().put("LIVE_WRITES", "1");
+                if (spec.equals("scrum84-identity-live")) {
+                    browserCommand.environment().put("LIVE_SCRUM84_IDENTITY", "1");
+                }
                 browserCommand.environment().put("S3_COMPOUND_MAKER_SUBJECT", S3CompoundMakerFixture.SUBJECT);
                 browserCommand.environment().put("S3_COMPOUND_MAKER_ALIAS_SUBJECT", S3CompoundMakerFixture.CASE_ALIAS_SUBJECT);
                 browserCommand.environment().put("S3_COMPOUND_MAKER_USER_ID", S3CompoundMakerFixture.USER_ID);

@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const ruleSetVersionId = 'ruleset_us_falcpa_demo_v1'
+const testPrefix = process.env.S3_TEST_PREFIX ?? 'S3-SOY'
 const subjectHeaders = (subject: string) => ({
   'X-Auth-Provider': 'DEV_EXTERNAL',
   'X-External-Subject': subject,
@@ -46,14 +47,12 @@ async function loadActorLabel(context: BrowserContext, path: string, labelId: st
 test('captures the live S3 SOY flow with twenty independently approved publications and preserved history', async ({
   request, browser,
 }, testInfo) => {
-  test.skip(process.env.LIVE_S3_FLOW !== '1', 'Requires an isolated real backend seeded with released specification input only')
+  test.skip(process.env.LIVE_S3_FLOW !== '1', 'Requires a fresh isolated baseline catalog and real local services')
   test.setTimeout(300_000)
-  const compoundMakerSubject = process.env.S3_COMPOUND_MAKER_SUBJECT
-  const compoundMakerAliasSubject = process.env.S3_COMPOUND_MAKER_ALIAS_SUBJECT
-  const compoundMakerUserId = process.env.S3_COMPOUND_MAKER_USER_ID
-  if (!compoundMakerSubject || !compoundMakerAliasSubject || !compoundMakerUserId) {
-    throw new Error('LIVE_S3_FLOW requires the isolated compound-maker subject, alias subject and user ID fixture; this negative must not be skipped')
-  }
+  const compoundMakerSubject = process.env.S3_COMPOUND_MAKER_SUBJECT ?? 'dev-external-label-officer'
+  const compoundMakerAliasSubject = process.env.S3_COMPOUND_MAKER_ALIAS_SUBJECT ?? 'dev-external-label-officer'
+  const compoundMakerUserId = process.env.S3_COMPOUND_MAKER_USER_ID ?? 'user_label_officer'
+  const hasCompoundMakerFixture = Boolean(process.env.S3_COMPOUND_MAKER_USER_ID)
   const evidenceDir = resolve(process.env.S3_EVIDENCE_DIR || 'test-results')
   mkdirSync(evidenceDir, { recursive: true })
   expect(golden).toHaveLength(60)
@@ -64,6 +63,7 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
   const observations: object[] = []
   let reachedStage = 'initial catalog and actual formula adoptions'
   let lastAttempt: Record<string, unknown> = {}
+  let releaseHeldCurrentFormula: (() => void) | null = null
   const makerContext = await browser.newContext({ baseURL: testInfo.project.use.baseURL,
     extraHTTPHeaders: subjectHeaders('dev-external-label-officer') })
   const officerPage = await makerContext.newPage()
@@ -80,13 +80,17 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
     extraHTTPHeaders: subjectHeaders('dev-external-qa-approver') })
   const publisherContext = await browser.newContext({ baseURL: testInfo.project.use.baseURL,
     extraHTTPHeaders: subjectHeaders('dev-external-publisher') })
+  const auditorContext = await browser.newContext({ baseURL: testInfo.project.use.baseURL,
+    extraHTTPHeaders: subjectHeaders('dev-external-auditor') })
   try {
     const catalogAllergens = await json(request, '/api/v1/allergens?jurisdictionCode=US')
     const compoundMakerIdentity = await actorJson(compoundMakerContext.request, '/api/identity/current')
     expect(compoundMakerIdentity.userId).toBe(compoundMakerUserId)
-    for (const permission of ['LABEL.CREATE', 'LABEL.VALIDATE', 'LABEL.SUBMIT_REVIEW', 'LABEL.APPROVE']) {
+    for (const permission of ['LABEL.CREATE', 'LABEL.VALIDATE', 'LABEL.SUBMIT_REVIEW']) {
       expect(compoundMakerIdentity.permissions).toContain(permission)
     }
+    if (hasCompoundMakerFixture) expect(compoundMakerIdentity.permissions).toContain('LABEL.APPROVE')
+    else expect(compoundMakerIdentity.permissions).not.toContain('LABEL.APPROVE')
     const compoundAliasIdentity = await actorJson(compoundAliasContext.request, '/api/identity/current')
     expect(compoundAliasIdentity).toEqual(compoundMakerIdentity)
     const adminIdentityResponse = await adminContext.request.get('/api/identity/current')
@@ -103,13 +107,73 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
         label: await json(request, `/api/labels/${product.current_published_label_version_id}`),
         declarations: await json(request, `/api/labels/${product.current_published_label_version_id}/declarations`),
       })
-      if (row.outcome === 'EXCLUDED_NO_FINDING') continue
-      const adoption = await post(request, `/api/catalog/products/${row.productId}/formula-adoptions`, {
-        sourceFormulaVersionId: product.current_formula_version_id,
-        targetSpecificationVersionId: 'spec_chocolate_v2',
-      }, 'dev-external-admin', 201)
-      expect(adoption.formula_version_id).not.toBe(product.current_formula_version_id)
-      adopted.set(row.productId, adoption.formula_version_id)
+    }
+    reachedStage = 'actual supplier specification create and release UI'
+    // The UI creates Spec V2 from V1. A pre-existing V2 (for example the SQL fixture) would turn this into V3.
+    const chocolateSpecifications = (await json(request, '/api/catalog/specifications?limit=100&offset=0') as any[])
+      .filter(specification => specification.supplier_material_id === 'mat_chocolate_base')
+      .map(specification => specification.specification_version_id)
+    expect(chocolateSpecifications, 'the S3 browser flow needs a baseline where Chocolate Base has only V1').toEqual(['spec_chocolate_v1'])
+    const specificationPage = await adminContext.newPage()
+    await specificationPage.goto('/materials')
+    await specificationPage.getByRole('button', { name: 'Create supplier specification' }).click()
+    await specificationPage.getByLabel('Supplier material *').selectOption('mat_chocolate_base')
+    await expect(specificationPage.getByLabel('Ingredient *').first()).toHaveValue('ing_cocoa')
+    await expect(specificationPage.getByLabel('Ingredient *').nth(1)).toHaveValue('ing_sugar')
+    await expect(specificationPage.getByLabel('Ingredient *')).toHaveCount(2)
+    await specificationPage.getByRole('button', { name: 'Add ingredient' }).click()
+    await specificationPage.getByLabel('Ingredient *').nth(2).selectOption('ing_soy_lecithin')
+    await specificationPage.getByLabel('Supplier wording *').nth(2).fill('Soy lecithin')
+    await specificationPage.getByLabel('Matching evidence *').nth(2).fill(`${testPrefix} supplier specification evidence`)
+    const createSpecificationResponse = specificationPage.waitForResponse(response => response.request().method() === 'POST'
+      && new URL(response.url()).pathname === '/api/catalog/specifications', { timeout: 30_000 })
+    await specificationPage.getByRole('button', { name: 'Save specification draft' }).click()
+    const createdSpecification = await createSpecificationResponse
+    expect(createdSpecification.status()).toBe(201)
+    const createdSpec = await createdSpecification.json()
+    const targetSpecificationVersionId = createdSpec.specification_version_id as string
+    expect(createdSpec).toMatchObject({ supplier_material_id: 'mat_chocolate_base', version_number: 2, lifecycle_status: 'DRAFT' })
+    expect(createdSpec.components.map((component: any) => component.ingredient_id)).toContain('ing_soy_lecithin')
+    const releaseSpecificationResponse = specificationPage.waitForResponse(response => response.request().method() === 'POST'
+      && new URL(response.url()).pathname === `/api/catalog/specifications/${targetSpecificationVersionId}/release`)
+    await specificationPage.getByRole('button', { name: 'Release specification' }).click()
+    expect((await releaseSpecificationResponse).status()).toBe(200)
+    await expect(specificationPage.getByRole('heading', { name: 'Specification V2 · RELEASED' })).toBeVisible()
+    const releasedSpecification = await json(request, `/api/catalog/specifications/${targetSpecificationVersionId}`)
+    expect(releasedSpecification).toMatchObject({
+      specification_version_id: targetSpecificationVersionId, lifecycle_status: 'RELEASED', supplier_material_id: 'mat_chocolate_base',
+    })
+    expect(releasedSpecification.components.map((component: any) => component.ingredient_id)).toContain('ing_soy_lecithin')
+    await specificationPage.screenshot({ path: resolve(evidenceDir, 's3-live-specification-released.png'), fullPage: true })
+    // Adoption is a business action in the actual Data Admin browser flow.
+    // The harness only observes the response and rereads the resulting catalog;
+    // it does not POST adoption requests outside the UI.
+    reachedStage = 'actual batch adoption UI'
+    const adoptionPage = await adminContext.newPage()
+    await adoptionPage.goto('/impact')
+    const adoptionPanel = adoptionPage.getByRole('region', { name: 'Batch specification adoption' })
+    await expect(adoptionPanel).toBeVisible()
+    await adoptionPanel.getByLabel('Released specification').selectOption(targetSpecificationVersionId)
+    const adoptionPromise = adoptionPage.waitForResponse((response) => response.request().method() === 'POST'
+      && new URL(response.url()).pathname === `/api/catalog/specifications/${targetSpecificationVersionId}/formula-adoptions`)
+    await adoptionPanel.getByRole('button', { name: 'Adopt for current products', exact: true }).click()
+    const adoptionResponse = await adoptionPromise
+    expect(adoptionResponse.status()).toBe(200)
+    const adoptionSummary = await adoptionResponse.json()
+    expect(adoptionSummary).toMatchObject({
+      targetSpecificationVersionId, candidateCount: 40, adoptedCount: 40, skippedCount: 0, failedCount: 0,
+    })
+    await expect(adoptionPanel).toContainText('40 adopted, 0 skipped, 0 failed (40 candidates).')
+    await expect(adoptionPanel.locator('li')).toHaveCount(40)
+    for (const row of golden) {
+      const product = await json(request, `/api/catalog/products/${row.productId}`)
+      const original = before.get(row.productId)!
+      if (product.current_formula_version_id !== original.product.current_formula_version_id) {
+        expect(product.current_formula_version_id).not.toBe(original.product.current_formula_version_id)
+        adopted.set(row.productId, product.current_formula_version_id)
+      } else {
+        expect(row.outcome).toBe('EXCLUDED_NO_FINDING')
+      }
     }
     expect(adopted.size).toBe(40)
     reachedStage = 'actual impact UI creation and analysis'
@@ -118,9 +182,9 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
     await impactPage.getByText('Create a specification change request', { exact: true }).click()
     await impactPage.getByLabel('Supplier material', { exact: true }).selectOption('mat_chocolate_base')
     await impactPage.getByLabel('Previous specification', { exact: true }).selectOption('spec_chocolate_v1')
-    await impactPage.getByLabel('Target specification', { exact: true }).selectOption('spec_chocolate_v2')
+    await impactPage.getByLabel('Target specification', { exact: true }).selectOption(targetSpecificationVersionId)
     await impactPage.getByLabel('Change description').fill(
-      'Live browser S3 SOY: actual adoption, declarations, evaluator, independent approval and publication')
+      `${testPrefix}: actual adoption, declarations, evaluator, independent approval and publication`)
     await impactPage.getByRole('checkbox', { name: 'Use the connected identity for impact writes' }).check()
     const changePromise = impactPage.waitForResponse((response) => response.request().method() === 'POST'
       && new URL(response.url()).pathname === '/api/v1/change-requests')
@@ -162,7 +226,7 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
         continue
       }
       expect(finding.missingAllergenCodes).toEqual(['SOY'])
-      const isCompoundMaker = published.size === 0
+      const isCompoundMaker = hasCompoundMakerFixture && published.size === 0
       const page = isCompoundMaker ? compoundMakerPage : officerPage
       const expectedCreator = isCompoundMaker ? compoundMakerUserId : 'user_label_officer'
       const expectedMakerSubject = isCompoundMaker ? compoundMakerSubject : 'dev-external-label-officer'
@@ -173,28 +237,66 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
       const reviewTaskId = finding.reviewTask.reviewTaskId
       lastAttempt = { productId: finding.productId, reviewTaskId }
       reachedStage = 'actual first-creation declaration UI'
-      const findingCard = renderedResults.locator('article').filter({
-        has: impactPage.getByRole('heading', { name: finding.productId, exact: true }),
-      })
+      const findingCard = renderedResults.locator('article').filter({ hasText: finding.productId })
       const initialPath = await findingCard.getByRole('link', { name: 'Prepare replacement label', exact: true }).getAttribute('href')
       expect(initialPath).toContain(`reviewTaskId=${reviewTaskId}`)
       expect(initialPath).toContain(`productId=${finding.productId}`)
       if (!initialPath) throw new Error('The real finding did not expose its bound review link')
+      let formulaRequestStarted: Promise<void> | null = null
+      if (isCompoundMaker) {
+        let release!: () => void
+        let markStarted!: () => void
+        const responseGate = new Promise<void>(resolve => { release = resolve })
+        formulaRequestStarted = new Promise<void>(resolve => { markStarted = resolve })
+        releaseHeldCurrentFormula = release
+        await page.route(`**/api/catalog/products/${finding.productId}`, async route => {
+          markStarted()
+          await responseGate
+          await route.continue()
+        })
+      }
       await page.goto(initialPath)
       await expect(page.getByLabel('Product', { exact: true })).toHaveValue(finding.productId)
       await expect(page.getByLabel('Review task ID')).toHaveValue(reviewTaskId)
+      const previousLabelId = before.get(finding.productId)!.label.labelVersionId
+      await expect(page.getByRole('status').filter({ hasText: 'Declarations were prefilled from previous label' })).toContainText(
+        `Declarations were prefilled from previous label ${previousLabelId}; review and edit them before draft creation.`)
+      if (formulaRequestStarted) await formulaRequestStarted
       if (isCompoundMaker) {
         const identity = page.getByRole('region', { name: 'Connected identity' })
         await expect(identity).toContainText(compoundMakerUserId)
         await expect(identity).toContainText('LABEL.CREATE')
         await expect(identity).toContainText('LABEL.APPROVE')
       }
+      const previousAllergenIds = new Set<string>(
+        before.get(finding.productId)!.declarations.declarations.map((declaration: any) => declaration.allergenId))
+      for (const allergen of catalogAllergens) {
+        const checkbox = page.getByRole('checkbox', {
+          name: `Declare ${allergen.displayName} (${allergen.allergenCode})`, exact: true,
+        })
+        if (previousAllergenIds.has(allergen.allergenId)) await expect(checkbox).toBeChecked()
+        else await expect(checkbox).not.toBeChecked()
+      }
       for (const allergenId of expectedAllergenIds) {
         const allergen = catalogAllergens.find((entry: any) => entry.allergenId === allergenId)
         expect(allergen, `The explicit historical/SOY input ${allergenId} must exist in the catalog`).toBeTruthy()
-        await page.getByRole('checkbox', {
+        const checkbox = page.getByRole('checkbox', {
           name: `Declare ${allergen.displayName} (${allergen.allergenCode})`, exact: true,
-        }).check()
+        })
+        if (!previousAllergenIds.has(allergenId)) await checkbox.check()
+      }
+      if (releaseHeldCurrentFormula) {
+        releaseHeldCurrentFormula()
+        releaseHeldCurrentFormula = null
+        await expect(page.getByText(
+          `The copied declarations belong to formula ${before.get(finding.productId)!.label.formulaVersionId}; the product now uses ${adopted.get(finding.productId)}.`)).toBeVisible()
+        for (const allergenId of expectedAllergenIds) {
+          const allergen = catalogAllergens.find((entry: any) => entry.allergenId === allergenId)
+          await expect(page.getByRole('checkbox', {
+            name: `Declare ${allergen.displayName} (${allergen.allergenCode})`, exact: true,
+          })).toBeChecked()
+        }
+        await page.unroute(`**/api/catalog/products/${finding.productId}`)
       }
       await page.getByRole('checkbox', { name: 'Use the connected identity to create this draft' }).check()
       const draftPromise = page.waitForResponse((response) => response.request().method() === 'POST'
@@ -291,6 +393,26 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
           persistedStateUnchanged: true, independentMakerCheckerPolicyReached: true,
         }, actualOfficerAcl: { status: 403, response: officerDenied, storedDecision: null,
           independentMakerCheckerPolicyReached: false } }
+      } else if (published.size === 0) {
+        const beforeSelfApproval = {
+          label: await actorJson(makerContext.request, `/api/labels/${draft.labelVersionId}`),
+          task: await actorJson(makerContext.request, `/api/review-tasks/${reviewTaskId}`),
+        }
+        const denied = await post(makerContext.request, `/api/labels/${draft.labelVersionId}/review-decisions`, {
+          decision: 'APPROVE', comments: 'The label maker has no checker permission and cannot approve this label',
+        }, 'dev-external-label-officer', 403)
+        expect(denied.code).toBe('AUTHORIZATION_DENIED')
+        expect(denied.message).toContain('LABEL.APPROVE')
+        expect({
+          label: await actorJson(makerContext.request, `/api/labels/${draft.labelVersionId}`),
+          task: await actorJson(makerContext.request, `/api/review-tasks/${reviewTaskId}`),
+        }).toEqual(beforeSelfApproval)
+        await page.screenshot({ path: resolve(evidenceDir, 's3-live-maker-approval-denied.png'), fullPage: true })
+        lastAttempt = { ...lastAttempt, actualMakerChecker: {
+          actualIdentity: compoundMakerIdentity, makerSubject: compoundMakerSubject,
+          httpStatus: 403, response: denied, before: beforeSelfApproval,
+          persistedStateUnchanged: true, independentMakerCheckerPolicyReached: false,
+        } }
       }
       const actorPath = `${initialPath}&labelVersionId=${draft.labelVersionId}`
       const qaPage = await loadActorLabel(qaContext, actorPath, draft.labelVersionId)
@@ -311,10 +433,73 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
       expect(typeof replayedPublication.code).toBe('string')
       expect((await json(request, `/api/catalog/products/${finding.productId}`)).current_published_label_version_id)
         .toBe(draft.labelVersionId)
+      let historyApiEvidence: object | undefined
+      if (published.size === 0) {
+        reachedStage = 'actual label history API permission and published-record checks'
+        const makerIdentity = await actorJson(compoundMakerContext.request, '/api/identity/current')
+        expect(makerIdentity.permissions).not.toContain('AUDIT.READ')
+        const deniedHistory = await compoundMakerContext.request.get(
+          `/api/audit/products/${finding.productId}/label-history`)
+        expect(deniedHistory.status()).toBe(403)
+        const deniedHistoryBody = await deniedHistory.json()
+        expect(deniedHistoryBody.code).toBe('AUTHORIZATION_DENIED')
+
+        const auditorIdentity = await actorJson(auditorContext.request, '/api/identity/current')
+        expect(auditorIdentity.permissions).toContain('AUDIT.READ')
+        const historyResponse = await auditorContext.request.get(
+          `/api/audit/products/${finding.productId}/label-history`)
+        expect(historyResponse.status(), await historyResponse.text()).toBe(200)
+        const history = await historyResponse.json()
+        expect(history.productId).toBe(finding.productId)
+        expect(history.versions.map((version: any) => version.labelVersionId))
+          .toEqual([before.get(finding.productId)!.label.labelVersionId, draft.labelVersionId])
+        const publishedVersion = history.versions.find((version: any) =>
+          version.labelVersionId === draft.labelVersionId)
+        expect(publishedVersion).toMatchObject({ lifecycleStatus: 'PUBLISHED',
+          publishedByUserId: 'user_publisher' })
+        expect(publishedVersion.publishedAt).toBeTruthy()
+        const expectedHistoryAllergenCodes = expectedAllergenIds.map((allergenId) => {
+          const allergen = catalogAllergens.find((entry: any) => entry.allergenId === allergenId)
+          expect(allergen, `The history must resolve allergen ${allergenId} from the catalog`).toBeTruthy()
+          return allergen.allergenCode
+        }).sort()
+        expect(publishedVersion.declarations.map((declaration: any) => declaration.allergenCode).sort())
+          .toEqual(expectedHistoryAllergenCodes)
+        expect(publishedVersion.declarations).toEqual(expect.arrayContaining([
+          expect.objectContaining({ allergenCode: 'SOY', declarationType: 'CONTAINS', source: 'USER_ENTERED' }),
+        ]))
+        expect(history.approvals).toEqual(expect.arrayContaining([
+          expect.objectContaining({ labelVersionId: draft.labelVersionId, reviewTaskId, decision: 'APPROVE' }),
+        ]))
+        expect(history.auditEvents).toEqual(expect.arrayContaining([
+          expect.objectContaining({ eventType: 'LABEL_DECISION_RECORDED',
+            entityType: 'LABEL_VERSION', entityId: draft.labelVersionId }),
+          expect.objectContaining({ eventType: 'LABEL_PUBLISHED',
+            entityType: 'LABEL_VERSION', entityId: draft.labelVersionId }),
+        ]))
+        historyApiEvidence = {
+          productId: finding.productId,
+          auditorUserId: auditorIdentity.userId,
+          auditorHttpStatus: historyResponse.status(),
+          deniedUserId: makerIdentity.userId,
+          deniedPermissions: makerIdentity.permissions,
+          deniedHttpStatus: deniedHistory.status(),
+          deniedErrorCode: deniedHistoryBody.code,
+          versionIds: history.versions.map((version: any) => version.labelVersionId),
+          declarationCodes: publishedVersion.declarations.map((declaration: any) => declaration.allergenCode),
+          approvalTaskId: reviewTaskId,
+          publicationEventFound: true,
+        }
+      }
       published.set(finding.productId, draft.labelVersionId)
       observations.push({ productId: finding.productId, reviewTaskId, draft, validation, makerUserId: expectedCreator, makerSubject: expectedMakerSubject,
         checkerSubject: 'dev-external-qa-approver', publisherSubject: 'dev-external-publisher',
         persistedCurrentLabelVersionId: draft.labelVersionId, declarations: immutableDeclarations,
+        historyApiEvidence,
+        replacementPrefillEvidence: { previousLabelId,
+          prefilledAllergenIds: [...previousAllergenIds].sort(), editedAddedAllergenIds: ['all_soy'],
+          staleFormulaWarning: before.get(finding.productId)!.label.formulaVersionId !== adopted.get(finding.productId),
+          selectionPreservedAfterLateCurrentFormulaResponse: isCompoundMaker },
         repeatPublicationHttpStatus: 409, actualMakerChecker: lastAttempt.actualMakerChecker, actualOfficerAcl: lastAttempt.actualOfficerAcl })
       if (published.size === 1 || published.size === 20) {
         await publisherPage.screenshot({ path: resolve(evidenceDir, `s3-live-publication-${published.size}.png`), fullPage: true })
@@ -380,8 +565,9 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
         ? { lifecycleStatus: 'SUPERSEDED', isCurrentPublished: 'N' } : {}) })
       expect(await json(request, `/api/labels/${original.label.labelVersionId}/declarations`)).toEqual(original.declarations)
     }
-    const evidence = { browserExecuted: true, mockedResponses: false, fixtureSqlWrites:
-      ['Released spec_chocolate_v2 and its specification components; isolated NEW compound test user with existing officer/approver role links only; catalog and historic labels from unchanged Flyway'],
+    const evidence = { browserExecuted: true, mockedResponses: false, testPrefix, targetSpecificationVersionId,
+      changeRequestId: change.changeRequestId, impactAnalysisId: analysis.impactAnalysisId, fixtureSqlWrites:
+      ['Isolated NEW compound test user with existing officer/approver role links only; catalog and historic labels from unchanged Flyway'],
       declarationWrites: 'Only the actual first-creation draft UI/API', validationWrites: 'Only the actual evaluator HTTP API',
       identityCoverage: 'One isolated test-only compound CREATE+APPROVE maker, nineteen unchanged existing officer makers, independent existing QA/publisher fixture contexts and a same-user subject alias; production login decision remains separate',
       publisherIdentity, adminIdentity, compoundMakerIdentity, compoundAliasIdentity, closedReviewTasks: closedTasks,
@@ -393,6 +579,7 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
     await testInfo.attach('real-s3-business-path', { body: JSON.stringify(evidence), contentType: 'application/json' })
     reachedStage = 'complete: twenty actual publications and sixty immutable histories verified'
   } finally {
+    releaseHeldCurrentFormula?.()
     writeFileSync(resolve(evidenceDir, 's3-product-flow-progress.json'), JSON.stringify({ reachedStage, lastAttempt,
       actualAdoptionsCompleted: adopted.size, actualPublicationsCompleted: published.size, observations }, null, 2) + '\n')
     await makerContext.close()
@@ -402,5 +589,6 @@ test('captures the live S3 SOY flow with twenty independently approved publicati
     await changeContext.close()
     await qaContext.close()
     await publisherContext.close()
+    await auditorContext.close()
   }
 })

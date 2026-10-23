@@ -33,7 +33,7 @@ test('impact preparation link opens the existing materials workflow by keyboard'
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/\/materials$/)
   await expect(page.getByRole('heading', { name: 'Materials & specs', exact: true })).toBeVisible()
-  await expect(page.getByText('Connected to the M1 read-only API')).toBeVisible()
+  await expect(page.getByText('Connected to the food catalog')).toBeVisible()
 })
 
 test('impact foundation fits desktop and mobile navigation', async ({ page }) => {
