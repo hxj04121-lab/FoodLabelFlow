@@ -5,6 +5,7 @@ import {
   type LabelDraft,
   type ValidationRun,
 } from '@/api/labels'
+import { demoOriginDisabledMessage, isLocalDemoHost } from '@/lib/local-demo'
 import { Panel, SectionHead } from '@/components/catalog-shared'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -39,7 +40,7 @@ export function LabelValidationPanel({ draft, onRunChange, identityState }: {
   const [error, setError] = useState('')
   const [uncertain, setUncertain] = useState(false)
   const writeLock = useRef(false)
-  const local = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname)
+  const local = isLocalDemoHost()
   const connected = identityState?.status === 'ready'
   const canValidate = connected && identityState?.status === 'ready' && identityState.actor.permissions.includes('LABEL.VALIDATE')
 
@@ -151,7 +152,7 @@ export function LabelValidationPanel({ draft, onRunChange, identityState }: {
           </label>
           {!local && (
             <p role="alert">
-              Validation writes are disabled outside localhost. Configure approved authentication before deployment.
+              {demoOriginDisabledMessage}
             </p>
           )}
           {error && (

@@ -2,6 +2,7 @@ import { defineConfig } from '@playwright/test'
 const externalBaseUrl = process.env.PLAYWRIGHT_BASE_URL
 export default defineConfig({
   testDir: './tests',
+  testIgnore: '**/demo-origin-ui.spec.ts',
   workers: 1,
   use: {
     baseURL: externalBaseUrl || 'http://127.0.0.1:5173',

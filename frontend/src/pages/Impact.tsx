@@ -1,5 +1,6 @@
 import { createChangeRequest, getChangeRequest, getImpactAnalysis, listChangeRequests, runImpactAnalysis,
   type ChangeRequest, type ImpactAnalysis } from '@/api/impact'
+import { demoOriginDisabledMessage, isLocalDemoHost } from '@/lib/local-demo'
 import { LabelApiError } from '@/api/labels'
 import { Panel, SectionHead } from '@/components/catalog-shared'
 import { Badge } from '@/components/ui/badge'
@@ -41,7 +42,7 @@ export function Impact() {
   const manualRead = useRef<AbortController | null>(null)
   const [restoring, setRestoring] = useState(false)
   const [exactChange, setExactChange] = useState<ChangeRequest | null>(null)
-  const local = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname)
+  const local = isLocalDemoHost()
   const identity = useCurrentIdentity()
   const identityGeneration = identity.session.generation
   const activeIdentity = useRef(identityGeneration)
@@ -281,7 +282,7 @@ export function Impact() {
           <Button disabled={!local || !identityEnabled || !identity.hasPermission('CHANGE_REQUEST.CREATE') || busy || restoring || !!uncertainCreate || !!uncertainRun || specificationsLoading || !previousId || !targetId || previousId === targetId || !description.trim()} onClick={create}>Create change request</Button>
           {uncertainCreate && <Button variant="outline" disabled={!local || !identityEnabled || !identity.hasPermission('CHANGE_REQUEST.CREATE') || busy || restoring || !!uncertainRun} onClick={create}>Retry the same change request</Button>}
         </div></details>
-        {!local && <p role="alert">Impact writes are disabled outside localhost until approved authentication is connected.</p>}
+        {!local && <p role="alert">{demoOriginDisabledMessage}</p>}
         {error && <p className="error-notice" role="alert">{error}</p>}
         <p aria-live="polite">{message}</p>
       </div></Panel>
