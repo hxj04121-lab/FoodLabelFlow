@@ -53,7 +53,8 @@ uses the development header identities and must only target a loopback demo stac
 
 ## Open dependencies (not M1 scope)
 
-- SCRUM-87 (M3): browser entry point for batch adoption, names, and the outcome filter on the impact page.
-- SCRUM-88 (M4): Change Manager / Data Admin entries in the demo identity switch.
-- SCRUM-89 (M5): the full reset/regression receipt, and an independent rehearsal on the merged SHA.
+- SCRUM-87 (M3): browser entry point for batch adoption, names, and the outcome filter on the impact page. Delivered in PR #92.
+- SCRUM-88 (M4): Change Manager / Data Admin entries in the demo identity switch. Delivered in PR #92.
+- SCRUM-89 (M5): the full reset/regression receipt, and an independent rehearsal on the merged SHA. Still open; the
+  browser walkthrough is in the [S4 demo runbook](S4-demo-runbook.md).
 - CI on the PR for this branch is the authoritative gate before SCRUM-85 is moved to Done.
