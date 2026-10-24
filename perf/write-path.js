@@ -7,7 +7,7 @@
 //   ITERATIONS         default 3
 //   EXPECT_PRODUCTS    expected adopted/relevant product count (default 40, the demo golden result)
 //   THRESHOLDS=off     measure without pass/fail thresholds
-import { check } from 'k6';
+import { check, sleep } from 'k6';
 import exec from 'k6/execution';
 import { Trend } from 'k6/metrics';
 import { CHANGE_MANAGER, DATA_ADMIN, RULE_SET, enforce, getJson, postJson } from './lib.js';
@@ -25,8 +25,9 @@ export const options = {
     ? {
         http_req_failed: ['rate<0.01'],
         checks: ['rate==1.0'],
-        batch_adoption_duration: ['p(95)<__BATCH_ADOPTION__'],
-        impact_run_duration: ['p(95)<__IMPACT_RUN__'],
+        // About 4x the warm p95 measured locally (240 ms / 110 ms): CI runs a single, cold iteration.
+        batch_adoption_duration: ['p(95)<1000'],
+        impact_run_duration: ['p(95)<500'],
       }
     : { batch_adoption_duration: ['max>=0'], impact_run_duration: ['max>=0'] },
   summaryTrendStats: ['avg', 'min', 'med', 'p(90)', 'p(95)', 'p(99)', 'max'],
@@ -76,4 +77,6 @@ export default function (data) {
     [`impact ${EXPECT} relevant`]: (i) => i.status === 'COMPLETED' && i.relevantProductCount === EXPECT,
     'impact splits NO_ACTION / REVIEW_REQUIRED': (i) => i.noActionCount + i.reviewRequiredCount === i.relevantProductCount,
   });
+  // Spaces the iterations out; also gives the web dashboard enough samples to export a report.
+  sleep(3);
 }

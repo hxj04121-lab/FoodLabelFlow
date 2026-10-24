@@ -54,10 +54,14 @@ mkdir -p "$out"
   echo "host=$(uname -sm) started=$(date -u +%FT%TZ)"
 } > "$out/context.env"
 
-# The dashboard export needs no listening port beyond the run; keep it on loopback.
+# The dashboard listens only during the run, on loopback. Its export needs at least one
+# aggregation period, so the short write path aggregates every second.
+set +e
+K6_WEB_DASHBOARD_PERIOD="${K6_WEB_DASHBOARD_PERIOD:-$([[ "$script" == write-path ]] && echo 1s || echo 10s)}" \
 K6_WEB_DASHBOARD=true K6_WEB_DASHBOARD_HOST=127.0.0.1 K6_WEB_DASHBOARD_OPEN=false \
 K6_WEB_DASHBOARD_EXPORT="$out/report.html" \
   k6 run --quiet --summary-export "$out/summary.json" -e BASE_URL="$SPECTRACE_API" "$@" "perf/$script.js" 2>&1 | tee "$out/k6.log"
 status="${PIPESTATUS[0]}"
+set -e
 echo "Results: $out"
 exit "$status"

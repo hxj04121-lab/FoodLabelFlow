@@ -194,6 +194,35 @@ jobs:
           -Ds3.checkout="$GITHUB_WORKSPACE"
           -Ds3.browser.evidence="$GITHUB_WORKSPACE/frontend/test-results/explicit-harness"
           test
+      - uses: grafana/setup-k6-action@v1
+        with:
+          k6-version: '2.3.0'
+      # Runs last on its own fresh stack: the perf setup adopts Spec V2 for every product,
+      # which the browser journeys above must not see. Thresholds come from perf/*.js.
+      - name: Perf smoke (k6) against a fresh Compose stack
+        shell: bash
+        env:
+          SPECTRACE_API: http://127.0.0.1:8080
+          PROFILE: smoke
+        run: |
+          set -euo pipefail
+          docker compose up -d --wait --wait-timeout 180 mysql backend
+          PERF_RESULTS_DIR=perf/results/read-mix perf/run.sh read-mix
+          PERF_RESULTS_DIR=perf/results/write-path ITERATIONS=1 perf/run.sh write-path
+      - name: Publish perf smoke summary
+        if: always()
+        shell: bash
+        run: |
+          if compgen -G 'perf/results/*/summary.json' >/dev/null; then
+            { echo "## k6 perf smoke @ ${GITHUB_SHA}"; python3 perf/summarize.py perf/results/*/summary.json; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload perf smoke results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-smoke-${{ github.sha }}
+          path: perf/results
+          if-no-files-found: warn
       - name: Show container logs on failure
         if: failure()
         run: |

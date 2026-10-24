@@ -34,15 +34,16 @@ if (!profiles[PROFILE]) throw new Error(`unknown PROFILE ${PROFILE}`);
 if (PROFILE !== 'ramp' && __ENV.VUS) scenario.vus = Number(__ENV.VUS);
 if (PROFILE !== 'ramp' && __ENV.DURATION) scenario.duration = __ENV.DURATION;
 
-// Per-endpoint p95 limits come from the measured baseline in
-// docs/evidence/S4-performance-and-autoscaling.md, with headroom for slower CI runners.
+// Per-endpoint p95 limits: about 3x the p95 measured with the capacity profile (20 VUs, no think
+// time, ~990 req/s on one backend), rounded up, as headroom for cold JVMs and shared CI runners.
+// Measurements: docs/evidence/S4-performance-and-autoscaling.md.
 const thresholds = {
   http_req_failed: ['rate<0.01'],
   checks: ['rate>0.99'],
-  'http_req_duration{name:catalog_list}': ['p(95)<__CATALOG_LIST__'],
-  'http_req_duration{name:product_detail}': ['p(95)<__PRODUCT_DETAIL__'],
-  'http_req_duration{name:impact_report}': ['p(95)<__IMPACT_REPORT__'],
-  'http_req_duration{name:label_history}': ['p(95)<__LABEL_HISTORY__'],
+  'http_req_duration{name:catalog_list}': ['p(95)<100'],
+  'http_req_duration{name:product_detail}': ['p(95)<75'],
+  'http_req_duration{name:impact_report}': ['p(95)<200'],
+  'http_req_duration{name:label_history}': ['p(95)<150'],
 };
 
 // With THRESHOLDS=off the per-endpoint entries still exist (always true) so the
