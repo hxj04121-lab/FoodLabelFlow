@@ -30,7 +30,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /** Real HTTP serialization, resolver and identity service; only the persistence port is mocked. */
 class DemoIdentityHttpTest {
     private static final List<String> DEMO_SUBJECTS = List.of(
-            "dev-external-label-officer", "dev-external-qa-approver", "dev-external-publisher");
+            "dev-external-label-officer", "dev-external-qa-approver", "dev-external-publisher",
+            "dev-external-admin", "dev-external-change-manager");
     private final IdentityRepository repository = mock(IdentityRepository.class);
 
     private MockMvc mvc(boolean demoEnabled, String runtime, String... profiles) {
@@ -50,6 +51,10 @@ class DemoIdentityHttpTest {
                     Set.of("QA_APPROVER"), Set.of("LABEL.REVIEW", "LABEL.APPROVE"));
             case 2 -> new AuthenticatedActor("mapped-publisher", "publisher", "Mapped Publisher",
                     Set.of("LABEL_PUBLISHER"), Set.of("LABEL.REVIEW", "LABEL.PUBLISH"));
+            case 3 -> new AuthenticatedActor("mapped-data-admin", "data.admin", "Mapped Data Admin",
+                    Set.of("ADMIN_DATA_MAINTENANCE"), Set.of("DATA.MAINTAIN", "FORMULA.RELEASE", "RULE_SET.MAINTAIN"));
+            case 4 -> new AuthenticatedActor("mapped-change-manager", "change.manager", "Mapped Change Manager",
+                    Set.of("CHANGE_MANAGER"), Set.of("CHANGE_REQUEST.CREATE", "IMPACT.RUN"));
             default -> throw new IllegalArgumentException("Unknown demo actor");
         };
     }
@@ -62,13 +67,13 @@ class DemoIdentityHttpTest {
     }
 
     @Test
-    void enabledDemoOptionsExposeExactlyTheMappedMakerCheckerAndPublisher() throws Exception {
+    void enabledDemoOptionsExposeExactlyTheMappedDemoActorsWithoutGrantingOtherRoles() throws Exception {
         mapDemoActors();
         ResultActions result = mvc(true, "development").perform(get("/api/identity/demo-options")
                 .header("X-User-Id", "admin").header("X-Role", "ADMIN")
                 .header("X-Permissions", "LABEL.APPROVE,LABEL.PUBLISH").param("userId", "admin"));
-        result.andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(3));
-        List<String> keys = List.of("MAKER", "CHECKER", "PUBLISHER");
+        result.andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(5));
+        List<String> keys = List.of("MAKER", "CHECKER", "PUBLISHER", "DATA_ADMIN", "CHANGE_MANAGER");
         for (int index = 0; index < keys.size(); index++) {
             AuthenticatedActor expected = actor(index);
             String option = "$[" + index + "]";
@@ -88,7 +93,7 @@ class DemoIdentityHttpTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {0, 1, 2})
+    @ValueSource(ints = {0, 1, 2, 3, 4})
     void selectingADemoSubjectUsesItsMappedIdentityAndIgnoresClientPrivileges(int index) throws Exception {
         mapDemoActors();
         AuthenticatedActor expected = actor(index);
@@ -150,7 +155,7 @@ class DemoIdentityHttpTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {0, 1, 2})
+    @ValueSource(ints = {0, 1, 2, 3, 4})
     void unavailableDemoMappingRejectsTheWholeOptionList(int missingIndex) throws Exception {
         mapDemoActors();
         when(repository.findActiveActorByExternalSubject("DEV_EXTERNAL", DEMO_SUBJECTS.get(missingIndex)))

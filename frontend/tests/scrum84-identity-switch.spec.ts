@@ -10,6 +10,16 @@ const identities = {
   'dev-external-label-officer': { userId: 'user_label_officer', username: 'label.officer', displayName: 'Demo Label Officer', roles: ['LABEL_OFFICER'], permissions: ['LABEL.CREATE', 'LABEL.VALIDATE', 'LABEL.SUBMIT_REVIEW'] },
   'dev-external-qa-approver': { userId: 'user_approver', username: 'qa.approver', displayName: 'Demo Approver', roles: ['APPROVER'], permissions: ['LABEL.APPROVE', 'LABEL.REQUEST_CHANGES'] },
   'dev-external-publisher': { userId: 'user_publisher', username: 'publication.manager', displayName: 'Demo Publisher', roles: ['PUBLISHER'], permissions: ['LABEL.PUBLISH'] },
+  'dev-external-admin': { userId: 'user_admin', username: 'data.admin', displayName: 'Demo Admin/Data Maintenance', roles: ['ADMIN_DATA_MAINTENANCE'], permissions: ['DATA.MAINTAIN', 'FORMULA.RELEASE', 'RULE_SET.MAINTAIN'] },
+  'dev-external-change-manager': { userId: 'user_change_manager', username: 'change.manager', displayName: 'Demo Change Manager', roles: ['CHANGE_MANAGER'], permissions: ['CHANGE_REQUEST.CREATE', 'IMPACT.RUN'] },
+} as const
+
+const demoIdentityKeys = {
+  'dev-external-label-officer': 'MAKER',
+  'dev-external-qa-approver': 'CHECKER',
+  'dev-external-publisher': 'PUBLISHER',
+  'dev-external-admin': 'DATA_ADMIN',
+  'dev-external-change-manager': 'CHANGE_MANAGER',
 } as const
 
 test('demo identity switch reloads the verified actor and clears previous permissions', async ({ page }) => {
@@ -24,8 +34,7 @@ test('demo identity switch reloads the verified actor and clears previous permis
     await route.fulfill({ json: identities[subject as keyof typeof identities] })
   })
   await page.route('**/api/identity/demo-options', route => route.fulfill({ json: Object.entries(identities).map(([subject, actor]) => ({
-    key: subject.includes('label-officer') ? 'MAKER' : subject.includes('qa-approver') ? 'CHECKER' : 'PUBLISHER',
-    subject, actor,
+    key: demoIdentityKeys[subject as keyof typeof demoIdentityKeys], subject, actor,
   })) }))
   await page.goto('/reviews')
   await expect(page.getByText('Demo Label Officer').first()).toBeVisible()
@@ -35,14 +44,24 @@ test('demo identity switch reloads the verified actor and clears previous permis
   await page.getByRole('combobox', { name: 'Demo identity' }).selectOption('PUBLISHER')
   await expect(page.getByText('Demo Publisher').first()).toBeVisible()
   await expect(page.getByText('Demo Approver')).toHaveCount(0)
+  await page.getByRole('combobox', { name: 'Demo identity' }).selectOption('DATA_ADMIN')
+  await expect(page.getByText('Demo Admin/Data Maintenance').first()).toBeVisible()
+  const connected = page.getByRole('region', { name: 'Connected identity' })
+  await expect(connected).toContainText('DATA.MAINTAIN')
+  await expect(connected).not.toContainText('LABEL.PUBLISH')
+  await page.getByRole('combobox', { name: 'Demo identity' }).selectOption('CHANGE_MANAGER')
+  await expect(page.getByText('Demo Change Manager').first()).toBeVisible()
+  await expect(connected).toContainText('IMPACT.RUN')
+  await expect(connected).not.toContainText('DATA.MAINTAIN')
   expect(seenSubjects).toContain('dev-external-label-officer')
   expect(seenSubjects).toContain('dev-external-qa-approver')
   expect(seenSubjects).toContain('dev-external-publisher')
+  expect(seenSubjects).toContain('dev-external-admin')
+  expect(seenSubjects).toContain('dev-external-change-manager')
   await page.reload()
-  await expect(page.getByRole('combobox', { name: 'Demo identity' })).toHaveValue('PUBLISHER')
-  const connected = page.getByRole('region', { name: 'Connected identity' })
-  await expect(connected).toContainText('Demo Publisher')
-  await expect(connected).toContainText('LABEL.PUBLISH')
+  await expect(page.getByRole('combobox', { name: 'Demo identity' })).toHaveValue('CHANGE_MANAGER')
+  await expect(connected).toContainText('Demo Change Manager')
+  await expect(connected).toContainText('CHANGE_REQUEST.CREATE')
   await expect(connected).not.toContainText('LABEL.CREATE')
 })
 
@@ -68,8 +87,7 @@ test('late initial Maker identity response cannot overwrite a verified Checker',
     }
   })
   await page.route('**/api/identity/demo-options', route => route.fulfill({ json: Object.entries(identities).map(([subject, actor]) => ({
-    key: subject.includes('label-officer') ? 'MAKER' : subject.includes('qa-approver') ? 'CHECKER' : 'PUBLISHER',
-    subject, actor,
+    key: demoIdentityKeys[subject as keyof typeof demoIdentityKeys], subject, actor,
   })) }))
   try {
     await page.goto('/reviews')
@@ -102,8 +120,7 @@ test('switching identities clears ReviewTask details and rejects a late previous
     return route.fulfill({ status: 401, json: { code: 'AUTHENTICATION_REQUIRED' } })
   })
   await page.route('**/api/identity/demo-options', route => route.fulfill({ json: Object.entries(identities).map(([subject, actor]) => ({
-    key: subject.includes('label-officer') ? 'MAKER' : subject.includes('qa-approver') ? 'CHECKER' : 'PUBLISHER',
-    subject, actor,
+    key: demoIdentityKeys[subject as keyof typeof demoIdentityKeys], subject, actor,
   })) }))
   await page.route('**/api/review-tasks?*', route => route.fulfill({ json: [] }))
   await page.route('**/api/review-tasks/old-maker-task', async route => {
@@ -150,7 +167,7 @@ test('switching identity rereads the saved impact context and ignores the old ac
       : { status: 401, json: { code: 'AUTHENTICATION_REQUIRED' } })
   })
   await page.route('**/api/identity/demo-options', route => route.fulfill({ json: Object.entries(identities).map(([subject, actor]) => ({
-    key: subject.includes('label-officer') ? 'MAKER' : subject.includes('qa-approver') ? 'CHECKER' : 'PUBLISHER', subject, actor,
+    key: demoIdentityKeys[subject as keyof typeof demoIdentityKeys], subject, actor,
   })) }))
   await page.route('**/api/v1/change-requests?*', route => route.fulfill({ json: [change] }))
   await page.route('**/api/v1/change-requests/identity-change', route => route.fulfill({ json: change }))

@@ -11,6 +11,7 @@ until that bridge is installed. No request accepts a trusted actor ID.
 | --- | --- | --- |
 | GET/POST | /suppliers | paginated list / create |
 | GET | /suppliers/{id} | supplier |
+| GET | /ingredients | canonical ingredients for specification authoring |
 | GET/POST | /materials | paginated list / create |
 | GET | /materials/{id} | material |
 | GET/POST | /specifications | paginated list / draft create |

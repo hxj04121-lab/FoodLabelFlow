@@ -16,7 +16,7 @@ changes from that candidate are not included here; they belong to SCRUM-87/88/89
 | Schema | `V11__idempotent_batch_formula_adoption.sql`: `formula_adoption_batch_item`, primary key `(product_id, target_specification_version_id)`, with foreign keys to the product, the source and result formulas, and the target specification. |
 | Impact read model | Each finding carries `productDisplayName`, the current catalog `product_description`, resolved through `RelevantProductLookupPort.findProductDisplayNames` when the response is built. It is not persisted, so stored run evidence is unchanged. A missing name is a server fault. The PR #89 fallback that reused the product ID as the name was removed. |
 | Review-required filter | Served by the existing `outcome` discriminator and `reviewRequiredCount`, as M2's frozen impact contract 1.1.0 specifies. No new query parameter. |
-| Demo path | [`scripts/s4-m1-spec-v2-demo.sh`](../../scripts/s4-m1-spec-v2-demo.sh): `reset` (separate Compose project `spectrace-s4-demo`, volume dropped), `spec-v2` (the only seeded input), `adopt`, `change`, `impact`, `all`. API only, no SQL. |
+| Demo path | [`scripts/s4-m1-spec-v2-demo.sh`](../../scripts/s4-m1-spec-v2-demo.sh): `reset` (a new, uniquely named `spectrace-s4-*` Compose project on loopback ports; earlier demo stacks are stopped, never deleted), `fresh` (`reset` + `spec-v2`), `spec-v2` (the only seeded input), `adopt`, `change`, `impact`, `all`, plus `list`, `down` (containers only) and `purge` (deletes a project's data after typed confirmation). API only, no SQL. Updated in PR #92; the original #91 `reset` dropped a fixed project's volume. |
 | A07 | [Adopt a Released Specification for Current Products](S4-M1-A07-adopt-specification-for-current-products.md): use case, analysis/design class, design sequence, and the per-product Unit of Work + idempotency-key decision. The [final-report index](S4-final-report-index-20261010.md) M1 row now links it. |
 
 ## Acceptance criteria
@@ -43,9 +43,11 @@ Local Testcontainers note: Colima needs
 ## Demo operator steps
 
 ```bash
-scripts/s4-m1-spec-v2-demo.sh reset      # fresh demo stack on :8080 / :5173
-scripts/s4-m1-spec-v2-demo.sh spec-v2    # prints the released Spec V2 id; the only seeded input
+scripts/s4-m1-spec-v2-demo.sh fresh      # new isolated stack on 127.0.0.1:8080 / :5173, then releases Spec V2 (the only seeded input)
 ```
+
+`fresh` prints the Compose project and Spec V2 id. Earlier demo stacks are stopped first and
+keep their data; see the [S4 demo runbook](S4-demo-runbook.md) for `list`, `down` and `purge`.
 
 Then, live, as the Data Admin and Change Manager, either in the browser (M3 entry points,
 M4 identity options) or with `adopt <spec>`, `change <spec>` and `impact <cr>`. The script
@@ -53,7 +55,8 @@ uses the development header identities and must only target a loopback demo stac
 
 ## Open dependencies (not M1 scope)
 
-- SCRUM-87 (M3): browser entry point for batch adoption, names, and the outcome filter on the impact page.
-- SCRUM-88 (M4): Change Manager / Data Admin entries in the demo identity switch.
-- SCRUM-89 (M5): the full reset/regression receipt, and an independent rehearsal on the merged SHA.
+- SCRUM-87 (M3): browser entry point for batch adoption, names, and the outcome filter on the impact page. Delivered in PR #92.
+- SCRUM-88 (M4): Change Manager / Data Admin entries in the demo identity switch. Delivered in PR #92.
+- SCRUM-89 (M5): the full reset/regression receipt, and an independent rehearsal on the merged SHA. Still open; the
+  browser walkthrough is in the [S4 demo runbook](S4-demo-runbook.md).
 - CI on the PR for this branch is the authoritative gate before SCRUM-85 is moved to Done.

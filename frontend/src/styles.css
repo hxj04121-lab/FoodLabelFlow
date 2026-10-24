@@ -352,3 +352,5 @@ th { position:relative; }
   }
 }
 @media (max-width: 600px) { .topbar .identity-switcher > span, .topbar-divider { display: none; } }
+.history-version { display:grid; gap:10px; padding:18px 0; border-top:1px solid var(--color-border); overflow-wrap:anywhere; }
+.history-version h3 { margin:0; }

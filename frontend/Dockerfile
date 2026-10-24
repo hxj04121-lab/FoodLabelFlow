@@ -3,6 +3,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
+ARG VITE_DEMO_ALLOWED_ORIGINS=""
+ENV VITE_DEMO_ALLOWED_ORIGINS=$VITE_DEMO_ALLOWED_ORIGINS
 RUN npm run build
 
 FROM nginx:1.29-alpine

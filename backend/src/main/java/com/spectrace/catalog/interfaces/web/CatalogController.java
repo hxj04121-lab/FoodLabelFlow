@@ -24,6 +24,10 @@ public class CatalogController {
     public List<Map<String, Object>> suppliers(@RequestParam(defaultValue="50") int limit, @RequestParam(defaultValue="0") int offset) {
         return service.list(SUPPLIER, limit, offset);
     }
+    @GetMapping("/ingredients")
+    public List<Map<String, Object>> ingredients(@RequestParam(defaultValue="50") int limit, @RequestParam(defaultValue="0") int offset) {
+        return service.list(INGREDIENT, limit, offset);
+    }
     @GetMapping("/suppliers/{id}") public Map<String, Object> supplier(@PathVariable String id) { return service.get(SUPPLIER, id); }
     @PostMapping("/suppliers") @ResponseStatus(HttpStatus.CREATED)
     public Map<String, Object> supplier(@RequestBody Supplier body) { return service.create(body); }

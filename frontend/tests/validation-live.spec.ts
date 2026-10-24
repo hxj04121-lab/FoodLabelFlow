@@ -24,7 +24,7 @@ test('validates a seeded PASS and a new blocking FAIL through the browser and pe
   })
 
   await page.goto('/labels')
-  await expect(page.getByText('Connected to the M1 read-only API')).toBeVisible({
+  await expect(page.getByText('Connected to the food catalog')).toBeVisible({
     timeout: 30_000,
   })
   const originalProductResponse = await page.request.get('/api/catalog/products/prod_usda_1106285')
@@ -66,7 +66,7 @@ test('validates a seeded PASS and a new blocking FAIL through the browser and pe
 
   // Re-read the committed run rather than re-evaluating current inputs.
   await page.reload()
-  await expect(page.getByText('Connected to the M1 read-only API')).toBeVisible({
+  await expect(page.getByText('Connected to the food catalog')).toBeVisible({
     timeout: 30_000,
   })
   await page.getByLabel('Existing label version ID').fill('label_1106285_v1')

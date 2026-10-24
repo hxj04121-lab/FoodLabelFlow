@@ -21,7 +21,7 @@ test('creates, publishes and preserves old content through the full stack', asyn
   await page.getByLabel('Unit (optional)').fill('kg')
   await page.getByRole('button',{name:'Preview formula',exact:true}).click()
   await page.screenshot({path:evidencePath('wo-m3-formula-create-preview.png','../test-artifacts/sprint1/screenshots/wo-m3-formula-create-preview.png'),fullPage:true})
-  await page.getByRole('checkbox',{name:'Enable local demo identity for this form'}).check()
+  await page.getByRole('checkbox',{name:'Enable course Data Admin identity for this form'}).check()
   await page.getByRole('button',{name:'Save draft',exact:true}).click()
   await expect(page.getByRole('status')).toContainText('Draft saved to the server')
   await page.getByRole('button',{name:'Publish formula',exact:true}).click()

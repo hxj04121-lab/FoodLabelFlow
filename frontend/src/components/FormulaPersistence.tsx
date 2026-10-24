@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { demoOriginDisabledMessage, isLocalDemoHost } from '@/lib/local-demo'
 import { Button } from './ui/button'
 import { CatalogRequestError, createFormula, getCatalogProduct, getFormulaHistory, releaseFormula, type CreateFormulaRequest, type FormulaVersion } from '@/api/client'
 
@@ -16,7 +17,7 @@ export function FormulaPersistence({request,onSaved,onBusy}: {
   const [uncertain,setUncertain]=useState(false)
   const [conflict,setConflict]=useState(false)
   const [confirm,setConfirm]=useState(false)
-  const local=['127.0.0.1','localhost','[::1]'].includes(location.hostname)
+  const local=isLocalDemoHost()
   async function run(operation:()=>Promise<void>, mutation=false) {
     if(lock.current)return
     lock.current=true;setBusy(true);onBusy(true);setError('')
@@ -56,9 +57,9 @@ export function FormulaPersistence({request,onSaved,onBusy}: {
   }
   return <section className="formula-section persistence-panel" aria-label="Server actions">
     <h3>Save and publish</h3>
-    <p className="muted">Local course environment only. Uses the main-branch DEV_EXTERNAL admin mapping and project-seeded provenance; this is not production authentication.</p>
-    <label className="demo-consent"><input type="checkbox" checked={enabled} disabled={!local||busy} onChange={e=>setEnabled(e.target.checked)}/> Enable local demo identity for this form</label>
-    {!local&&<p role="alert">Writes are disabled outside localhost. Configure approved authentication before deployment.</p>}
+    <p className="muted">Course demonstration only. Formula writes use the DEV_EXTERNAL Data Admin identity (dev-external-admin), independently of the role selected in the header. This is not production authentication.</p>
+    <label className="demo-consent"><input type="checkbox" checked={enabled} disabled={!local||busy} onChange={e=>setEnabled(e.target.checked)}/> Enable course Data Admin identity for this form</label>
+    {!local&&<p role="alert">{demoOriginDisabledMessage}</p>}
     {error&&<p className="error-notice" role="alert">{error}</p>}
     <p aria-live="polite">{message}</p>
     {created&&<p className="muted">Server version: V{created.version_number} · {created.lifecycle_status} · {created.formula_version_id}</p>}

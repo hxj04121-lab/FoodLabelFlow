@@ -17,5 +17,5 @@ export function CatalogConnection({ children }: { children:ReactNode }) {
   },[attempt])
   if(state==='loading') return <section className="panel upcoming" role="status"><h2>Loading catalog data</h2><p>Connecting to the catalog API and loading products, specifications and formula history.</p></section>
   if(state==='error') return <section className="panel upcoming"><h2>Catalog data is unavailable</h2><p role="alert">{error}</p><p>Start the M1 backend and try again. Offline preview data will not be substituted.</p><Button onClick={()=>setAttempt(attempt+1)}>Retry connection</Button></section>
-  return <><div className="source-notice connection-status">Connected to the M1 read-only API · Loaded at {loadedAt} · Local demo writes available in the formula editor</div>{children}</>
+  return <><div className="source-notice connection-status">Connected to the food catalog · Loaded at {loadedAt} · Workflow actions use the active identity and its existing permissions</div>{children}</>
 }

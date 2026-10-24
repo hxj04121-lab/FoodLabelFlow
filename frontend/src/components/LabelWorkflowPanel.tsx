@@ -1,4 +1,5 @@
 import { getLabelDraft, LabelApiError, type LabelDraft, type ValidationRun } from '@/api/labels'
+import { demoOriginDisabledMessage, isLocalDemoHost } from '@/lib/local-demo'
 import { decideLabelReview, publishReviewTaskLabel, requireWorkflowTarget, submitLabelForReview,
   type ReviewDecision } from '@/api/label-workflow'
 import { Panel, SectionHead } from './catalog-shared'
@@ -25,7 +26,7 @@ export function LabelWorkflowPanel({ draft, validationRun, reviewTaskId, onDraft
   const lock = useRef(false)
   const currentId = useRef(draft?.labelVersionId)
   currentId.current = draft?.labelVersionId
-  const local = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname)
+  const local = isLocalDemoHost()
   const independent = identity.state.status === 'ready' && identity.state.actor.userId !== draft?.createdByUserId
   const validationPassed = validationRun?.labelVersionId === draft?.labelVersionId &&
     validationRun?.ruleSetVersionId === draft?.ruleSetVersionId && validationRun?.status === 'PASSED'
@@ -101,7 +102,7 @@ export function LabelWorkflowPanel({ draft, validationRun, reviewTaskId, onDraft
         <p>Declarations are fixed at draft creation. Review submission requires the latest validation to pass. Approval requires an authorized person other than the maker; publication requires its own permission.</p>
         <label className="demo-consent"><input type="checkbox" checked={connectedIdentityEnabled} disabled={disabled}
           onChange={event => setConnectedIdentityEnabled(event.target.checked)} />Use the connected identity for review and publication</label>
-        <p>A trusted maker, reviewer or publisher identity must be supplied by the connected environment. This form does not select an identity or assign permissions.</p>
+        <p>The active identity is selected in the application header. This consent enables workflow actions under that identity; it does not grant permissions.</p>
         {!independent && draft.lifecycleStatus === 'PENDING_REVIEW' && <p>Your connected identity created this label. An independent reviewer must make the decision.</p>}
         {!validationPassed && draft.lifecycleStatus === 'DRAFT' && <p>Run or load a PASSED validation for this exact label and rule set before submitting.</p>}
         <Button disabled={disabled || !connectedIdentityEnabled || !validationPassed || !identity.hasPermission('LABEL.SUBMIT_REVIEW') || draft.lifecycleStatus !== 'DRAFT'}
@@ -118,7 +119,7 @@ export function LabelWorkflowPanel({ draft, validationRun, reviewTaskId, onDraft
             onClick={() => command('Publication', 'PUBLISHED', target => publishReviewTaskLabel(target, reviewTaskId.trim()))}>Publish label</Button>
         </div>
       </>}
-      {!local && <p role="alert">Workflow writes are disabled outside localhost until approved authentication is connected.</p>}
+      {!local && <p role="alert">{demoOriginDisabledMessage}</p>}
       {error && <p className="error-notice" role="alert">{error}</p>}
       <p className="label-operation-message" aria-live="polite">{message}</p>
       {pending && <p role="status">Unconfirmed command: {pending.action} for {pending.label.labelVersionId}. Switching labels does not clear this guard.</p>}

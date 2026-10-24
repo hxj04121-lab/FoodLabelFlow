@@ -178,6 +178,9 @@ class CatalogIntegrationTest {
             var response = client.send(HttpRequest.newBuilder(URI.create(base + "/formulas/formula_1106963_v1/trace")).GET().build(), HttpResponse.BodyHandlers.ofString());
             assertThat(response.statusCode()).isEqualTo(200);
             assertThat(response.body()).contains("spec_chocolate_v1", "Demo Chocolate Supplier", "specificationEvidence");
+            var ingredients = client.send(HttpRequest.newBuilder(URI.create(base + "/ingredients?limit=100&offset=0")).GET().build(), HttpResponse.BodyHandlers.ofString());
+            assertThat(ingredients.statusCode()).isEqualTo(200);
+            assertThat(ingredients.body()).contains("ing_soy_lecithin", "Soy Lecithin", "ing_cocoa");
             var invalid = HttpRequest.newBuilder(URI.create(base + "/suppliers")).header("Content-Type","application/json")
                     .POST(HttpRequest.BodyPublishers.ofString("{\"code\":\"\",\"name\":\"test\",\"provenanceId\":\"prov_project_seed\"}")).build();
             var invalidResponse = client.send(invalid, HttpResponse.BodyHandlers.ofString());

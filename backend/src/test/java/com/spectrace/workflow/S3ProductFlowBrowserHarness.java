@@ -6,9 +6,7 @@ import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -37,9 +35,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Explicit local acceptance launcher, excluded from default Surefire name patterns.
  * Run with -Dtest=S3ProductFlowBrowserHarness after installing frontend dependencies
  * and a Playwright Chromium browser. It owns its database and both child processes.
- * Production endpoints and frontend execute unchanged; only released specification
- * input is added to the initial Flyway catalog. New declarations and passing runs
- * must be created by the actual browser and HTTP evaluator.
+ * Production endpoints and frontend execute unchanged against the fresh Flyway
+ * catalog. Specification V2, declarations and passing runs must be created by
+ * the actual browser and HTTP evaluator; only the test identity fixture is added.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "spectrace.dev-external-auth.enabled=true")
@@ -84,20 +82,14 @@ class S3ProductFlowBrowserHarness {
         var historicalContent = historicalLabelContent();
         var historicalDeclarations = historicalDeclarations();
         assertThat(historicalContent).hasSize(60);
-        String inputOnly;
-        try (var stream = Objects.requireNonNull(getClass().getResourceAsStream(
-                "/fixtures/s3-soy-spec-v2-adoption.sql"))) {
-            String fixture = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
-            int boundary = fixture.indexOf("INSERT INTO formula_version");
-            assertThat(boundary).isPositive();
-            inputOnly = fixture.substring(0, boundary);
-            assertThat(inputOnly).doesNotContain("validation_run", "label_version", "review_task");
-        }
-        new ResourceDatabasePopulator(new ByteArrayResource(inputOnly.getBytes(StandardCharsets.UTF_8)))
-                .execute(Objects.requireNonNull(jdbc.getDataSource()));
-        Files.writeString(evidence.resolve("released-spec-input-only.sql"), inputOnly, StandardCharsets.UTF_8);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM ingredient_specification_version "
-                + "WHERE specification_version_id='spec_chocolate_v2'", Integer.class)).isEqualTo(1);
+        var chocolateSpecifications = jdbc.queryForList("SELECT specification_version_id "
+                + "FROM ingredient_specification_version WHERE supplier_material_id='mat_chocolate_base' "
+                + "ORDER BY version_number", String.class);
+        assertThat(chocolateSpecifications).as("the browser creates Spec V2 from the untouched V1 baseline")
+                .containsExactly("spec_chocolate_v1");
+        Files.writeString(evidence.resolve("fresh-browser-baseline.json"), JSON.writeValueAsString(Map.of(
+                "chocolateSpecificationVersionIds", chocolateSpecifications,
+                "historicalPublishedLabelCount", historicalContent.size())), StandardCharsets.UTF_8);
         int frontendPort;
         try (var freePort = new ServerSocket(0)) { frontendPort = freePort.getLocalPort(); }
         var viteCommand = new ProcessBuilder("node", "node_modules/vite/bin/vite.js", "--host", "127.0.0.1",
@@ -112,7 +104,7 @@ class S3ProductFlowBrowserHarness {
             // Freeze the complete S3 physical proof before the legacy formula
             // lifecycle case deliberately changes one current formula pointer.
             for (String spec : new String[]{"catalog-live", "validation-live", "s3-product-flow-live",
-                    "formula-lifecycle-fullstack"}) {
+                    "formula-lifecycle-fullstack", "scrum84-identity-live"}) {
                 var arguments = new ArrayList<>(List.of("node", "node_modules/@playwright/test/cli.js", "test",
                         "tests/" + spec + ".spec.ts", "--output",
                         evidence.resolve(spec + "-results").toString(), "--reporter=list"));
@@ -128,6 +120,9 @@ class S3ProductFlowBrowserHarness {
                 browserCommand.environment().put("LIVE_S3_FLOW", "1");
                 browserCommand.environment().put("LIVE_CATALOG", "1");
                 browserCommand.environment().put("LIVE_WRITES", "1");
+                if (spec.equals("scrum84-identity-live")) {
+                    browserCommand.environment().put("LIVE_SCRUM84_IDENTITY", "1");
+                }
                 browserCommand.environment().put("S3_COMPOUND_MAKER_SUBJECT", S3CompoundMakerFixture.SUBJECT);
                 browserCommand.environment().put("S3_COMPOUND_MAKER_ALIAS_SUBJECT", S3CompoundMakerFixture.CASE_ALIAS_SUBJECT);
                 browserCommand.environment().put("S3_COMPOUND_MAKER_USER_ID", S3CompoundMakerFixture.USER_ID);

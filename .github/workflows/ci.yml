@@ -56,6 +56,11 @@ jobs:
       - name: Verify SCRUM-84 controlled identity switching and stale response isolation
         working-directory: frontend
         run: npx playwright test tests/scrum84-identity-switch.spec.ts tests/scrum84-returned-revision-ui.spec.ts --workers=1
+      - name: Verify hosted course demo origin policy and UI fixtures
+        working-directory: frontend
+        run: |
+          npx playwright test tests/demo-origin-policy.spec.ts --workers=1
+          npx playwright test --config playwright.demo-origin.config.ts
       - name: Upload SCRUM-84 browser failure evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
@@ -70,6 +75,13 @@ jobs:
     needs: [backend, frontend]
     steps:
       - uses: actions/checkout@v4
+      - name: Verify S4 demo project namespace guard without Docker
+        run: bash scripts/tests/s4-m1-spec-v2-demo-project-scope.test.sh
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
       - name: Validate Compose configuration
         run: docker compose config --quiet
       - name: Build application images
@@ -84,18 +96,8 @@ jobs:
         run: npm ci && npx playwright install --with-deps chromium
       - name: Start full stack
         run: docker compose up -d mysql backend frontend
-      - name: Seed only released specification input for the S3 browser scenario
-        shell: bash
-        run: |
-          set -euo pipefail
-          fixture_input="$(mktemp)"
-          sed '/^INSERT INTO formula_version/,$d' backend/src/test/resources/fixtures/s3-soy-spec-v2-adoption.sql > "$fixture_input"
-          test -s "$fixture_input"
-          if grep -Eiq 'INSERT INTO (formula_version|label_version|label_allergen_declaration|validation_run|review_task)' "$fixture_input"; then
-            echo "The S3 input fixture must not seed business outputs."
-            exit 1
-          fi
-          docker compose exec -T mysql sh -c 'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD" spectrace' < "$fixture_input"
+      # No SQL Spec V2 here: the S3 browser flow creates and releases it through the
+      # Data Admin specification UI, so this stack starts from the Flyway baseline.
       - name: Verify SCRUM-84 real demo identity switching against isolated stack
         working-directory: frontend
         env:
@@ -181,6 +183,17 @@ jobs:
           SCRUM84_BOOTSTRAP_OUTPUT: test-results/revision-bootstrap.json
           S3_EVIDENCE_DIR: test-results/revision-evidence
         run: npx playwright test tests/scrum84-returned-revision-live.spec.ts --output=test-results/revision-browser
+      - name: Release CI-owned Compose stacks before the separate browser harness
+        run: |
+          docker compose -p s3-revision-ci down -v
+          docker compose down -v
+      - name: Verify the explicit Java browser harness from a fresh V1 baseline
+        run: >-
+          mvn -B -ntp -f backend/pom.xml
+          -Dtest=S3ProductFlowBrowserHarness
+          -Ds3.checkout="$GITHUB_WORKSPACE"
+          -Ds3.browser.evidence="$GITHUB_WORKSPACE/frontend/test-results/explicit-harness"
+          test
       - name: Show container logs on failure
         if: failure()
         run: |
@@ -191,7 +204,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: validation-browser-evidence
-          path: frontend/test-results
+          path: |
+            frontend/test-results
+            backend/target/surefire-reports
           if-no-files-found: warn
       - name: Stop full stack
         if: always()
@@ -240,6 +255,7 @@ jobs:
         run: |
           npx playwright install chromium
           npx playwright test --grep-invert 'captures.*live'
+          npx playwright test --config playwright.demo-origin.config.ts
           npx nyc report --reporter=lcov --reporter=text-summary
       - name: Cache SonarQube packages
         uses: actions/cache@v4

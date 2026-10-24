@@ -1,3 +1,4 @@
+import { demoOriginDisabledMessage, isLocalDemoHost } from '@/lib/local-demo'
 import {
   createLabelDraft,
   createReturnedLabelRevision,
@@ -43,6 +44,11 @@ type PendingRevision = {
   declarations: EditableDeclaration[]
 }
 
+type ReplacementPrefill = {
+  labelVersionId: string
+  formulaVersionId: string
+}
+
 function matchesSubmittedDeclarations(stored: LabelDeclarations, submitted: EditableDeclaration[]) {
   return stored.declarations.length === submitted.length && submitted.every(expected =>
     stored.declarations.some(actual => actual.allergenId === expected.allergenId &&
@@ -67,6 +73,8 @@ export function Labels() {
   const [reviewTaskId, setReviewTaskId] = useState(searchParams.get('reviewTaskId') ?? '')
   const [reviewTask, setReviewTask] = useState<ReviewTask | null>(null)
   const [declarationIds, setDeclarationIds] = useState<string[]>([])
+  const [replacementPrefill, setReplacementPrefill] = useState<ReplacementPrefill | null>(null)
+  const [replacementPrefillStatus, setReplacementPrefillStatus] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle')
   const [currentFormulaId, setCurrentFormulaId] = useState<string | null>(null)
   const [formulaLoading, setFormulaLoading] = useState(true)
   const [formulaError, setFormulaError] = useState('')
@@ -85,10 +93,14 @@ export function Labels() {
     declarations: Array<{ allergenId: string; declarationType: 'CONTAINS'; displayText: string }>
   } | null>(null)
   const writeLock = useRef(false)
-  const local = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname)
+  const local = isLocalDemoHost()
   const identity = useCurrentIdentity()
   const connected = identity.state.status === 'ready'
   const canCreate = connected && identity.hasPermission('LABEL.CREATE')
+  const expectedFormulaVersionId = searchParams.get('expectedFormulaVersionId')?.trim() ?? ''
+  const impactFormulaIsRelevant = Boolean(expectedFormulaVersionId && reviewTask && reviewTask.reviewTaskId === reviewTaskId.trim())
+  const staleImpactFormula = Boolean(impactFormulaIsRelevant && currentFormulaId && expectedFormulaVersionId !== currentFormulaId)
+  const prefillFromOlderFormula = Boolean(replacementPrefill && currentFormulaId && replacementPrefill.formulaVersionId !== currentFormulaId)
 
   const product = useMemo(
     () => data.product.find((candidate) => candidate.product_id === productId),
@@ -107,7 +119,28 @@ export function Labels() {
     setDraft(label)
     setLookupId(label.labelVersionId)
     setProductId(label.productId)
+    setReplacementPrefill(null)
+    setReplacementPrefillStatus('idle')
     if (declarations) setDeclarationIds(declarations.map(row => row.allergenId))
+  }
+
+  async function prefillReplacementDeclarations(task: ReviewTask, expectedProductId: string, signal?: AbortSignal) {
+    setReplacementPrefillStatus('loading')
+    setReplacementPrefill(null)
+    if (task.productId !== expectedProductId) {
+      throw new LabelApiError('REVIEW_TASK_PRODUCT_MISMATCH', 'The review task belongs to a different product.', 409)
+    }
+    const previous = await getLabelDraft(task.currentLabelVersionId, signal)
+    if (signal?.aborted) return
+    if (previous.productId !== task.productId || previous.labelVersionId !== task.currentLabelVersionId) {
+      throw new LabelApiError('REVIEW_TASK_CURRENT_LABEL_MISMATCH', 'The previous label does not match this review task.', 409)
+    }
+    const stored = await getLabelDeclarations(previous, signal)
+    if (signal?.aborted) return
+    setDeclarationIds(stored.declarations.map(row => row.allergenId))
+    setReplacementPrefill({ labelVersionId: previous.labelVersionId, formulaVersionId: previous.formulaVersionId })
+    setReplacementPrefillStatus('ready')
+    setMessage(`Declarations prefilled from ${previous.labelVersionId}. Review and edit them before creating the new draft.`)
   }
 
   function setTaskLabelLocation(taskId: string, label: LabelDraft) {
@@ -156,19 +189,29 @@ export function Labels() {
   useEffect(() => {
     const exactTaskId = searchParams.get('reviewTaskId')?.trim()
     if (!exactTaskId) return
+    // The URL names the handoff's product; state can still hold the product of an earlier entry.
+    const handoffProductId = searchParams.get('productId')?.trim() || productId
     const controller = new AbortController()
     let active = true
+    let replacementPrefillStarted = false
+    setProductId(handoffProductId)
     setReviewTaskId(exactTaskId)
     setReviewTask(null)
     setDraft(null)
     setValidationRun(null)
     setDeclarationIds([])
+    setReplacementPrefill(null)
+    setReplacementPrefillStatus('idle')
     setError('')
     setBusy(true)
     getReviewTask(exactTaskId, controller.signal).then(async task => {
       if (!active) return
       setReviewTask(task)
-      if (!task.draftLabelVersionId) return
+      if (!task.draftLabelVersionId) {
+        replacementPrefillStarted = true
+        await prefillReplacementDeclarations(task, handoffProductId, controller.signal)
+        return
+      }
       const requestedLabelId = searchParams.get('labelVersionId')?.trim()
       if (requestedLabelId && requestedLabelId !== task.targetLabelVersionId) {
         throw new LabelApiError('REVIEW_TASK_TARGET_MISMATCH', 'The selected label is not the current target of this review task.', 409)
@@ -183,7 +226,10 @@ export function Labels() {
       adoptDraft(loaded, stored.declarations)
       setMessage(`Loaded ${loaded.labelVersionId} from review task ${task.reviewTaskId}.`)
     }).catch((cause: unknown) => {
-      if (active && !controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Review task handoff failed.')
+      if (active && !controller.signal.aborted) {
+        if (replacementPrefillStarted) setReplacementPrefillStatus('failed')
+        setError(cause instanceof Error ? cause.message : 'Review task handoff failed.')
+      }
     }).finally(() => { if (active && !controller.signal.aborted) setBusy(false) })
     return () => { active = false; controller.abort() }
   }, [searchParams])
@@ -219,10 +265,19 @@ export function Labels() {
   }, [allergenAttempt])
 
   function selectProduct(nextProductId: string) {
+    const next = new URLSearchParams(searchParams)
+    next.delete('reviewTaskId')
+    next.delete('labelVersionId')
+    next.delete('expectedFormulaVersionId')
+    next.set('productId', nextProductId)
+    setSearchParams(next, { replace: true })
     setProductId(nextProductId)
     setDraft(null)
     setValidationRun(null)
     setDeclarationIds([])
+    setReviewTask(null)
+    setReplacementPrefill(null)
+    setReplacementPrefillStatus('idle')
     setReviewTaskId('')
     setLookupId('')
     setMessage(uncertain ? UNCONFIRMED_DRAFT_MESSAGE : '')
@@ -230,6 +285,7 @@ export function Labels() {
   }
 
   async function createDraft() {
+    const replacementNeedsPrefill = Boolean(reviewTask && !reviewTask.draftLabelVersionId)
     if (
       writeLock.current ||
       !local ||
@@ -238,6 +294,8 @@ export function Labels() {
       allergenState.status !== 'ready' ||
       !productId ||
       !currentFormulaId || formulaLoading ||
+      (replacementNeedsPrefill && replacementPrefillStatus !== 'ready') ||
+      staleImpactFormula ||
       uncertain
     ) {
       return
@@ -317,6 +375,7 @@ export function Labels() {
   async function loadTaskDraft() {
     const exactTaskId = pendingRevision?.reviewTaskId ?? pendingCreation?.reviewTaskId ?? reviewTaskId.trim()
     if (!exactTaskId || busy || writeLock.current) return
+    let replacementPrefillStarted = false
     setBusy(true)
     setError('')
     setMessage('')
@@ -328,7 +387,9 @@ export function Labels() {
       const task = await getReviewTask(exactTaskId)
       setReviewTask(task)
       if (!task.draftLabelVersionId) {
-        setMessage(`Review task ${exactTaskId} has no bound draft.` + (uncertain ? ` ${UNCONFIRMED_DRAFT_MESSAGE}` : ''))
+        replacementPrefillStarted = true
+        await prefillReplacementDeclarations(task, productId)
+        setMessage(`Review task ${exactTaskId} has no bound draft. Previous-label declarations are ready to edit.` + (uncertain ? ` ${UNCONFIRMED_DRAFT_MESSAGE}` : ''))
         return
       }
       const loaded = await getLabelDraft(task.draftLabelVersionId)
@@ -347,6 +408,7 @@ export function Labels() {
       setMessage(`Loaded the existing draft ${loaded.labelVersionId} bound to ${exactTaskId}.` +
         (uncertain && !confirmed ? ` ${UNCONFIRMED_DRAFT_MESSAGE}` : ''))
     } catch (cause: unknown) {
+      if (replacementPrefillStarted) setReplacementPrefillStatus('failed')
       setError(`${cause instanceof LabelApiError ? cause.code : 'NETWORK_ERROR'}: ${cause instanceof Error ? cause.message : 'Review task read failed.'}`)
     } finally { setBusy(false) }
   }
@@ -385,7 +447,7 @@ export function Labels() {
   }
 
   async function saveReturnedRevision(declarations: EditableDeclaration[]) {
-    if (!reviewTask || !draft || !identity.hasPermission('LABEL.CREATE') || revisionBusy || busy || writeLock.current) return
+    if (!local || !reviewTask || !draft || !identity.hasPermission('LABEL.CREATE') || revisionBusy || busy || writeLock.current) return
     if (reviewTask.status !== 'OPEN' || reviewTask.decision !== 'REQUEST_CHANGES'
         || reviewTask.targetLabelVersionId !== draft.labelVersionId) return
     writeLock.current = true
@@ -505,9 +567,14 @@ export function Labels() {
           </div>
 
           {formulaError && <p className="error-notice" role="alert">{formulaError}</p>}
+          {staleImpactFormula && <p className="error-notice" role="alert">The product formula changed after this impact result. Refresh the impact analysis before creating a replacement label.</p>}
+          {replacementPrefillStatus === 'loading' && <p role="status">Loading declarations from the previous label…</p>}
+          {replacementPrefill && <p role="status">Declarations were prefilled from previous label {replacementPrefill.labelVersionId}; review and edit them before draft creation.</p>}
+          {prefillFromOlderFormula && <p role="status">The copied declarations belong to formula {replacementPrefill?.formulaVersionId}; the product now uses {currentFormulaId}. Validation checks the edited selection against the current formula.</p>}
+          {replacementPrefillStatus === 'failed' && <p className="error-notice" role="alert">Previous-label declarations could not be loaded. Draft creation for this review task remains disabled until the exact source label and declarations can be read.</p>}
           <fieldset className="declaration-entry" disabled={busy}>
             <legend>Declarations for the new draft</legend>
-            <p>Select the declarations you intend to record. They are saved with this new version and cannot be edited after creation; validation checks them against the formula.</p>
+            <p>{replacementPrefill ? 'The previous label declarations are prefilled. Edit the selection before creating this immutable version; validation checks it against the current formula.' : 'Select the declarations you intend to record. They are saved with this new version and cannot be edited after creation; validation checks them against the formula.'}</p>
             {allergenState.status === 'ready' && allergenState.allergens.map(allergen =>
               <label key={allergen.allergenId}><input type="checkbox"
                 checked={declarationIds.includes(allergen.allergenId)}
@@ -534,7 +601,7 @@ export function Labels() {
           </label>
           {!local && (
             <p role="alert">
-              Draft writes are disabled outside localhost. Configure approved authentication before deployment.
+              {demoOriginDisabledMessage}
             </p>
           )}
 
@@ -556,6 +623,8 @@ export function Labels() {
                 allergenState.status !== 'ready' ||
                 busy ||
                 uncertain ||
+                (!!reviewTask && !reviewTask.draftLabelVersionId && replacementPrefillStatus !== 'ready') ||
+                staleImpactFormula ||
                 formulaLoading || !currentFormulaId
               }
               onClick={createDraft}
@@ -677,7 +746,7 @@ export function Labels() {
         draft={draft}
         allergens={allergenState.status === 'ready' ? allergenState.allergens : []}
         revisionAllowed={Boolean(
-          draft && reviewTask && canCreate && !uncertain &&
+          local && draft && reviewTask && canCreate && !uncertain &&
           reviewTask.status === 'OPEN' && reviewTask.decision === 'REQUEST_CHANGES' &&
           reviewTask.targetLabelVersionId === draft.labelVersionId &&
           reviewTask.draftLabelVersionId === draft.labelVersionId &&

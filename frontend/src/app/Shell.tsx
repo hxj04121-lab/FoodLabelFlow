@@ -1,4 +1,5 @@
 import { Panel } from '@/components/catalog-shared'
+import { isLocalDemoHost } from '@/lib/local-demo'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -10,6 +11,7 @@ import {
 import { Catalog } from '@/pages/Catalog'
 import { HealthPage } from '@/pages/HealthPage'
 import { Impact } from '@/pages/Impact'
+import { LabelHistory } from '@/pages/LabelHistory'
 import { Labels } from '@/pages/Labels'
 import { Reviews } from '@/pages/Reviews'
 import { Materials } from '@/pages/Materials'
@@ -23,6 +25,7 @@ import {
   FileText,
   FlaskConical,
   GitBranch,
+  History,
   Layers3,
   LayoutDashboard,
   Menu,
@@ -56,6 +59,7 @@ const navigation = [
       { path: '/labels', label: 'Labels', icon: FileText },
       { path: '/impact', label: 'Change impact', icon: GitBranch },
       { path: '/reviews', label: 'Review workspace', icon: ClipboardCheck },
+      { path: '/label-history', label: 'Label history', icon: History },
     ],
   },
 ]
@@ -67,6 +71,7 @@ export function Shell() {
   const location = useLocation()
   const navigate = useNavigate()
   const identity = useCurrentIdentity()
+  const workspaceName = isLocalDemoHost() ? 'Course demo' : 'Connected workspace'
   useEffect(() => {
     setMobile(false)
   }, [location.pathname])
@@ -126,7 +131,7 @@ export function Shell() {
         </nav>
         <div className="sidebar-bottom">
           <div className="environment-card">
-            <strong>Local workspace</strong>
+            <strong>{workspaceName}</strong>
             <span>Single-market MVP · United States</span>
           </div>
           <NavLink
@@ -191,6 +196,7 @@ export function Shell() {
             <Route path="/labels" element={<CatalogConnection><Labels /></CatalogConnection>} />
             <Route path="/impact" element={<CatalogConnection><Impact /></CatalogConnection>} />
             <Route path="/reviews" element={<Reviews />} />
+            <Route path="/label-history" element={<LabelHistory />} />
             <Route path="/health" element={<HealthPage />} />
             <Route
               path="*"
@@ -204,7 +210,7 @@ export function Shell() {
           </Routes>
           <footer className="page-footer">
             <span>SpecTrace · Food label change control</span>
-            <span>Local workspace · Single-market MVP</span>
+            <span>{workspaceName} · Single-market MVP</span>
           </footer>
         </main>
       </div>
@@ -221,7 +227,7 @@ export function Shell() {
             <li>Use the detail tabs to view formula items, version history and sources.</li>
             <li>Browse suppliers and materials to inspect specifications and components.</li>
             <li>Catalog pages read from the M1 API. Refresh to reload; failed requests never fall back to offline data.</li>
-            <li>The preview profile is not a signed-in account. On localhost, the formula editor can explicitly enable the course demo identity for saving and publishing. Label approvals remain a separate workflow.</li>
+            <li>The preview profile is not a signed-in account. In an enabled course demo, the formula editor requires explicit Data Admin consent for saving and publishing. Label approvals use the separately verified connected identity.</li>
           </ol>
         </DialogContent>
       </Dialog>
