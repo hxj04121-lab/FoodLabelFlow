@@ -118,7 +118,23 @@ journeys:
 3. It writes the per-endpoint table to the job summary and uploads `perf/results`
    (summary JSON, HTML report, logs) as artifact **`perf-smoke-<commit SHA>`**.
 
-CI run: _to be added once the branch is pushed (link to the run and the artifact name)._
+First CI run, PR #95 at head `23ef913`:
+[run 40057018222](https://github.com/hxj04121-lab/FoodLabelFlow/actions/runs/40057018222), `containers`
+job 03:13:51–03:23:01Z. Every job passed (backend, frontend, security, containers, SonarQube).
+It ran on GitHub's `ubuntu-latest` (Linux x86_64) with k6 v2.3.0, on the PR's test merge commit
+`fa109ea` (main `11c9006` + `23ef913`).
+
+| CI smoke | Requests | Error rate | p95 (limit) |
+|---|---|---|---|
+| read-mix, 2 VUs × 30 s | 293 (9.7 req/s) | 0.00 %, checks 293/293 | catalog 5.0 ms (100) · detail 3.9 ms (75) · impact report 15.9 ms (200) · label history 6.6 ms (150) |
+| write-path, 1 cold iteration | 6 | 0.00 %, checks 9/9 | batch adoption 404 ms (1000) · impact run 203 ms (500) |
+
+Artifact: `perf-smoke-fa109ea197af3f799ca9cce59679d714991a3ca4` (summary JSON, HTML report,
+k6 log and context for both scripts). On pull requests `github.sha` is the test merge commit, so
+from the next run the artifact and job summary are named after the PR head commit
+(`perf-smoke-<head SHA>`). On pushes they use the pushed commit.
+The cold CI write path (404 / 203 ms) is about 1.5× slower than the warm Mac rehearsal
+(284 / 124 ms p95). That is still well under the limits, which supports the chosen headroom.
 
 ## 2. Scalability (HPA on local k3s)
 

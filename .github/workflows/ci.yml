@@ -209,18 +209,21 @@ jobs:
           docker compose up -d --wait --wait-timeout 180 mysql backend
           PERF_RESULTS_DIR=perf/results/read-mix perf/run.sh read-mix
           PERF_RESULTS_DIR=perf/results/write-path ITERATIONS=1 perf/run.sh write-path
+      # On pull_request events github.sha is the test merge commit; name results after the PR head.
       - name: Publish perf smoke summary
         if: always()
         shell: bash
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           if compgen -G 'perf/results/*/summary.json' >/dev/null; then
-            { echo "## k6 perf smoke @ ${GITHUB_SHA}"; python3 perf/summarize.py perf/results/*/summary.json; } >> "$GITHUB_STEP_SUMMARY"
+            { echo "## k6 perf smoke @ ${HEAD_SHA} (checkout ${GITHUB_SHA})"; python3 perf/summarize.py perf/results/*/summary.json; } >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Upload perf smoke results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: perf-smoke-${{ github.sha }}
+          name: perf-smoke-${{ github.event.pull_request.head.sha || github.sha }}
           path: perf/results
           if-no-files-found: warn
       - name: Show container logs on failure
