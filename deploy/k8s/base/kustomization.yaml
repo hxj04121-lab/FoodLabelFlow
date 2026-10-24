@@ -1,0 +1,16 @@
+# SpecTrace on single-node k3s for the S4 scalability demonstration.
+# Apply overlays/local, not this base
+# (Colima k3s on macOS, k3d on Windows/WSL2). See deploy/k8s/README.md.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: spectrace
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: spectrace
+    includeSelectors: false
+resources:
+  - namespace.yaml
+  - mysql.yaml
+  - backend.yaml
+  - backend-hpa.yaml
+  - frontend.yaml

@@ -1,0 +1,78 @@
+# Stateless Spring Boot API: no HTTP session, no in-process cache; every replica reads MySQL.
+# Concurrent replicas are safe at start-up because Flyway serialises migrations with a MySQL
+# named lock. No spec.replicas: the HorizontalPodAutoscaler owns the replica count.
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: spectrace-backend:local
+          ports:
+            - containerPort: 8080
+          env:
+            # Same values as docker-compose.yml.
+            - name: SPRING_PROFILES_ACTIVE
+              value: demo
+            - name: SPECTRACE_RUNTIME_ENVIRONMENT
+              value: development
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:mysql://mysql:3306/spectrace?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+            - name: SPRING_DATASOURCE_USERNAME
+              value: root
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: spectrace-mysql
+                  key: password
+            - name: SPECTRACE_DEV_EXTERNAL_AUTH_ENABLED
+              value: "true"
+            - name: JAVA_TOOL_OPTIONS
+              value: -XX:MaxRAMPercentage=75
+          # The HPA scales on CPU utilisation relative to this request.
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 768Mi
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
