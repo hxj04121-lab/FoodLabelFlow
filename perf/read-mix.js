@@ -37,7 +37,7 @@ if (PROFILE !== 'ramp' && __ENV.DURATION) scenario.duration = __ENV.DURATION;
 // Per-endpoint p95 limits: about 3x the p95 measured with the capacity profile (20 VUs, no think
 // time, ~990 req/s on one backend), rounded up, as headroom for cold JVMs and shared CI runners.
 // Measurements: docs/evidence/S4-performance-and-autoscaling.md.
-const thresholds = {
+const baselineThresholds = {
   http_req_failed: ['rate<0.01'],
   checks: ['rate>0.99'],
   'http_req_duration{name:catalog_list}': ['p(95)<100'],
@@ -45,6 +45,18 @@ const thresholds = {
   'http_req_duration{name:impact_report}': ['p(95)<200'],
   'http_req_duration{name:label_history}': ['p(95)<150'],
 };
+
+// The ramp deliberately overloads a single backend until the HPA adds replicas, so it guards
+// availability and an upper latency bound instead of the single-stack baseline limits.
+const rampThresholds = {
+  http_req_failed: ['rate<0.01'],
+  checks: ['rate>0.99'],
+  'http_req_duration{name:catalog_list}': ['p(95)<1000'],
+  'http_req_duration{name:product_detail}': ['p(95)<1000'],
+  'http_req_duration{name:impact_report}': ['p(95)<1000'],
+  'http_req_duration{name:label_history}': ['p(95)<1000'],
+};
+const thresholds = PROFILE === 'ramp' ? rampThresholds : baselineThresholds;
 
 // With THRESHOLDS=off the per-endpoint entries still exist (always true) so the
 // summary export keeps p50/p95/p99 for each endpoint.

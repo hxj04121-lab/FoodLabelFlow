@@ -113,9 +113,11 @@ load() {
     [[ -n "$pf_pid" ]] && kill "$pf_pid" 2>/dev/null || true
   }
   trap cleanup EXIT
-  k port-forward --address 127.0.0.1 svc/frontend "$FORWARD_PORT:80" >"$out/port-forward.log" 2>&1 &
+  # kubectl itself, not the k() wrapper, so that $! is the process cleanup has to stop.
+  kubectl -n "$NS" port-forward --address 127.0.0.1 svc/frontend "$FORWARD_PORT:80" >"$out/port-forward.log" 2>&1 &
   pf_pid=$!
   for _ in $(seq 1 30); do curl -fsS "$BASE_URL/api/health" >/dev/null 2>&1 && break; sleep 1; done
+  kill -0 "$pf_pid" 2>/dev/null || { cat "$out/port-forward.log" >&2; echo "port-forward failed; is $FORWARD_PORT in use?" >&2; exit 69; }
   curl -fsS "$BASE_URL/api/health" >/dev/null
   { kubectl version 2>/dev/null; kubectl get nodes -o wide; } > "$out/cluster.txt"
   watch_loop > "$out/hpa-timeline.log" 2>&1 &

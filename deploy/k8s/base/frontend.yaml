@@ -25,6 +25,14 @@ spec:
       labels:
         app: frontend
     spec:
+      # nginx opens one upstream connection per proxied request (frontend/nginx.conf has no
+      # keepalive, which keeps every new backend replica in the Service rotation). Under the
+      # ramp the default 28k ephemeral ports run out (EADDRNOTAVAIL -> 502); a namespaced,
+      # Kubernetes-"safe" sysctl widens the range for this pod only.
+      securityContext:
+        sysctls:
+          - name: net.ipv4.ip_local_port_range
+            value: "1024 65535"
       containers:
         - name: frontend
           image: spectrace-frontend:local
