@@ -3,7 +3,7 @@
 # One set of commands for macOS (Colima k3s) and Windows (WSL2 Ubuntu + Docker Desktop + k3d).
 #
 #   cluster   use the current kubectl context if it is `colima` or `k3d-*`; with no context,
-#             create one (k3d cluster create spectrace, or colima start --kubernetes)
+#             create one (k3d cluster create spectrace, or Colima with k3s)
 #   images    build spectrace-backend:local and spectrace-frontend:local; on k3d also
 #             import them into the cluster (k3d image import)
 #   deploy    create the MySQL Secret if missing, apply deploy/k8s/overlays/local,
@@ -52,7 +52,8 @@ cluster() {
     if command -v k3d >/dev/null; then
       k3d cluster create spectrace --wait
     elif command -v colima >/dev/null; then
-      colima start --kubernetes
+      # A running Colima VM gains k3s without a restart; a stopped one starts with it.
+      if colima status >/dev/null 2>&1; then colima kubernetes start; else colima start --kubernetes; fi
     else
       echo "Install k3d (Windows/WSL2) or Colima (macOS) first; see deploy/k8s/README.md" >&2; exit 69
     fi
@@ -85,14 +86,14 @@ deploy() {
   k rollout status statefulset/mysql --timeout=300s
   k rollout status deployment/backend --timeout=300s
   k rollout status deployment/frontend --timeout=180s
-  echo "Waiting for metrics-server (the HPA shows <unknown> until it reports)..."
-  for _ in $(seq 1 60); do kubectl top nodes >/dev/null 2>&1 && break; sleep 5; done
+  echo "Waiting for backend pod metrics (the HPA shows <unknown> until metrics-server reports)..."
+  for _ in $(seq 1 60); do k top pods -l app=backend >/dev/null 2>&1 && break; sleep 5; done
   k get hpa,pods -o wide
 }
 
 watch_once() {
   echo "=== $(date -u +%FT%TZ)"
-  k get hpa backend --no-headers 2>&1 | awk '{print "hpa: targets=" $3 " min=" $4 " max=" $5 " replicas=" $6}'
+  k get hpa backend -o jsonpath='hpa: cpu={.status.currentMetrics[0].resource.current.averageUtilization}%/60% current={.status.currentReplicas} desired={.status.desiredReplicas}{"\n"}' 2>&1
   k get pods -l app=backend --no-headers 2>&1
   k top pods -l app=backend --no-headers 2>/dev/null || true
 }
@@ -124,7 +125,10 @@ load() {
   echo "Recording ${COOLDOWN:-150}s more for the HPA to scale back down..."
   sleep "${COOLDOWN:-150}"
   cleanup; trap - EXIT
+  k describe hpa backend > "$out/hpa-describe.txt" 2>&1 || true
+  k get events --sort-by=.lastTimestamp > "$out/events.txt" 2>&1 || true
   echo "HPA timeline: $out/hpa-timeline.log"
+  grep -E 'SuccessfulRescale' "$out/events.txt" || true
 }
 
 delete_namespace() {

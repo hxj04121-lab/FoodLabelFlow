@@ -25,9 +25,29 @@ spec:
       labels:
         app: backend
     spec:
+      # Spring Boot exits if MySQL is not accepting connections yet; wait instead of crash-looping.
+      # MySQL opens 3306 only after its first-start initialisation has finished.
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox:1.37
+          command: ["sh", "-c", "until nc -z -w 2 mysql 3306; do echo waiting for mysql; sleep 2; done"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 32Mi
+      terminationGracePeriodSeconds: 40
       containers:
         - name: backend
           image: spectrace-backend:local
+          # On scale-down, keep serving while the Service endpoints and kube-proxy rules drop this
+          # pod; without the pause, requests already routed to it fail during the HPA scale-in.
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "10"]
           ports:
             - containerPort: 8080
           env:

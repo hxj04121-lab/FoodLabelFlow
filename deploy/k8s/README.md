@@ -69,7 +69,7 @@ scripts/s4-autoscale-demo.sh demo
 ```
 
 This creates the cluster if there is no kubectl context (`k3d cluster create spectrace` or
-`colima start --kubernetes`), builds and loads the images, deploys, waits for metrics-server,
+`colima kubernetes start` / `colima start --kubernetes`), builds and loads the images, deploys, waits for metrics-server,
 then port-forwards the frontend to `127.0.0.1:18080` and runs the k6 `ramp` profile
 (0 → 40 VUs in 1 min, hold 4 min, release 30 s) while recording `kubectl get hpa,pods` and
 `kubectl top pods` every 15 s. Expect about 15 minutes in total, most of it the first image build.
