@@ -68,8 +68,8 @@ Colima needs at least 4 CPUs / 8 GB (`colima start --cpu 4 --memory 8 --kubernet
 scripts/s4-autoscale-demo.sh demo
 ```
 
-This creates the cluster if there is no kubectl context (`k3d cluster create spectrace`, or
-k3s inside Colima), builds and loads the images, deploys, waits until metrics-server reports
+This creates the cluster if there is no kubectl context
+(`k3d cluster create spectrace --api-port 127.0.0.1:6550`, or k3s inside Colima), builds and loads the images, deploys, waits until metrics-server reports
 backend CPU, prepares Spec V2 → adoption → ChangeRequest → impact analysis through the API,
 then port-forwards the frontend to `127.0.0.1:18080` and runs the k6 `ramp` profile
 (0 → 100 VUs in 1 min, hold 4 min, release 30 s) while recording the HPA, the backend pods and

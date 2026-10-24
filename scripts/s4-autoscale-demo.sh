@@ -3,7 +3,7 @@
 # One set of commands for macOS (Colima k3s) and Windows (WSL2 Ubuntu + Docker Desktop + k3d).
 #
 #   cluster   use the current kubectl context if it is `colima` or `k3d-*`; with no context,
-#             create one (k3d cluster create spectrace, or Colima with k3s)
+#             create one (k3d cluster create spectrace on 127.0.0.1:6550, or Colima with k3s)
 #   images    build spectrace-backend:local and spectrace-frontend:local; on k3d also
 #             import them into the cluster (k3d image import)
 #   deploy    create the MySQL Secret if missing, apply deploy/k8s/overlays/local,
@@ -50,7 +50,8 @@ cluster() {
   detect
   if [[ -z "$PLATFORM" ]]; then
     if command -v k3d >/dev/null; then
-      k3d cluster create spectrace --wait
+      # Keep the Kubernetes API on loopback too (k3d's default listens on every interface).
+      k3d cluster create spectrace --api-port 127.0.0.1:6550 --wait
     elif command -v colima >/dev/null; then
       # A running Colima VM gains k3s without a restart; a stopped one starts with it.
       if colima status >/dev/null 2>&1; then colima kubernetes start; else colima start --kubernetes; fi

@@ -205,6 +205,26 @@ latency at the top of the ramp.
 | 100 VUs, `4848c0d` ([files](s4-perf/mac-autoscale-100vus-before-port-fix/)) | 1 → 3 → 5 → 1, but 843 / 100 620 requests (0.84 %) were 502s. The nginx log showed `connect() ... failed (99: Address not available)`: nginx opens a new upstream connection per request, and at about 300 req/s TIME_WAIT used up the default 28 k ephemeral ports. A port-forward left over from the previous run was also still listening. | The frontend pod sets the namespaced safe sysctl `net.ipv4.ip_local_port_range=1024 65535` (nginx keeps one connection per request, so every new replica still gets traffic). The script stops `kubectl port-forward` by its own PID and fails if the port is taken. The ramp got its own thresholds. |
 | 100 VUs, `5b97e58` (above) | 1 → 5 → 1, 0.00 % errors | — |
 
+### k3d path check on the Mac (the script branch the Windows teammate uses)
+
+The same command ran with an empty `KUBECONFIG` at commit `fceab78`:
+`DURATION=60s COOLDOWN=90 scripts/s4-autoscale-demo.sh demo`.
+
+- **Cluster**: the script found no context and ran `k3d cluster create spectrace`, giving
+  k3d v5.9.0 with k3s v1.35.5+k3s1 inside Colima's Docker. The context was detected as
+  `k3d-spectrace`.
+- **Images**: `k3d image import` loaded the two images in 9 s, and the pods started with
+  `imagePullPolicy: Never`.
+- **Load**: the 2.5-minute ramp sent 42 959 requests at 286.1 req/s with **0.00 % errors**.
+  Latency was p50 8.4 ms, p95 187.4 ms and p99 611.3 ms, and all ramp thresholds passed.
+- **HPA**: 1 → 2 (03:01:32, 45 s after load started) → 3 → 5 (03:02:19, 1 min 32 s). Back to 1
+  at 03:04:37, about 75 s after k6 ended.
+
+Files: [`s4-perf/mac-k3d-path-check/`](s4-perf/mac-k3d-path-check/). Since that run the script
+creates the cluster with `--api-port 127.0.0.1:6550`, so the Kubernetes API also stays on
+loopback; that variant was checked separately (cluster Ready, server `https://127.0.0.1:6550`).
+This check uses k3d on macOS, not Windows/WSL2; the teammate's run below is still needed.
+
 ## 3. How to demonstrate it in 3 minutes
 
 Teammate setup (WSL2 + Docker Desktop + k3d, or Colima on macOS), prerequisites and clean-up are

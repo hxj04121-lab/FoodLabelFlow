@@ -1,0 +1,12 @@
+LAST SEEN   TYPE      REASON                         OBJECT                               MESSAGE
+5m39s       Warning   FailedComputeMetricsReplicas   horizontalpodautoscaler/backend      invalid metrics (1 invalid out of 1), first error is: failed to get cpu resource metric value: failed to get cpu utilization: unable to get metrics for resource cpu: unable to fetch metrics from resource metrics API: the server is currently unable to handle the request (get pods.metrics.k8s.io)
+5m39s       Warning   FailedGetResourceMetric        horizontalpodautoscaler/backend      failed to get cpu utilization: unable to get metrics for resource cpu: unable to fetch metrics from resource metrics API: the server is currently unable to handle the request (get pods.metrics.k8s.io)
+4m10s       Warning   FailedGetResourceMetric        horizontalpodautoscaler/backend      failed to get cpu utilization: unable to get metrics for resource cpu: no metrics returned from resource metrics API
+4m10s       Warning   FailedComputeMetricsReplicas   horizontalpodautoscaler/backend      invalid metrics (1 invalid out of 1), first error is: failed to get cpu resource metric value: failed to get cpu utilization: unable to get metrics for resource cpu: no metrics returned from resource metrics API
+3m55s       Warning   FailedComputeMetricsReplicas   horizontalpodautoscaler/backend      invalid metrics (1 invalid out of 1), first error is: failed to get cpu resource metric value: failed to get cpu utilization: did not receive metrics for targeted pods (pods might be unready)
+3m55s       Warning   FailedGetResourceMetric        horizontalpodautoscaler/backend      failed to get cpu utilization: did not receive metrics for targeted pods (pods might be unready)
+3m26s       Normal    SuccessfulRescale              horizontalpodautoscaler/backend      New size: 2; reason: cpu resource utilization (percentage of request) above target
+2m56s       Normal    SuccessfulRescale              horizontalpodautoscaler/backend      New size: 3; reason: cpu resource utilization (percentage of request) above target
+2m41s       Normal    SuccessfulRescale              horizontalpodautoscaler/backend      New size: 5; reason: cpu resource utilization (percentage of request) above target
+43s         Normal    SuccessfulRescale              horizontalpodautoscaler/backend      New size: 4; reason: All metrics below target
+28s         Normal    SuccessfulRescale              horizontalpodautoscaler/backend      New size: 1; reason: All metrics below target
