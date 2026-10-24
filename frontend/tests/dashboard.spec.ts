@@ -21,6 +21,39 @@ test('overview, chart switching and CSV export', async ({ page }) => {
   await page.screenshot({ path: 'test-results/overview.png', fullPage: true })
 })
 
+test('shell help, overview shortcuts and mobile drawer controls', async ({ page }) => {
+  await page.goto('/')
+  const help = page.getByRole('dialog', { name: 'Welcome to SpecTrace' })
+  await page.getByRole('button', { name: 'Help', exact: true }).click()
+  await expect(help).toBeVisible()
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'User guide', exact: true }).click()
+  await expect(help).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.user-card strong')).not.toBeEmpty()
+  await page
+    .getByRole('button', { name: 'View PLAIN BREAD CRUMBS, PLAIN', exact: true })
+    .click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Open labels', exact: true }).click()
+  await expect(page).toHaveURL(/\/labels$/)
+  await expect(page.locator('.breadcrumb')).toContainText('Change control')
+  await page.getByRole('link', { name: 'Overview', exact: true }).click()
+  await page.getByRole('button', { name: 'Analyze a change', exact: true }).click()
+  await expect(page).toHaveURL(/\/impact$/)
+  await page.getByRole('button', { name: 'Find products and formulas', exact: true }).click()
+  await expect(page).toHaveURL(/\/products$/)
+  await page.setViewportSize({ width: 390, height: 844 })
+  const overlay = page.getByRole('button', { name: 'Dismiss navigation overlay' })
+  await page.getByRole('button', { name: 'Open navigation' }).click()
+  await page.getByRole('button', { name: 'Close navigation' }).click()
+  await expect(overlay).toHaveCount(0)
+  await page.getByRole('button', { name: 'Open navigation' }).click()
+  await overlay.click({ position: { x: 350, y: 400 } })
+  await expect(overlay).toHaveCount(0)
+})
+
 test('product search, group filter, pagination and traceability tabs', async ({
   page,
 }) => {

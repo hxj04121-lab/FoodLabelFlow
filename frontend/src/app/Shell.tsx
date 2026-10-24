@@ -145,6 +145,13 @@ export function Shell() {
             <CircleHelp size={18} />
             <span>User guide</span>
           </button>
+          <div className="user-card">
+            <span className="avatar">{initials}</span>
+            <div>
+              <strong>{identity.session.actor?.displayName ?? 'Identity unavailable'}</strong>
+              <small>{identity.session.actor?.roles.join(', ') ?? 'No verified role'}</small>
+            </div>
+          </div>
         </div>
       </aside>
       <div className="main-shell">
