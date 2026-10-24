@@ -1,0 +1,52 @@
+# nginx serves the built UI and proxies /api/ to http://backend:8080 (frontend/nginx.conf),
+# i.e. to the backend Service, which spreads requests over every ready backend replica.
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      # nginx opens one upstream connection per proxied request (frontend/nginx.conf has no
+      # keepalive, which keeps every new backend replica in the Service rotation). Under the
+      # ramp the default 28k ephemeral ports run out (EADDRNOTAVAIL -> 502); a namespaced,
+      # Kubernetes-"safe" sysctl widens the range for this pod only.
+      securityContext:
+        sysctls:
+          - name: net.ipv4.ip_local_port_range
+            value: "1024 65535"
+      containers:
+        - name: frontend
+          image: spectrace-frontend:local
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            periodSeconds: 5

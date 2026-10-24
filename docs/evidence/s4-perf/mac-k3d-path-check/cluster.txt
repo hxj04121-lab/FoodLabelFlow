@@ -1,0 +1,5 @@
+Client Version: v1.37.1
+Kustomize Version: v5.8.1
+Server Version: v1.35.5+k3s1
+NAME                     STATUS   ROLES           AGE     VERSION        INTERNAL-IP   EXTERNAL-IP   OS-IMAGE           KERNEL-VERSION      CONTAINER-RUNTIME
+k3d-spectrace-server-0   Ready    control-plane   2m25s   v1.35.5+k3s1   172.21.0.3    <none>        K3s v1.35.5+k3s1   6.8.0-100-generic   containerd://2.2.3-k3s1

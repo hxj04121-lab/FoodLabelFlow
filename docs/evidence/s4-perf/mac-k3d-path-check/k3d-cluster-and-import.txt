@@ -1,0 +1,25 @@
+INFO[0000] Created network 'k3d-spectrace'              
+INFO[0000] Created image volume k3d-spectrace-images    
+INFO[0001] Creating node 'k3d-spectrace-server-0'       
+INFO[0001] Pulling image 'ghcr.io/k3d-io/k3d-tools:5.9.0' 
+INFO[0006] Starting node 'k3d-spectrace-tools'          
+INFO[0018] Creating LoadBalancer 'k3d-spectrace-serverlb' 
+INFO[0020] Pulling image 'ghcr.io/k3d-io/k3d-proxy:5.9.0' 
+INFO[0027] Using the k3d-tools node to gather environment information 
+INFO[0027] Starting node 'k3d-spectrace-tools'          
+INFO[0028] Starting node 'k3d-spectrace-server-0'       
+INFO[0033] Starting node 'k3d-spectrace-serverlb'       
+INFO[0040] Injecting records for hostAliases (incl. host.k3d.internal) and for 3 network members into CoreDNS configmap... 
+k3d-spectrace-server-0   Ready    control-plane   8s    v1.35.5+k3s1   172.21.0.3    <none>        K3s v1.35.5+k3s1   6.8.0-100-generic   containerd://2.2.3-k3s1
+Platform: k3d (k3d-spectrace)
+INFO[0000] Importing image(s) into cluster 'spectrace'  
+INFO[0003] Importing images into nodes...               
+INFO[0003] Importing images from tarball '/k3d/images/k3d-spectrace-images-20261024105831.tar' into node 'k3d-spectrace-server-0'... 
+INFO[0008] Removing k3d-tools node...                   
+INFO[0009] Successfully imported image(s)               
+INFO[0009] Successfully imported 2 image(s) into 1 cluster(s) 
+pod/backend-f755c677b-lfcgr     1/1     Running   0             2m4s   10.42.0.6    k3d-spectrace-server-0   <none>           <none>
+pod/frontend-689bfc8d5b-zv2sd   1/1     Running   3 (96s ago)   2m4s   10.42.0.5    k3d-spectrace-server-0   <none>           <none>
+pod/mysql-0                     1/1     Running   0             2m4s   10.42.0.12   k3d-spectrace-server-0   <none>           <none>
+Results: perf/results/20261024T030045Z-autoscale-k3d-fceab78/k6
+HPA timeline: perf/results/20261024T030045Z-autoscale-k3d-fceab78/hpa-timeline.log

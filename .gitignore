@@ -12,3 +12,4 @@ frontend/playwright-report/
 frontend/.nyc_output/
 frontend/coverage/
 .DS_Store
+perf/results/

@@ -1,0 +1,70 @@
+# The root password lives in Secret spectrace-mysql, created by scripts/s4-autoscale-demo.sh
+# (never committed). Data survives pod restarts through the local-path PVC.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+spec:
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+      targetPort: 3306
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+spec:
+  serviceName: mysql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.4.11
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: spectrace-mysql
+                  key: password
+            - name: MYSQL_DATABASE
+              value: spectrace
+          ports:
+            - containerPort: 3306
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "mysql --protocol=TCP -h 127.0.0.1 -uroot -p\"$MYSQL_ROOT_PASSWORD\" -D spectrace -e 'SELECT 1' >/dev/null 2>&1"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "mysqladmin --protocol=TCP -h 127.0.0.1 -uroot -p\"$MYSQL_ROOT_PASSWORD\" ping >/dev/null 2>&1"]
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 6
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi

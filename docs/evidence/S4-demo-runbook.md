@@ -105,3 +105,13 @@ Compose stacks and uploads the harness evidence plus Surefire reports. This
 closes the coverage gap from the ordinary Maven name patterns excluding
 `*Harness`. It is still isolated acceptance evidence, not cloud-deployment
 evidence or another person's independent rehearsal.
+
+## 6. Quality attributes: performance and auto-scaling
+
+Scripted k6 performance tests (`perf/`), the CI perf smoke artifact `perf-smoke-<sha>`, and the
+local k3s HorizontalPodAutoscaler demo (`scripts/s4-autoscale-demo.sh`, Colima on macOS or
+WSL2 + Docker Desktop + k3d on Windows) are recorded in
+[S4-performance-and-autoscaling.md](S4-performance-and-autoscaling.md). Its section 3 is the
+three-minute, two-terminal script (`kubectl -n spectrace get hpa -w` and the k6 ramp), and
+[`deploy/k8s/README.md`](../../deploy/k8s/README.md) has the set-up and clean-up steps.
+These run on a laptop only; the hosted course site is not load-tested.

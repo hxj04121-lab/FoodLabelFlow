@@ -1,0 +1,182 @@
+=== 2026-10-24T02:25:48Z
+hpa: targets=cpu: min=<unknown>/60% max=1 replicas=5
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (25s ago)   42s
+=== 2026-10-24T02:26:04Z
+hpa: targets=cpu: min=<unknown>/60% max=1 replicas=5
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (40s ago)   57s
+backend-59ff9d5bdf-pc5jx   262m   222Mi   
+=== 2026-10-24T02:26:19Z
+hpa: targets=cpu: min=<unknown>/60% max=1 replicas=5
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (55s ago)   72s
+backend-59ff9d5bdf-pc5jx   369m   236Mi   
+=== 2026-10-24T02:26:34Z
+hpa: targets=cpu: min=73%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   0/1   Running   0             13s
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (70s ago)   87s
+backend-59ff9d5bdf-pc5jx   396m   240Mi   
+=== 2026-10-24T02:26:49Z
+hpa: targets=cpu: min=79%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0             28s
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (85s ago)   102s
+backend-59ff9d5bdf-k49m8   675m   234Mi   
+backend-59ff9d5bdf-pc5jx   463m   247Mi   
+=== 2026-10-24T02:27:04Z
+hpa: targets=cpu: min=92%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0              44s
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (101s ago)   118s
+backend-59ff9d5bdf-k49m8   440m   246Mi   
+backend-59ff9d5bdf-pc5jx   234m   245Mi   
+=== 2026-10-24T02:27:20Z
+hpa: targets=cpu: min=67%/60% max=1 replicas=5
+backend-59ff9d5bdf-826r9   0/1   Running   0              14s
+backend-59ff9d5bdf-k49m8   1/1   Running   0              59s
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (116s ago)   2m13s
+backend-59ff9d5bdf-k49m8   337m   248Mi   
+backend-59ff9d5bdf-pc5jx   363m   248Mi   
+=== 2026-10-24T02:27:35Z
+hpa: targets=cpu: min=70%/60% max=1 replicas=5
+backend-59ff9d5bdf-826r9   1/1   Running   0               29s
+backend-59ff9d5bdf-k49m8   1/1   Running   0               74s
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (2m11s ago)   2m28s
+backend-59ff9d5bdf-826r9   907m   222Mi   
+backend-59ff9d5bdf-k49m8   402m   259Mi   
+backend-59ff9d5bdf-pc5jx   297m   248Mi   
+=== 2026-10-24T02:27:50Z
+hpa: targets=cpu: min=69%/60% max=1 replicas=5
+backend-59ff9d5bdf-826r9   1/1   Running   0               44s
+backend-59ff9d5bdf-k49m8   1/1   Running   0               89s
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (2m26s ago)   2m43s
+backend-59ff9d5bdf-826r9   401m   245Mi   
+backend-59ff9d5bdf-k49m8   136m   259Mi   
+backend-59ff9d5bdf-pc5jx   118m   248Mi   
+=== 2026-10-24T02:28:05Z
+hpa: targets=cpu: min=38%/60% max=1 replicas=5
+backend-59ff9d5bdf-826r9   1/1   Running   0               59s
+backend-59ff9d5bdf-k49m8   1/1   Running   0               104s
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (2m41s ago)   2m58s
+backend-59ff9d5bdf-826r9   221m   247Mi   
+backend-59ff9d5bdf-k49m8   234m   260Mi   
+backend-59ff9d5bdf-pc5jx   117m   249Mi   
+=== 2026-10-24T02:28:20Z
+hpa: targets=cpu: min=33%/60% max=1 replicas=5
+backend-59ff9d5bdf-826r9   1/1   Running   0               75s
+backend-59ff9d5bdf-k49m8   1/1   Running   0               2m
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (2m57s ago)   3m14s
+backend-59ff9d5bdf-826r9   207m   248Mi   
+backend-59ff9d5bdf-k49m8   163m   260Mi   
+backend-59ff9d5bdf-pc5jx   125m   249Mi   
+=== 2026-10-24T02:28:36Z
+hpa: targets=cpu: min=28%/60% max=1 replicas=5
+backend-59ff9d5bdf-826r9   1/1   Running   0               90s
+backend-59ff9d5bdf-k49m8   1/1   Running   0               2m15s
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (3m12s ago)   3m29s
+backend-59ff9d5bdf-826r9   191m   250Mi   
+backend-59ff9d5bdf-k49m8   125m   261Mi   
+backend-59ff9d5bdf-pc5jx   106m   249Mi   
+=== 2026-10-24T02:28:51Z
+hpa: targets=cpu: min=24%/60% max=1 replicas=5
+backend-59ff9d5bdf-826r9   1/1   Terminating   0               105s
+backend-59ff9d5bdf-k49m8   1/1   Running       0               2m30s
+backend-59ff9d5bdf-pc5jx   1/1   Running       2 (3m27s ago)   3m44s
+backend-59ff9d5bdf-k49m8   116m   261Mi   
+backend-59ff9d5bdf-pc5jx   108m   249Mi   
+=== 2026-10-24T02:29:06Z
+hpa: targets=cpu: min=47%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0               2m46s
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (3m43s ago)   4m
+backend-59ff9d5bdf-k49m8   226m   261Mi   
+backend-59ff9d5bdf-pc5jx   251m   249Mi   
+=== 2026-10-24T02:29:22Z
+hpa: targets=cpu: min=40%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0               3m1s
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (3m58s ago)   4m15s
+backend-59ff9d5bdf-k49m8   192m   261Mi   
+backend-59ff9d5bdf-pc5jx   210m   249Mi   
+=== 2026-10-24T02:29:37Z
+hpa: targets=cpu: min=32%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0               3m16s
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (4m13s ago)   4m30s
+backend-59ff9d5bdf-k49m8   165m   261Mi   
+backend-59ff9d5bdf-pc5jx   157m   249Mi   
+=== 2026-10-24T02:29:52Z
+hpa: targets=cpu: min=40%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0               3m31s
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (4m28s ago)   4m45s
+backend-59ff9d5bdf-k49m8   191m   261Mi   
+backend-59ff9d5bdf-pc5jx   209m   249Mi   
+=== 2026-10-24T02:30:07Z
+hpa: targets=cpu: min=56%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0               3m46s
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (4m43s ago)   5m
+backend-59ff9d5bdf-k49m8   279m   261Mi   
+backend-59ff9d5bdf-pc5jx   282m   249Mi   
+=== 2026-10-24T02:30:22Z
+hpa: targets=cpu: min=31%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0               4m2s
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (4m59s ago)   5m16s
+backend-59ff9d5bdf-k49m8   154m   261Mi   
+backend-59ff9d5bdf-pc5jx   159m   249Mi   
+=== 2026-10-24T02:30:38Z
+hpa: targets=cpu: min=55%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0               4m17s
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (5m14s ago)   5m31s
+backend-59ff9d5bdf-k49m8   273m   262Mi   
+backend-59ff9d5bdf-pc5jx   280m   249Mi   
+=== 2026-10-24T02:30:53Z
+hpa: targets=cpu: min=45%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0               4m33s
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (5m30s ago)   5m47s
+backend-59ff9d5bdf-k49m8   228m   262Mi   
+backend-59ff9d5bdf-pc5jx   231m   249Mi   
+=== 2026-10-24T02:31:09Z
+hpa: targets=cpu: min=39%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0               4m48s
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (5m45s ago)   6m2s
+backend-59ff9d5bdf-k49m8   191m   262Mi   
+backend-59ff9d5bdf-pc5jx   200m   249Mi   
+=== 2026-10-24T02:31:24Z
+hpa: targets=cpu: min=26%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0            5m3s
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (6m ago)   6m17s
+backend-59ff9d5bdf-k49m8   135m   262Mi   
+backend-59ff9d5bdf-pc5jx   134m   249Mi   
+=== 2026-10-24T02:31:39Z
+hpa: targets=cpu: min=8%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0               5m18s
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (6m15s ago)   6m32s
+backend-59ff9d5bdf-k49m8   40m   262Mi   
+backend-59ff9d5bdf-pc5jx   40m   249Mi   
+=== 2026-10-24T02:31:54Z
+hpa: targets=cpu: min=0%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0               5m34s
+backend-59ff9d5bdf-pc5jx   1/1   Running   2 (6m31s ago)   6m48s
+backend-59ff9d5bdf-k49m8   3m    262Mi   
+backend-59ff9d5bdf-pc5jx   4m    249Mi   
+=== 2026-10-24T02:32:10Z
+hpa: targets=cpu: min=0%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0     5m49s
+backend-59ff9d5bdf-k49m8   3m    262Mi   
+=== 2026-10-24T02:32:25Z
+hpa: targets=cpu: min=0%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0     6m4s
+backend-59ff9d5bdf-k49m8   4m    262Mi   
+=== 2026-10-24T02:32:40Z
+hpa: targets=cpu: min=0%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0     6m19s
+backend-59ff9d5bdf-k49m8   3m    262Mi   
+=== 2026-10-24T02:32:55Z
+hpa: targets=cpu: min=0%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0     6m34s
+backend-59ff9d5bdf-k49m8   3m    262Mi   
+=== 2026-10-24T02:33:10Z
+hpa: targets=cpu: min=0%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0     6m50s
+backend-59ff9d5bdf-k49m8   4m    262Mi   
+=== 2026-10-24T02:33:26Z
+hpa: targets=cpu: min=0%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0     7m5s
+backend-59ff9d5bdf-k49m8   3m    262Mi   
+=== 2026-10-24T02:33:41Z
+hpa: targets=cpu: min=0%/60% max=1 replicas=5
+backend-59ff9d5bdf-k49m8   1/1   Running   0     7m20s
+backend-59ff9d5bdf-k49m8   4m    262Mi   

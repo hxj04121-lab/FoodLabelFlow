@@ -1,0 +1,51 @@
+
+
+  █ THRESHOLDS 
+
+    http_req_duration{name:catalog_list}
+    ✓ 'max>=0' max=62.62ms
+
+    http_req_duration{name:impact_report}
+    ✓ 'max>=0' max=67ms
+
+    http_req_duration{name:label_history}
+    ✓ 'max>=0' max=76.02ms
+
+    http_req_duration{name:product_detail}
+    ✓ 'max>=0' max=54.95ms
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 5826    48.414759/s
+    checks_succeeded...: 100.00% 5826 out of 5826
+    checks_failed......: 0.00%   0 out of 5826
+
+    ✓ setup 200
+    ✓ product_detail 200
+    ✓ catalog_list 200
+    ✓ impact_report 200
+    ✓ label_history 200
+
+    HTTP
+    http_req_duration..............: avg=7.25ms   min=1.25ms   med=5.99ms   p(90)=14.07ms  p(95)=16.31ms  p(99)=20.65ms  max=76.02ms 
+      { expected_response:true }...: avg=7.25ms   min=1.25ms   med=5.99ms   p(90)=14.07ms  p(95)=16.31ms  p(99)=20.65ms  max=76.02ms 
+      { name:catalog_list }........: avg=5.45ms   min=1.76ms   med=5.65ms   p(90)=7.31ms   p(95)=7.82ms   p(99)=10.23ms  max=62.62ms 
+      { name:impact_report }.......: avg=13.33ms  min=5.27ms   med=13.83ms  p(90)=17.93ms  p(95)=19.71ms  p(99)=26.97ms  max=67ms    
+      { name:label_history }.......: avg=8.66ms   min=2.98ms   med=8.85ms   p(90)=11.57ms  p(95)=12.26ms  p(99)=16.67ms  max=76.02ms 
+      { name:product_detail }......: avg=4.74ms   min=1.25ms   med=4.94ms   p(90)=6.36ms   p(95)=6.82ms   p(99)=9.39ms   max=54.95ms 
+    http_req_failed................: 0.00%  0 out of 5826
+    http_reqs......................: 5826   48.414759/s
+
+    EXECUTION
+    iteration_duration.............: avg=206.23ms min=102.86ms med=206.05ms p(90)=287.18ms p(95)=297.71ms p(99)=307.44ms max=351.24ms
+    iterations.....................: 5824   48.398138/s
+    vus............................: 10     min=10        max=10
+    vus_max........................: 10     min=10        max=10
+
+    NETWORK
+    data_received..................: 135 MB 1.1 MB/s
+    data_sent......................: 1.4 MB 12 kB/s
+
+
+

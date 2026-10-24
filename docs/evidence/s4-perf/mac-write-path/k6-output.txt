@@ -1,0 +1,55 @@
+
+
+  █ THRESHOLDS 
+
+    batch_adoption_duration
+    ✓ 'p(95)<1000' p(95)=284.1ms
+
+    checks
+    ✓ 'rate==1.0' rate=100.00%
+
+    http_req_failed
+    ✓ 'rate<0.01' rate=0.00%
+
+    impact_run_duration
+    ✓ 'p(95)<500' p(95)=124ms
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 25      2.445731/s
+    checks_succeeded...: 100.00% 25 out of 25
+    checks_failed......: 0.00%   0 out of 25
+
+    ✓ setup 200
+    ✓ spec_create 2xx
+    ✓ spec_release 2xx
+    ✓ batch_adoption 2xx
+    ✓ adopted 40
+    ✓ change_request 2xx
+    ✓ impact_run 2xx
+    ✓ impact 40 relevant
+    ✓ impact splits NO_ACTION / REVIEW_REQUIRED
+
+    CUSTOM
+    batch_adoption_duration........: avg=263.66ms min=238ms  med=267ms   p(90)=282.2ms  p(95)=284.1ms  p(99)=285.62ms max=286ms   
+    impact_run_duration............: avg=107.66ms min=91ms   med=106ms   p(90)=122ms    p(95)=124ms    p(99)=125.6ms  max=126ms   
+
+    HTTP
+    http_req_duration..............: avg=75.49ms  min=4.76ms med=15.72ms p(90)=252.53ms p(95)=271.26ms p(99)=282.2ms  max=284.94ms
+      { expected_response:true }...: avg=75.49ms  min=4.76ms med=15.72ms p(90)=252.53ms p(95)=271.26ms p(99)=282.2ms  max=284.94ms
+    http_req_failed................: 0.00%  0 out of 16
+    http_reqs......................: 16     1.565268/s
+
+    EXECUTION
+    iteration_duration.............: avg=3.4s     min=3.37s  med=3.4s    p(90)=3.42s    p(95)=3.42s    p(99)=3.42s    max=3.42s   
+    iterations.....................: 3      0.293488/s
+    vus............................: 1      min=1       max=1
+    vus_max........................: 1      min=1       max=1
+
+    NETWORK
+    data_received..................: 116 kB 11 kB/s
+    data_sent......................: 6.7 kB 651 B/s
+
+
+
