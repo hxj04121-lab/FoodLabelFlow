@@ -17,7 +17,6 @@ import { Overview } from '@/pages/Overview'
 import { Upcoming } from '@/pages/Upcoming'
 import {
   Activity,
-  Box,
   ChevronRight,
   CircleHelp,
   ClipboardCheck,
@@ -29,7 +28,6 @@ import {
   Menu,
   Package,
   Search,
-  ShieldCheck,
   Truck,
   X,
 } from 'lucide-react'
@@ -42,14 +40,24 @@ import {
   useNavigate,
 } from 'react-router-dom'
 const navigation = [
-  { path: '/', label: 'Overview', icon: LayoutDashboard },
-  { path: '/suppliers', label: 'Suppliers', icon: Truck },
-  { path: '/materials', label: 'Materials & specs', icon: Layers3 },
-  { path: '/products', label: 'Products', icon: Package },
-  { path: '/formulas', label: 'Formula versions', icon: FlaskConical },
-  { path: '/labels', label: 'Labels', icon: FileText },
-  { path: '/impact', label: 'Change impact', icon: GitBranch },
-  { path: '/reviews', label: 'Review workspace', icon: ClipboardCheck },
+  {
+    section: 'Catalog',
+    items: [
+      { path: '/', label: 'Overview', icon: LayoutDashboard },
+      { path: '/suppliers', label: 'Suppliers', icon: Truck },
+      { path: '/materials', label: 'Materials & specs', icon: Layers3 },
+      { path: '/products', label: 'Products', icon: Package },
+      { path: '/formulas', label: 'Formula versions', icon: FlaskConical },
+    ],
+  },
+  {
+    section: 'Change control',
+    items: [
+      { path: '/labels', label: 'Labels', icon: FileText },
+      { path: '/impact', label: 'Change impact', icon: GitBranch },
+      { path: '/reviews', label: 'Review workspace', icon: ClipboardCheck },
+    ],
+  },
 ]
 import { CatalogConnection } from '@/components/CatalogConnection'
 import { ControlledDemoIdentitySwitcher, useCurrentIdentity } from '@/components/CurrentIdentityPanel'
@@ -62,36 +70,16 @@ export function Shell() {
   useEffect(() => {
     setMobile(false)
   }, [location.pathname])
-  const active = navigation.find((n) => n.path === location.pathname)
+  const activeGroup = navigation.find((g) =>
+    g.items.some((n) => n.path === location.pathname),
+  )
+  const active = activeGroup?.items.find((n) => n.path === location.pathname)
+  const initials = identity.session.actor?.displayName?.slice(0, 2).toUpperCase() ?? '—'
   return (
     <div className="app-shell">
       <a href="#main" className="skip-link">
         Skip to main content
       </a>
-      <header className="topbar">
-        <div className="wordmark">
-          <span className="logo">
-            <Layers3 size={23} />
-          </span>
-          SpecTrace<span className="workspace-label">Food label workspace</span>
-        </div>
-        <div className="topbar-right">
-          <span className="environment">
-            <span />
-            Local workspace
-          </span>
-          <button aria-label="Help" onClick={() => setHelp(true)}>
-            <CircleHelp size={19} />
-          </button>
-          <span className="topbar-divider" />
-          <ControlledDemoIdentitySwitcher showStatus={false} />
-          <span className="identity-status" aria-live="polite">
-            {identity.session.status === 'switching' ? 'Refreshing permissions…'
-              : identity.session.actor?.displayName || identity.session.error || 'Identity unavailable'}
-          </span>
-          <span className="avatar">{identity.session.actor?.displayName?.slice(0, 2).toUpperCase() ?? '—'}</span>
-        </div>
-      </header>
       {mobile && (
         <button
           className="mobile-overlay"
@@ -100,13 +88,13 @@ export function Shell() {
         />
       )}
       <aside className={`sidebar ${mobile ? 'is-open' : ''}`}>
-        <div className="workspace-switch">
-          <span className="workspace-icon">
-            <Box size={21} />
+        <div className="wordmark">
+          <span className="logo">
+            <Layers3 size={19} />
           </span>
           <div>
-            <strong>FoodLabelFlow</strong>
-            <small>TEAM 16 · SWE5006</small>
+            <strong>SpecTrace</strong>
+            <small>FoodLabelFlow · Team 16</small>
           </div>
           <button
             className="mobile-close"
@@ -116,30 +104,30 @@ export function Shell() {
             <X size={18} />
           </button>
         </div>
-        <p className="nav-section-label">Workspace</p>
-        <nav aria-label="Main navigation">
-          {navigation.map((n, i) => (
-            <NavLink
-              end={n.path === '/'}
-              to={n.path}
-              key={n.path}
-              className={({ isActive }) =>
-                `nav-item ${isActive ? 'active' : ''}`
-              }
-            >
-              <n.icon size={19} />
-              <span>{n.label}</span>
-              {i > 4 && <span className="nav-dot" />}
-            </NavLink>
+        <nav className="sidebar-nav" aria-label="Main navigation">
+          {navigation.map((group) => (
+            <div className="nav-group" key={group.section}>
+              <p className="nav-section-label">{group.section}</p>
+              {group.items.map((n) => (
+                <NavLink
+                  end={n.path === '/'}
+                  to={n.path}
+                  key={n.path}
+                  className={({ isActive }) =>
+                    `nav-item ${isActive ? 'active' : ''}`
+                  }
+                >
+                  <n.icon size={18} />
+                  <span>{n.label}</span>
+                </NavLink>
+              ))}
+            </div>
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="version-note">
-            <span className="version-icon">
-              <ShieldCheck size={21} />
-            </span>
-            <strong>Always traceable</strong>
-            <p>Preserve history. Keep every change in view.</p>
+          <div className="environment-card">
+            <strong>Local workspace</strong>
+            <span>Single-market MVP · United States</span>
           </div>
           <NavLink
             to="/health"
@@ -152,17 +140,10 @@ export function Shell() {
             <CircleHelp size={18} />
             <span>User guide</span>
           </button>
-          <div className="user-card">
-            <span className="avatar">{identity.session.actor?.displayName?.slice(0, 2).toUpperCase() ?? '—'}</span>
-            <div>
-              <strong>{identity.session.actor?.displayName ?? 'Identity unavailable'}</strong>
-              <small>{identity.session.actor?.roles.join(', ') ?? 'No verified role'}</small>
-            </div>
-          </div>
         </div>
       </aside>
       <div className="main-shell">
-        <div className="contextbar">
+        <header className="topbar">
           <div className="breadcrumb">
             <button
               className="mobile-toggle"
@@ -171,21 +152,35 @@ export function Shell() {
             >
               <Menu size={20} />
             </button>
-            <span>Workspace</span>
-            <ChevronRight size={14} />
+            <span className="breadcrumb-section">
+              {activeGroup?.section ?? 'Workspace'}
+            </span>
+            <ChevronRight className="breadcrumb-section" size={14} aria-hidden="true" />
             <strong>
               {active?.label ??
                 (location.pathname === '/health' ? 'System status' : 'Page')}
             </strong>
           </div>
-          <button
-            className="quick-search"
-            onClick={() => navigate('/products')}
-          >
-            <Search size={16} />
-            <span>Find products and formulas</span>
-          </button>
-        </div>
+          <div className="topbar-right">
+            <button
+              className="quick-search"
+              onClick={() => navigate('/products')}
+            >
+              <Search size={16} />
+              <span>Find products and formulas</span>
+            </button>
+            <button className="icon-button" aria-label="Help" onClick={() => setHelp(true)}>
+              <CircleHelp size={18} />
+            </button>
+            <span className="topbar-divider" />
+            <ControlledDemoIdentitySwitcher showStatus={false} />
+            <span className="identity-status" aria-live="polite">
+              {identity.session.status === 'switching' ? 'Refreshing permissions…'
+                : identity.session.actor?.displayName || identity.session.error || 'Identity unavailable'}
+            </span>
+            <span className="avatar" title={identity.session.actor?.roles.join(', ')}>{initials}</span>
+          </div>
+        </header>
         <main id="main">
           <Routes key={`${identity.session.generation}:${identity.session.status}`}>
             <Route path="/" element={<CatalogConnection><Overview /></CatalogConnection>} />
@@ -209,7 +204,7 @@ export function Shell() {
           </Routes>
           <footer className="page-footer">
             <span>SpecTrace · Food label change control</span>
-            <span>Local workspace / Single-market MVP</span>
+            <span>Local workspace · Single-market MVP</span>
           </footer>
         </main>
       </div>
