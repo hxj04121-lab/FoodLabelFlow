@@ -1,0 +1,5 @@
+Client Version: v1.37.1
+Kustomize Version: v5.8.1
+Server Version: v1.35.0+k3s1
+NAME     STATUS   ROLES           AGE   VERSION        INTERNAL-IP   EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION      CONTAINER-RUNTIME
+colima   Ready    control-plane   21m   v1.35.0+k3s1   192.168.5.1   <none>        Ubuntu 24.04.4 LTS   6.8.0-100-generic   docker://29.2.1

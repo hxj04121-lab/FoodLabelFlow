@@ -1,0 +1,323 @@
+{
+    "metrics": {
+        "http_req_duration{name:impact_report}": {
+            "p(99)": 217.24317999999988,
+            "max": 949.459,
+            "avg": 18.262051205936864,
+            "min": 5.358,
+            "med": 8.215499999999999,
+            "p(90)": 26.90770000000001,
+            "p(95)": 54.37949999999995,
+            "thresholds": {
+                "p(95)<200": false
+            }
+        },
+        "http_req_waiting": {
+            "p(99)": 128.25054999999975,
+            "max": 944.72,
+            "avg": 10.196322594995308,
+            "min": 1.48,
+            "med": 4.0865,
+            "p(90)": 14.765200000000004,
+            "p(95)": 29.404549999999997
+        },
+        "http_req_duration{name:catalog_list}": {
+            "p(95)": 25.018799999999985,
+            "p(99)": 97.80211999999996,
+            "max": 859.986,
+            "avg": 8.46407506955746,
+            "min": 2.108,
+            "med": 3.517,
+            "p(90)": 12.720600000000008,
+            "thresholds": {
+                "p(95)<100": false
+            }
+        },
+        "data_received": {
+            "count": 1249916160,
+            "rate": 3784781.6680978644
+        },
+        "http_req_blocked": {
+            "avg": 0.007226506024094164,
+            "min": 0.001,
+            "med": 0.006,
+            "p(90)": 0.01,
+            "p(95)": 0.013,
+            "p(99)": 0.025,
+            "max": 1.525
+        },
+        "http_reqs": {
+            "count": 53950,
+            "rate": 163.3621338201434
+        },
+        "http_req_connecting": {
+            "p(99)": 0,
+            "max": 0.798,
+            "avg": 0.0004155329008341057,
+            "min": 0,
+            "med": 0,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "http_req_tls_handshaking": {
+            "p(90)": 0,
+            "p(95)": 0,
+            "p(99)": 0,
+            "max": 0,
+            "avg": 0,
+            "min": 0,
+            "med": 0
+        },
+        "http_req_receiving": {
+            "avg": 0.26280400370713813,
+            "min": 0.011,
+            "med": 0.072,
+            "p(90)": 0.206,
+            "p(95)": 0.46,
+            "p(99)": 3.3615099999999996,
+            "max": 225.273
+        },
+        "http_req_duration{name:product_detail}": {
+            "avg": 7.05824136213656,
+            "min": 1.528,
+            "med": 2.734,
+            "p(90)": 10.1668,
+            "p(95)": 20.5125,
+            "p(99)": 83.07057999999994,
+            "max": 548.863,
+            "thresholds": {
+                "p(95)<75": false
+            }
+        },
+        "http_req_sending": {
+            "avg": 0.022172604263205088,
+            "min": 0.003,
+            "med": 0.019,
+            "p(90)": 0.033,
+            "p(95)": 0.039,
+            "p(99)": 0.064,
+            "max": 12.345
+        },
+        "vus": {
+            "value": 1,
+            "min": 0,
+            "max": 40
+        },
+        "iteration_duration": {
+            "med": 209.58797900000002,
+            "p(90)": 290.2187126,
+            "p(95)": 300.2803772,
+            "p(99)": 358.26183826,
+            "max": 1092.663958,
+            "avg": 211.082143942465,
+            "min": 102.344125
+        },
+        "http_req_duration{name:label_history}": {
+            "p(95)": 33.30175,
+            "p(99)": 164.2758999999998,
+            "max": 729.401,
+            "avg": 11.660607249255278,
+            "min": 2.8,
+            "med": 4.6545000000000005,
+            "p(90)": 16.0165,
+            "thresholds": {
+                "p(95)<150": false
+            }
+        },
+        "data_sent": {
+            "count": 13472001,
+            "rate": 40793.60204239307
+        },
+        "vus_max": {
+            "value": 40,
+            "min": 40,
+            "max": 40
+        },
+        "http_req_failed": {
+            "fails": 53945,
+            "passes": 5,
+            "thresholds": {
+                "rate<0.01": false
+            },
+            "value": 0.00009267840593141798
+        },
+        "http_req_duration": {
+            "avg": 10.481299202965722,
+            "min": 1.528,
+            "med": 4.214,
+            "p(90)": 15.167100000000001,
+            "p(95)": 30.423599999999972,
+            "p(99)": 132.31328,
+            "max": 949.459
+        },
+        "iterations": {
+            "count": 53948,
+            "rate": 163.35607776328263
+        },
+        "checks": {
+            "passes": 53945,
+            "fails": 5,
+            "thresholds": {
+                "rate>0.99": false
+            },
+            "value": 0.9999073215940686
+        },
+        "http_req_duration{expected_response:true}": {
+            "min": 1.528,
+            "med": 4.214,
+            "p(90)": 15.161600000000002,
+            "p(95)": 30.389799999999937,
+            "p(99)": 132.31467999999998,
+            "max": 949.459,
+            "avg": 10.477886514042094
+        }
+    },
+    "setup_data": {
+        "impactedIds": [
+            "prod_usda_1106285",
+            "prod_usda_1106963",
+            "prod_usda_1107123",
+            "prod_usda_1109412",
+            "prod_usda_1110930",
+            "prod_usda_1111174",
+            "prod_usda_1114509",
+            "prod_usda_1117669",
+            "prod_usda_1118468",
+            "prod_usda_1119637",
+            "prod_usda_1121486",
+            "prod_usda_1123666",
+            "prod_usda_1124414",
+            "prod_usda_1124504",
+            "prod_usda_1126130",
+            "prod_usda_1129904",
+            "prod_usda_1132049",
+            "prod_usda_1132711",
+            "prod_usda_1135103",
+            "prod_usda_1135585",
+            "prod_usda_1136800",
+            "prod_usda_1137129",
+            "prod_usda_1137149",
+            "prod_usda_1137641",
+            "prod_usda_348560",
+            "prod_usda_348784",
+            "prod_usda_349473",
+            "prod_usda_358610",
+            "prod_usda_366384",
+            "prod_usda_368616",
+            "prod_usda_375302",
+            "prod_usda_375679",
+            "prod_usda_386914",
+            "prod_usda_407551",
+            "prod_usda_421784",
+            "prod_usda_424416",
+            "prod_usda_428015",
+            "prod_usda_431247",
+            "prod_usda_445783",
+            "prod_usda_453237"
+        ],
+        "productIds": [
+            "prod_usda_1106285",
+            "prod_usda_1106963",
+            "prod_usda_1106980",
+            "prod_usda_1107123",
+            "prod_usda_1108162",
+            "prod_usda_1109412",
+            "prod_usda_1110829",
+            "prod_usda_1110930",
+            "prod_usda_1111174",
+            "prod_usda_1112406",
+            "prod_usda_1113358",
+            "prod_usda_1114509",
+            "prod_usda_1116239",
+            "prod_usda_1117669",
+            "prod_usda_1118257",
+            "prod_usda_1118468",
+            "prod_usda_1119637",
+            "prod_usda_1120177",
+            "prod_usda_1121486",
+            "prod_usda_1123666",
+            "prod_usda_1124398",
+            "prod_usda_1124414",
+            "prod_usda_1124504",
+            "prod_usda_1126130",
+            "prod_usda_1127173",
+            "prod_usda_1128343",
+            "prod_usda_1128561",
+            "prod_usda_1129893",
+            "prod_usda_1129904",
+            "prod_usda_1132049",
+            "prod_usda_1132065",
+            "prod_usda_1132201",
+            "prod_usda_1132711",
+            "prod_usda_1134824",
+            "prod_usda_1134826",
+            "prod_usda_1135103",
+            "prod_usda_1135585",
+            "prod_usda_1136009",
+            "prod_usda_1136800",
+            "prod_usda_1136920",
+            "prod_usda_1137129",
+            "prod_usda_1137149",
+            "prod_usda_1137219",
+            "prod_usda_1137641",
+            "prod_usda_348560",
+            "prod_usda_348784",
+            "prod_usda_349473",
+            "prod_usda_358610",
+            "prod_usda_366384",
+            "prod_usda_368616"
+        ]
+    },
+    "root_group": {
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {
+            "setup": {
+                "name": "setup",
+                "path": "::setup",
+                "id": "5c0f8025f7e0b6654089e5b00e950f1a",
+                "groups": {},
+                "checks": {
+                        "setup 200": {
+                            "name": "setup 200",
+                            "path": "::setup::setup 200",
+                            "id": "c1791b595c50a0fc497de1ffc651e52e",
+                            "passes": 2,
+                            "fails": 0
+                        }
+                    }
+            }
+        },
+        "checks": {
+            "product_detail 200": {
+                "id": "d19383a2d3a19847bf17811f577d4347",
+                "passes": 16061,
+                "fails": 2,
+                "name": "product_detail 200",
+                "path": "::product_detail 200"
+            },
+            "label_history 200": {
+                "path": "::label_history 200",
+                "id": "822a0889baaddf562dc88c06fe98459e",
+                "passes": 8056,
+                "fails": 0,
+                "name": "label_history 200"
+            },
+            "catalog_list 200": {
+                "name": "catalog_list 200",
+                "path": "::catalog_list 200",
+                "id": "782e51b8e19bf3637cbacd943b008a06",
+                "passes": 19047,
+                "fails": 2
+            },
+            "impact_report 200": {
+                "name": "impact_report 200",
+                "path": "::impact_report 200",
+                "id": "2c9367efdc98cf95c6a2a857cc6cdcd6",
+                "passes": 10779,
+                "fails": 1
+            }
+        }
+    }
+}

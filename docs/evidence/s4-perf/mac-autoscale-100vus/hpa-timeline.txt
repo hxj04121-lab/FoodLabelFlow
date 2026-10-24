@@ -1,0 +1,279 @@
+=== 2026-10-24T02:46:18Z
+hpa: cpu=0%/60% current=1 desired=1
+backend-f755c677b-chzmv   1/1   Running   0     9m
+backend-f755c677b-chzmv   4m    260Mi   
+=== 2026-10-24T02:46:33Z
+hpa: cpu=0%/60% current=1 desired=1
+backend-f755c677b-chzmv   1/1   Running   0     9m15s
+backend-f755c677b-chzmv   276m   264Mi   
+=== 2026-10-24T02:46:48Z
+hpa: cpu=55%/60% current=1 desired=1
+backend-f755c677b-chzmv   1/1   Running   0     9m31s
+backend-f755c677b-chzmv   293m   265Mi   
+=== 2026-10-24T02:47:04Z
+hpa: cpu=58%/60% current=1 desired=1
+backend-f755c677b-chzmv   1/1   Running   0     9m46s
+backend-f755c677b-chzmv   462m   265Mi   
+=== 2026-10-24T02:47:19Z
+hpa: cpu=92%/60% current=1 desired=2
+backend-f755c677b-chzmv   1/1   Running           0     10m
+backend-f755c677b-qrtgt   0/1   PodInitializing   0     5s
+backend-f755c677b-chzmv   748m   272Mi   
+=== 2026-10-24T02:47:35Z
+hpa: cpu=149%/60% current=2 desired=3
+backend-f755c677b-chzmv   1/1   Running   0     10m
+backend-f755c677b-qrtgt   1/1   Running   0     21s
+backend-f755c677b-rjkms   0/1   Running   0     6s
+backend-f755c677b-chzmv   861m   279Mi   
+=== 2026-10-24T02:47:50Z
+hpa: cpu=172%/60% current=3 desired=3
+backend-f755c677b-chzmv   1/1   Running   0     10m
+backend-f755c677b-qrtgt   1/1   Running   0     37s
+backend-f755c677b-rjkms   1/1   Running   0     22s
+backend-f755c677b-chzmv   377m   279Mi   
+backend-f755c677b-qrtgt   877m   249Mi   
+=== 2026-10-24T02:48:06Z
+hpa: cpu=75%/60% current=3 desired=3
+backend-f755c677b-chzmv   1/1   Running   0     10m
+backend-f755c677b-qrtgt   1/1   Running   0     52s
+backend-f755c677b-rjkms   1/1   Running   0     37s
+backend-f755c677b-chzmv   282m   279Mi   
+backend-f755c677b-qrtgt   854m   262Mi   
+backend-f755c677b-rjkms   980m   246Mi   
+=== 2026-10-24T02:48:21Z
+hpa: cpu=141%/60% current=3 desired=5
+backend-f755c677b-4pwvz   0/1   PodInitializing   0     8s
+backend-f755c677b-chzmv   1/1   Running           0     11m
+backend-f755c677b-qrtgt   1/1   Running           0     68s
+backend-f755c677b-rjkms   1/1   Running           0     53s
+backend-f755c677b-tvvwj   0/1   Init:0/1          0     8s
+backend-f755c677b-chzmv   343m   279Mi   
+backend-f755c677b-qrtgt   584m   262Mi   
+backend-f755c677b-rjkms   964m   261Mi   
+=== 2026-10-24T02:48:37Z
+hpa: cpu=126%/60% current=5 desired=5
+backend-f755c677b-4pwvz   0/1   Running   0     23s
+backend-f755c677b-chzmv   1/1   Running   0     11m
+backend-f755c677b-qrtgt   1/1   Running   0     83s
+backend-f755c677b-rjkms   1/1   Running   0     68s
+backend-f755c677b-tvvwj   0/1   Running   0     23s
+backend-f755c677b-4pwvz   531m   101Mi   
+backend-f755c677b-chzmv   252m   279Mi   
+backend-f755c677b-qrtgt   401m   271Mi   
+backend-f755c677b-rjkms   651m   265Mi   
+=== 2026-10-24T02:48:52Z
+hpa: cpu=86%/60% current=5 desired=5
+backend-f755c677b-4pwvz   1/1   Running   0     38s
+backend-f755c677b-chzmv   1/1   Running   0     11m
+backend-f755c677b-qrtgt   1/1   Running   0     98s
+backend-f755c677b-rjkms   1/1   Running   0     83s
+backend-f755c677b-tvvwj   1/1   Running   0     38s
+backend-f755c677b-4pwvz   541m   197Mi   
+backend-f755c677b-chzmv   267m   279Mi   
+backend-f755c677b-qrtgt   349m   273Mi   
+backend-f755c677b-rjkms   542m   276Mi   
+backend-f755c677b-tvvwj   614m   193Mi   
+=== 2026-10-24T02:49:07Z
+hpa: cpu=77%/60% current=5 desired=5
+backend-f755c677b-4pwvz   1/1   Running   0     54s
+backend-f755c677b-chzmv   1/1   Running   0     11m
+backend-f755c677b-qrtgt   1/1   Running   0     114s
+backend-f755c677b-rjkms   1/1   Running   0     99s
+backend-f755c677b-tvvwj   1/1   Running   0     54s
+backend-f755c677b-4pwvz   663m   231Mi   
+backend-f755c677b-chzmv   205m   280Mi   
+backend-f755c677b-qrtgt   357m   272Mi   
+backend-f755c677b-rjkms   340m   274Mi   
+backend-f755c677b-tvvwj   626m   226Mi   
+=== 2026-10-24T02:49:23Z
+hpa: cpu=60%/60% current=5 desired=5
+backend-f755c677b-4pwvz   1/1   Running   0     69s
+backend-f755c677b-chzmv   1/1   Running   0     12m
+backend-f755c677b-qrtgt   1/1   Running   0     2m9s
+backend-f755c677b-rjkms   1/1   Running   0     114s
+backend-f755c677b-tvvwj   1/1   Running   0     69s
+backend-f755c677b-4pwvz   800m   243Mi   
+backend-f755c677b-chzmv   201m   279Mi   
+backend-f755c677b-qrtgt   318m   272Mi   
+backend-f755c677b-rjkms   367m   274Mi   
+backend-f755c677b-tvvwj   715m   235Mi   
+=== 2026-10-24T02:49:38Z
+hpa: cpu=96%/60% current=5 desired=5
+backend-f755c677b-4pwvz   1/1   Running   0     85s
+backend-f755c677b-chzmv   1/1   Running   0     12m
+backend-f755c677b-qrtgt   1/1   Running   0     2m25s
+backend-f755c677b-rjkms   1/1   Running   0     2m10s
+backend-f755c677b-tvvwj   1/1   Running   0     85s
+backend-f755c677b-4pwvz   610m   252Mi   
+backend-f755c677b-chzmv   222m   279Mi   
+backend-f755c677b-qrtgt   278m   273Mi   
+backend-f755c677b-rjkms   364m   279Mi   
+backend-f755c677b-tvvwj   618m   251Mi   
+=== 2026-10-24T02:49:54Z
+hpa: cpu=83%/60% current=5 desired=5
+backend-f755c677b-4pwvz   1/1   Running   0     100s
+backend-f755c677b-chzmv   1/1   Running   0     12m
+backend-f755c677b-qrtgt   1/1   Running   0     2m40s
+backend-f755c677b-rjkms   1/1   Running   0     2m25s
+backend-f755c677b-tvvwj   1/1   Running   0     100s
+backend-f755c677b-4pwvz   381m   254Mi   
+backend-f755c677b-chzmv   238m   279Mi   
+backend-f755c677b-qrtgt   291m   273Mi   
+backend-f755c677b-rjkms   277m   277Mi   
+backend-f755c677b-tvvwj   360m   250Mi   
+=== 2026-10-24T02:50:09Z
+hpa: cpu=61%/60% current=5 desired=5
+backend-f755c677b-4pwvz   1/1   Running   0     116s
+backend-f755c677b-chzmv   1/1   Running   0     12m
+backend-f755c677b-qrtgt   1/1   Running   0     2m56s
+backend-f755c677b-rjkms   1/1   Running   0     2m41s
+backend-f755c677b-tvvwj   1/1   Running   0     116s
+backend-f755c677b-4pwvz   400m   255Mi   
+backend-f755c677b-chzmv   260m   279Mi   
+backend-f755c677b-qrtgt   272m   273Mi   
+backend-f755c677b-rjkms   300m   277Mi   
+backend-f755c677b-tvvwj   411m   250Mi   
+=== 2026-10-24T02:50:25Z
+hpa: cpu=65%/60% current=5 desired=5
+backend-f755c677b-4pwvz   1/1   Running   0     2m11s
+backend-f755c677b-chzmv   1/1   Running   0     13m
+backend-f755c677b-qrtgt   1/1   Running   0     3m11s
+backend-f755c677b-rjkms   1/1   Running   0     2m56s
+backend-f755c677b-tvvwj   1/1   Running   0     2m11s
+backend-f755c677b-4pwvz   394m   262Mi   
+backend-f755c677b-chzmv   248m   279Mi   
+backend-f755c677b-qrtgt   250m   273Mi   
+backend-f755c677b-rjkms   298m   278Mi   
+backend-f755c677b-tvvwj   382m   251Mi   
+=== 2026-10-24T02:50:40Z
+hpa: cpu=62%/60% current=5 desired=5
+backend-f755c677b-4pwvz   1/1   Running   0     2m26s
+backend-f755c677b-chzmv   1/1   Running   0     13m
+backend-f755c677b-qrtgt   1/1   Running   0     3m26s
+backend-f755c677b-rjkms   1/1   Running   0     3m11s
+backend-f755c677b-tvvwj   1/1   Running   0     2m26s
+backend-f755c677b-4pwvz   279m   258Mi   
+backend-f755c677b-chzmv   198m   279Mi   
+backend-f755c677b-qrtgt   210m   273Mi   
+backend-f755c677b-rjkms   218m   278Mi   
+backend-f755c677b-tvvwj   309m   254Mi   
+=== 2026-10-24T02:50:56Z
+hpa: cpu=48%/60% current=5 desired=5
+backend-f755c677b-4pwvz   1/1   Running   0     2m42s
+backend-f755c677b-chzmv   1/1   Running   0     13m
+backend-f755c677b-qrtgt   1/1   Running   0     3m42s
+backend-f755c677b-rjkms   1/1   Running   0     3m27s
+backend-f755c677b-tvvwj   1/1   Running   0     2m42s
+backend-f755c677b-4pwvz   313m   260Mi   
+backend-f755c677b-chzmv   245m   279Mi   
+backend-f755c677b-qrtgt   238m   273Mi   
+backend-f755c677b-rjkms   244m   278Mi   
+backend-f755c677b-tvvwj   389m   256Mi   
+=== 2026-10-24T02:51:11Z
+hpa: cpu=57%/60% current=5 desired=5
+backend-f755c677b-4pwvz   1/1   Running   0     2m57s
+backend-f755c677b-chzmv   1/1   Running   0     13m
+backend-f755c677b-qrtgt   1/1   Running   0     3m57s
+backend-f755c677b-rjkms   1/1   Running   0     3m42s
+backend-f755c677b-tvvwj   1/1   Running   0     2m57s
+backend-f755c677b-4pwvz   357m   261Mi   
+backend-f755c677b-chzmv   262m   279Mi   
+backend-f755c677b-qrtgt   273m   273Mi   
+backend-f755c677b-rjkms   270m   278Mi   
+backend-f755c677b-tvvwj   325m   257Mi   
+=== 2026-10-24T02:51:26Z
+hpa: cpu=59%/60% current=5 desired=5
+backend-f755c677b-4pwvz   1/1   Running   0     3m12s
+backend-f755c677b-chzmv   1/1   Running   0     14m
+backend-f755c677b-qrtgt   1/1   Running   0     4m12s
+backend-f755c677b-rjkms   1/1   Running   0     3m57s
+backend-f755c677b-tvvwj   1/1   Running   0     3m12s
+backend-f755c677b-4pwvz   284m   261Mi   
+backend-f755c677b-chzmv   227m   279Mi   
+backend-f755c677b-qrtgt   235m   273Mi   
+backend-f755c677b-rjkms   257m   278Mi   
+backend-f755c677b-tvvwj   261m   257Mi   
+=== 2026-10-24T02:51:42Z
+hpa: cpu=50%/60% current=5 desired=5
+backend-f755c677b-4pwvz   1/1   Running   0     3m28s
+backend-f755c677b-chzmv   1/1   Running   0     14m
+backend-f755c677b-qrtgt   1/1   Running   0     4m28s
+backend-f755c677b-rjkms   1/1   Running   0     4m13s
+backend-f755c677b-tvvwj   1/1   Running   0     3m28s
+backend-f755c677b-4pwvz   228m   261Mi   
+backend-f755c677b-chzmv   174m   279Mi   
+backend-f755c677b-qrtgt   173m   273Mi   
+backend-f755c677b-rjkms   196m   278Mi   
+backend-f755c677b-tvvwj   186m   257Mi   
+=== 2026-10-24T02:51:57Z
+hpa: cpu=38%/60% current=5 desired=5
+backend-f755c677b-4pwvz   1/1   Running   0     3m43s
+backend-f755c677b-chzmv   1/1   Running   0     14m
+backend-f755c677b-qrtgt   1/1   Running   0     4m43s
+backend-f755c677b-rjkms   1/1   Running   0     4m28s
+backend-f755c677b-tvvwj   1/1   Running   0     3m43s
+backend-f755c677b-4pwvz   109m   262Mi   
+backend-f755c677b-chzmv   79m    279Mi   
+backend-f755c677b-qrtgt   72m    273Mi   
+backend-f755c677b-rjkms   82m    278Mi   
+backend-f755c677b-tvvwj   75m    257Mi   
+=== 2026-10-24T02:52:12Z
+hpa: cpu=16%/60% current=5 desired=5
+backend-f755c677b-4pwvz   1/1   Running   0     3m58s
+backend-f755c677b-chzmv   1/1   Running   0     14m
+backend-f755c677b-qrtgt   1/1   Running   0     4m58s
+backend-f755c677b-rjkms   1/1   Running   0     4m43s
+backend-f755c677b-tvvwj   1/1   Running   0     3m58s
+backend-f755c677b-4pwvz   15m   262Mi   
+backend-f755c677b-chzmv   10m   279Mi   
+backend-f755c677b-qrtgt   15m   273Mi   
+backend-f755c677b-rjkms   11m   278Mi   
+backend-f755c677b-tvvwj   15m   257Mi   
+=== 2026-10-24T02:52:27Z
+hpa: cpu=0%/60% current=5 desired=4
+backend-f755c677b-4pwvz   1/1   Terminating   0     4m13s
+backend-f755c677b-chzmv   1/1   Running       0     15m
+backend-f755c677b-qrtgt   1/1   Running       0     5m13s
+backend-f755c677b-rjkms   1/1   Running       0     4m58s
+backend-f755c677b-tvvwj   1/1   Running       0     4m13s
+backend-f755c677b-4pwvz   4m    262Mi   
+backend-f755c677b-chzmv   4m    279Mi   
+backend-f755c677b-qrtgt   4m    273Mi   
+backend-f755c677b-rjkms   4m    278Mi   
+backend-f755c677b-tvvwj   4m    257Mi   
+=== 2026-10-24T02:52:42Z
+hpa: cpu=0%/60% current=4 desired=2
+backend-f755c677b-chzmv   1/1   Running       0     15m
+backend-f755c677b-qrtgt   1/1   Terminating   0     5m29s
+backend-f755c677b-rjkms   1/1   Running       0     5m14s
+backend-f755c677b-tvvwj   1/1   Terminating   0     4m29s
+backend-f755c677b-chzmv   3m    279Mi   
+backend-f755c677b-qrtgt   4m    273Mi   
+backend-f755c677b-rjkms   4m    278Mi   
+backend-f755c677b-tvvwj   4m    257Mi   
+=== 2026-10-24T02:52:58Z
+hpa: cpu=0%/60% current=2 desired=1
+backend-f755c677b-chzmv   1/1   Running       0     15m
+backend-f755c677b-rjkms   1/1   Terminating   0     5m29s
+backend-f755c677b-chzmv   3m    279Mi   
+backend-f755c677b-rjkms   3m    278Mi   
+=== 2026-10-24T02:53:13Z
+hpa: cpu=1%/60% current=1 desired=1
+backend-f755c677b-chzmv   1/1   Running   0     15m
+backend-f755c677b-chzmv   4m    273Mi   
+=== 2026-10-24T02:53:28Z
+hpa: cpu=0%/60% current=1 desired=1
+backend-f755c677b-chzmv   1/1   Running   0     16m
+backend-f755c677b-chzmv   4m    273Mi   
+=== 2026-10-24T02:53:43Z
+hpa: cpu=0%/60% current=1 desired=1
+backend-f755c677b-chzmv   1/1   Running   0     16m
+backend-f755c677b-chzmv   4m    273Mi   
+=== 2026-10-24T02:53:58Z
+hpa: cpu=0%/60% current=1 desired=1
+backend-f755c677b-chzmv   1/1   Running   0     16m
+backend-f755c677b-chzmv   4m    273Mi   
+=== 2026-10-24T02:54:14Z
+hpa: cpu=0%/60% current=1 desired=1
+backend-f755c677b-chzmv   1/1   Running   0     16m
+backend-f755c677b-chzmv   4m    273Mi   

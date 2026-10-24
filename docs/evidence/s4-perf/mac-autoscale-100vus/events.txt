@@ -1,0 +1,117 @@
+LAST SEEN   TYPE      REASON                         OBJECT                               MESSAGE
+17m         Normal    Scheduled                      pod/backend-f755c677b-chzmv          Successfully assigned spectrace/backend-f755c677b-chzmv to colima
+27m         Normal    Scheduled                      pod/backend-59ff9d5bdf-826r9         Successfully assigned spectrace/backend-59ff9d5bdf-826r9 to colima
+6m6s        Normal    Scheduled                      pod/backend-f755c677b-tvvwj          Successfully assigned spectrace/backend-f755c677b-tvvwj to colima
+15m         Normal    Scheduled                      pod/backend-f755c677b-tz68h          Successfully assigned spectrace/backend-f755c677b-tz68h to colima
+6m51s       Normal    Scheduled                      pod/backend-f755c677b-rjkms          Successfully assigned spectrace/backend-f755c677b-rjkms to colima
+15m         Normal    Scheduled                      pod/backend-f755c677b-x5l9l          Successfully assigned spectrace/backend-f755c677b-x5l9l to colima
+19m         Normal    Scheduled                      pod/backend-f755c677b-s4cmp          Successfully assigned spectrace/backend-f755c677b-s4cmp to colima
+7m6s        Normal    Scheduled                      pod/backend-f755c677b-qrtgt          Successfully assigned spectrace/backend-f755c677b-qrtgt to colima
+6m6s        Normal    Scheduled                      pod/backend-f755c677b-4pwvz          Successfully assigned spectrace/backend-f755c677b-4pwvz to colima
+27m         Normal    Scheduled                      pod/backend-59ff9d5bdf-k49m8         Successfully assigned spectrace/backend-59ff9d5bdf-k49m8 to colima
+17m         Normal    Scheduled                      pod/backend-f755c677b-mcpq5          Successfully assigned spectrace/backend-f755c677b-mcpq5 to colima
+29m         Normal    Scheduled                      pod/backend-59ff9d5bdf-pc5jx         Successfully assigned spectrace/backend-59ff9d5bdf-pc5jx to colima
+28m         Warning   BackOff                        pod/backend-59ff9d5bdf-pc5jx         Back-off restarting failed container backend in pod backend-59ff9d5bdf-pc5jx_spectrace(21da2799-23b1-4008-9433-beee678f085d)
+28m         Normal    Started                        pod/backend-59ff9d5bdf-pc5jx         Container started
+28m         Normal    Created                        pod/backend-59ff9d5bdf-pc5jx         Container created
+28m         Normal    Pulled                         pod/backend-59ff9d5bdf-pc5jx         Container image "spectrace-backend:local" already present on machine and can be accessed by the pod
+28m         Warning   Unhealthy                      pod/backend-59ff9d5bdf-pc5jx         Startup probe failed: Get "http://10.42.0.5:8080/api/health": dial tcp 10.42.0.5:8080: connect: connection refused
+27m         Normal    Pulled                         pod/backend-59ff9d5bdf-k49m8         Container image "spectrace-backend:local" already present on machine and can be accessed by the pod
+27m         Normal    Started                        pod/backend-59ff9d5bdf-k49m8         Container started
+27m         Normal    Created                        pod/backend-59ff9d5bdf-k49m8         Container created
+27m         Warning   Unhealthy                      pod/backend-59ff9d5bdf-k49m8         Startup probe failed: Get "http://10.42.0.9:8080/api/health": dial tcp 10.42.0.9:8080: connect: connection refused
+27m         Normal    Pulled                         pod/backend-59ff9d5bdf-826r9         Container image "spectrace-backend:local" already present on machine and can be accessed by the pod
+27m         Normal    Created                        pod/backend-59ff9d5bdf-826r9         Container created
+27m         Normal    Started                        pod/backend-59ff9d5bdf-826r9         Container started
+27m         Warning   Unhealthy                      pod/backend-59ff9d5bdf-826r9         Startup probe failed: Get "http://10.42.0.10:8080/api/health": dial tcp 10.42.0.10:8080: connect: connection refused
+25m         Normal    Killing                        pod/backend-59ff9d5bdf-826r9         Stopping container backend
+25m         Warning   Unhealthy                      pod/backend-59ff9d5bdf-826r9         Readiness probe failed: Get "http://10.42.0.10:8080/api/health": EOF
+22m         Normal    Killing                        pod/backend-59ff9d5bdf-pc5jx         Stopping container backend
+19m         Normal    Pulling                        pod/backend-f755c677b-s4cmp          Pulling image "busybox:1.37"
+19m         Normal    Created                        pod/backend-f755c677b-s4cmp          Container created
+19m         Normal    Started                        pod/backend-f755c677b-s4cmp          Container started
+19m         Normal    Pulled                         pod/backend-f755c677b-s4cmp          Successfully pulled image "busybox:1.37" in 5.343s (5.343s including waiting). Image size: 1911395 bytes.
+19m         Normal    Pulled                         pod/backend-f755c677b-s4cmp          Container image "spectrace-backend:local" already present on machine and can be accessed by the pod
+19m         Normal    Started                        pod/backend-f755c677b-s4cmp          Container started
+19m         Normal    Created                        pod/backend-f755c677b-s4cmp          Container created
+19m         Warning   Unhealthy                      pod/backend-f755c677b-s4cmp          Startup probe failed: Get "http://10.42.0.11:8080/api/health": dial tcp 10.42.0.11:8080: connect: connection refused
+19m         Normal    Killing                        pod/backend-59ff9d5bdf-k49m8         Stopping container backend
+19m         Warning   FailedGetResourceMetric        horizontalpodautoscaler/backend      failed to get cpu utilization: unable to get metrics for resource cpu: no metrics returned from resource metrics API
+19m         Warning   FailedComputeMetricsReplicas   horizontalpodautoscaler/backend      invalid metrics (1 invalid out of 1), first error is: failed to get cpu resource metric value: failed to get cpu utilization: unable to get metrics for resource cpu: no metrics returned from resource metrics API
+19m         Warning   FailedGetResourceMetric        horizontalpodautoscaler/backend      failed to get cpu utilization: did not receive metrics for targeted pods (pods might be unready)
+19m         Warning   FailedComputeMetricsReplicas   horizontalpodautoscaler/backend      invalid metrics (1 invalid out of 1), first error is: failed to get cpu resource metric value: failed to get cpu utilization: did not receive metrics for targeted pods (pods might be unready)
+16m         Normal    Pulled                         pod/backend-f755c677b-mcpq5          Container image "busybox:1.37" already present on machine and can be accessed by the pod
+16m         Normal    Pulled                         pod/backend-f755c677b-chzmv          Container image "busybox:1.37" already present on machine and can be accessed by the pod
+16m         Normal    Created                        pod/backend-f755c677b-mcpq5          Container created
+16m         Normal    Created                        pod/backend-f755c677b-chzmv          Container created
+16m         Normal    Started                        pod/backend-f755c677b-chzmv          Container started
+16m         Normal    Started                        pod/backend-f755c677b-mcpq5          Container started
+16m         Normal    Pulled                         pod/backend-f755c677b-chzmv          Container image "spectrace-backend:local" already present on machine and can be accessed by the pod
+16m         Normal    Created                        pod/backend-f755c677b-mcpq5          Container created
+16m         Normal    Pulled                         pod/backend-f755c677b-mcpq5          Container image "spectrace-backend:local" already present on machine and can be accessed by the pod
+16m         Normal    Started                        pod/backend-f755c677b-chzmv          Container started
+16m         Normal    Started                        pod/backend-f755c677b-mcpq5          Container started
+16m         Normal    Created                        pod/backend-f755c677b-chzmv          Container created
+16m         Warning   Unhealthy                      pod/backend-f755c677b-chzmv          Startup probe failed: Get "http://10.42.0.18:8080/api/health": dial tcp 10.42.0.18:8080: connect: connection refused
+16m         Warning   Unhealthy                      pod/backend-f755c677b-mcpq5          Startup probe failed: Get "http://10.42.0.19:8080/api/health": dial tcp 10.42.0.19:8080: connect: connection refused
+16m         Warning   Unhealthy                      pod/backend-f755c677b-mcpq5          Readiness probe failed: Get "http://10.42.0.19:8080/api/health": context deadline exceeded (Client.Timeout exceeded while awaiting headers)
+15m         Normal    Pulled                         pod/backend-f755c677b-tz68h          Container image "busybox:1.37" already present on machine and can be accessed by the pod
+15m         Normal    Created                        pod/backend-f755c677b-tz68h          Container created
+15m         Normal    Started                        pod/backend-f755c677b-tz68h          Container started
+15m         Normal    Pulled                         pod/backend-f755c677b-x5l9l          Container image "busybox:1.37" already present on machine and can be accessed by the pod
+15m         Normal    Started                        pod/backend-f755c677b-x5l9l          Container started
+15m         Normal    Created                        pod/backend-f755c677b-x5l9l          Container created
+15m         Normal    Pulled                         pod/backend-f755c677b-tz68h          Container image "spectrace-backend:local" already present on machine and can be accessed by the pod
+15m         Normal    Created                        pod/backend-f755c677b-tz68h          Container created
+15m         Normal    Started                        pod/backend-f755c677b-tz68h          Container started
+15m         Normal    Pulled                         pod/backend-f755c677b-x5l9l          Container image "spectrace-backend:local" already present on machine and can be accessed by the pod
+15m         Normal    Started                        pod/backend-f755c677b-x5l9l          Container started
+15m         Normal    Created                        pod/backend-f755c677b-x5l9l          Container created
+15m         Warning   Unhealthy                      pod/backend-f755c677b-tz68h          Startup probe failed: Get "http://10.42.0.21:8080/api/health": dial tcp 10.42.0.21:8080: connect: connection refused
+15m         Warning   Unhealthy                      pod/backend-f755c677b-x5l9l          Startup probe failed: Get "http://10.42.0.22:8080/api/health": dial tcp 10.42.0.22:8080: connect: connection refused
+12m         Normal    Killing                        pod/backend-f755c677b-tz68h          Stopping container backend
+12m         Warning   Unhealthy                      pod/backend-f755c677b-tz68h          Readiness probe failed: Get "http://10.42.0.21:8080/api/health": dial tcp 10.42.0.21:8080: connect: connection refused
+12m         Normal    Killing                        pod/backend-f755c677b-x5l9l          Stopping container backend
+12m         Normal    SuccessfulRescale              horizontalpodautoscaler/backend      New size: 3; reason: All metrics below target
+11m         Normal    Killing                        pod/backend-f755c677b-s4cmp          Stopping container backend
+10m         Normal    Killing                        pod/backend-f755c677b-mcpq5          Stopping container backend
+10m         Warning   Unhealthy                      pod/backend-f755c677b-mcpq5          Readiness probe failed: Get "http://10.42.0.19:8080/api/health": dial tcp 10.42.0.19:8080: connect: connection refused
+7m7s        Normal    SuccessfulRescale              horizontalpodautoscaler/backend      New size: 2; reason: cpu resource utilization (percentage of request) above target
+7m6s        Normal    Created                        pod/backend-f755c677b-qrtgt          Container created
+7m6s        Normal    Pulled                         pod/backend-f755c677b-qrtgt          Container image "busybox:1.37" already present on machine and can be accessed by the pod
+7m5s        Normal    Started                        pod/backend-f755c677b-qrtgt          Container started
+7m4s        Normal    Pulled                         pod/backend-f755c677b-qrtgt          Container image "spectrace-backend:local" already present on machine and can be accessed by the pod
+7m3s        Normal    Started                        pod/backend-f755c677b-qrtgt          Container started
+7m3s        Normal    Created                        pod/backend-f755c677b-qrtgt          Container created
+6m52s       Normal    SuccessfulRescale              horizontalpodautoscaler/backend      New size: 3; reason: cpu resource utilization (percentage of request) above target
+6m52s       Warning   Unhealthy                      pod/backend-f755c677b-qrtgt          Startup probe failed: Get "http://10.42.0.24:8080/api/health": dial tcp 10.42.0.24:8080: connect: connection refused
+6m50s       Normal    Pulled                         pod/backend-f755c677b-rjkms          Container image "busybox:1.37" already present on machine and can be accessed by the pod
+6m50s       Normal    Started                        pod/backend-f755c677b-rjkms          Container started
+6m50s       Normal    Created                        pod/backend-f755c677b-rjkms          Container created
+6m49s       Normal    Started                        pod/backend-f755c677b-rjkms          Container started
+6m49s       Normal    Created                        pod/backend-f755c677b-rjkms          Container created
+6m49s       Normal    Pulled                         pod/backend-f755c677b-rjkms          Container image "spectrace-backend:local" already present on machine and can be accessed by the pod
+6m42s       Warning   Unhealthy                      pod/backend-f755c677b-rjkms          Startup probe failed: Get "http://10.42.0.25:8080/api/health": dial tcp 10.42.0.25:8080: connect: connection refused
+6m7s        Normal    SuccessfulRescale              horizontalpodautoscaler/backend      New size: 5; reason: cpu resource utilization (percentage of request) above target
+6m3s        Normal    Created                        pod/backend-f755c677b-tvvwj          Container created
+6m3s        Normal    Pulled                         pod/backend-f755c677b-4pwvz          Container image "busybox:1.37" already present on machine and can be accessed by the pod
+6m3s        Normal    Created                        pod/backend-f755c677b-4pwvz          Container created
+6m3s        Normal    Pulled                         pod/backend-f755c677b-tvvwj          Container image "busybox:1.37" already present on machine and can be accessed by the pod
+6m2s        Normal    Started                        pod/backend-f755c677b-4pwvz          Container started
+6m2s        Normal    Started                        pod/backend-f755c677b-tvvwj          Container started
+6m1s        Normal    Created                        pod/backend-f755c677b-4pwvz          Container created
+6m1s        Normal    Pulled                         pod/backend-f755c677b-4pwvz          Container image "spectrace-backend:local" already present on machine and can be accessed by the pod
+6m          Normal    Started                        pod/backend-f755c677b-4pwvz          Container started
+5m58s       Normal    Pulled                         pod/backend-f755c677b-tvvwj          Container image "spectrace-backend:local" already present on machine and can be accessed by the pod
+5m57s       Normal    Created                        pod/backend-f755c677b-tvvwj          Container created
+5m56s       Normal    Started                        pod/backend-f755c677b-tvvwj          Container started
+5m37s       Warning   Unhealthy                      pod/backend-f755c677b-4pwvz          Startup probe failed: Get "http://10.42.0.27:8080/api/health": dial tcp 10.42.0.27:8080: connect: connection refused
+5m36s       Warning   Unhealthy                      pod/backend-f755c677b-tvvwj          Startup probe failed: Get "http://10.42.0.26:8080/api/health": dial tcp 10.42.0.26:8080: connect: connection refused
+114s        Normal    Killing                        pod/backend-f755c677b-4pwvz          Stopping container backend
+114s        Normal    SuccessfulRescale              horizontalpodautoscaler/backend      New size: 4; reason: All metrics below target
+103s        Warning   Unhealthy                      pod/backend-f755c677b-4pwvz          Readiness probe failed: Get "http://10.42.0.27:8080/api/health": context deadline exceeded (Client.Timeout exceeded while awaiting headers)
+99s         Normal    Killing                        pod/backend-f755c677b-tvvwj          Stopping container backend
+99s         Normal    SuccessfulRescale              horizontalpodautoscaler/backend      New size: 2; reason: All metrics below target
+99s         Normal    Killing                        pod/backend-f755c677b-qrtgt          Stopping container backend
+85s         Normal    SuccessfulRescale              horizontalpodautoscaler/backend      New size: 1; reason: All metrics below target
+85s         Normal    Killing                        pod/backend-f755c677b-rjkms          Stopping container backend

@@ -21,8 +21,8 @@ const profiles = {
     executor: 'ramping-vus',
     startVUs: 0,
     stages: [
-      { duration: '1m', target: Number(__ENV.VUS || 40) },
-      { duration: __ENV.DURATION || '4m', target: Number(__ENV.VUS || 40) },
+      { duration: '1m', target: Number(__ENV.VUS || 100) },
+      { duration: __ENV.DURATION || '4m', target: Number(__ENV.VUS || 100) },
       { duration: '30s', target: 0 },
     ],
     gracefulRampDown: '10s',

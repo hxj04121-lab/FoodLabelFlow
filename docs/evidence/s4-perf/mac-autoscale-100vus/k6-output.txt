@@ -1,0 +1,57 @@
+
+
+  █ THRESHOLDS 
+
+    checks
+    ✓ 'rate>0.99' rate=100.00%
+
+    http_req_duration{name:catalog_list}
+    ✓ 'p(95)<1000' p(95)=239.72ms
+
+    http_req_duration{name:impact_report}
+    ✓ 'p(95)<1000' p(95)=574.97ms
+
+    http_req_duration{name:label_history}
+    ✓ 'p(95)<1000' p(95)=407.39ms
+
+    http_req_duration{name:product_detail}
+    ✓ 'p(95)<1000' p(95)=220.98ms
+
+    http_req_failed
+    ✓ 'rate<0.01' rate=0.00%
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 101649  308.018711/s
+    checks_succeeded...: 100.00% 101649 out of 101649
+    checks_failed......: 0.00%   0 out of 101649
+
+    ✓ setup 200
+    ✓ label_history 200
+    ✓ product_detail 200
+    ✓ impact_report 200
+    ✓ catalog_list 200
+
+    HTTP
+    http_req_duration..............: avg=80.31ms  min=54µs     med=21.38ms  p(90)=224.38ms p(95)=353.82ms p(99)=722.26ms max=2.81s
+      { expected_response:true }...: avg=80.31ms  min=54µs     med=21.38ms  p(90)=224.38ms p(95)=353.82ms p(99)=722.26ms max=2.81s
+      { name:catalog_list }........: avg=59.44ms  min=89µs     med=19.4ms   p(90)=151.49ms p(95)=239.72ms p(99)=532.29ms max=2.21s
+      { name:impact_report }.......: avg=144.52ms min=57µs     med=45.5ms   p(90)=415.14ms p(95)=574.97ms p(99)=979.31ms max=2.81s
+      { name:label_history }.......: avg=99.81ms  min=2.87ms   med=26.99ms  p(90)=278.73ms p(95)=407.39ms p(99)=791.58ms max=2.42s
+      { name:product_detail }......: avg=51.82ms  min=54µs     med=15.02ms  p(90)=134.92ms p(95)=220.98ms p(99)=471.41ms max=2.44s
+    http_req_failed................: 0.00%  0 out of 101649
+    http_reqs......................: 101649 308.018711/s
+
+    EXECUTION
+    iteration_duration.............: avg=280.31ms min=102.12ms med=249.72ms p(90)=435.74ms p(95)=563.35ms p(99)=927.81ms max=3s   
+    iterations.....................: 101647 308.01265/s
+    vus............................: 1      min=1           max=100
+    vus_max........................: 100    min=100         max=100
+
+    NETWORK
+    data_received..................: 2.3 GB 7.1 MB/s
+    data_sent......................: 25 MB  77 kB/s
+
+
+

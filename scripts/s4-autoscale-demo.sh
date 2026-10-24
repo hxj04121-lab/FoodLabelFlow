@@ -21,7 +21,7 @@
 # runs, or run `kubectl -n spectrace port-forward svc/frontend 18080:80` yourself.
 #
 #   FORWARD_PORT   local port for the frontend (default 18080)
-#   VUS, DURATION  k6 ramp peak virtual users (default 40) and hold time (default 4m)
+#   VUS, DURATION  k6 ramp peak virtual users (default 100) and hold time (default 4m)
 #   COOLDOWN       seconds to keep recording after k6 ends, for scale-down (default 150)
 set -euo pipefail
 cd "$(dirname "$0")/.."

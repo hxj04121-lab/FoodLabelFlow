@@ -68,14 +68,17 @@ Colima needs at least 4 CPUs / 8 GB (`colima start --cpu 4 --memory 8 --kubernet
 scripts/s4-autoscale-demo.sh demo
 ```
 
-This creates the cluster if there is no kubectl context (`k3d cluster create spectrace` or
-`colima kubernetes start` / `colima start --kubernetes`), builds and loads the images, deploys, waits for metrics-server,
+This creates the cluster if there is no kubectl context (`k3d cluster create spectrace`, or
+k3s inside Colima), builds and loads the images, deploys, waits until metrics-server reports
+backend CPU, prepares Spec V2 → adoption → ChangeRequest → impact analysis through the API,
 then port-forwards the frontend to `127.0.0.1:18080` and runs the k6 `ramp` profile
-(0 → 40 VUs in 1 min, hold 4 min, release 30 s) while recording `kubectl get hpa,pods` and
-`kubectl top pods` every 15 s. Expect about 15 minutes in total, most of it the first image build.
+(0 → 100 VUs in 1 min, hold 4 min, release 30 s) while recording the HPA, the backend pods and
+`kubectl top pods` every 15 s, plus 150 s of cool-down. On the Mac rehearsal it took 8 min 46 s
+with cached image layers; the first image build adds several minutes.
 
 Results land in `perf/results/<UTC>-autoscale-<platform>-<sha>/`: `hpa-timeline.log`,
-`k6/summary.json`, `k6/report.html` (open it in a browser), `k6/k6.log` and `cluster.txt`.
+`events.txt` (the HPA `SuccessfulRescale` events), `hpa-describe.txt`, `cluster.txt`,
+`k6/summary.json`, `k6/report.html` (open it in a browser) and `k6/k6.log`.
 Summarise k6 numbers with:
 
 ```bash
@@ -97,20 +100,22 @@ Terminal 1 — watch the autoscaler:
 kubectl -n spectrace get hpa -w
 ```
 
-Terminal 2 — drive load (about 2.5 minutes of k6, then scale-down is recorded):
+Terminal 2 — drive load (3 minutes of k6: 1 min ramp, 90 s at 100 VUs, 30 s release; then
+90 s more of HPA recording):
 
 ```bash
-DURATION=60s scripts/s4-autoscale-demo.sh load
+DURATION=90s COOLDOWN=90 scripts/s4-autoscale-demo.sh load
 ```
 
-What to point out:
+What to point out (times from the Mac rehearsal):
 
-1. Terminal 1: CPU climbs above 60 % within about a minute and `REPLICAS` steps up from 1
-   (the scale-up policy adds at most 2 pods per 15 s, capped at 5).
-2. `kubectl -n spectrace get pods -l app=backend` shows the new pods turning `1/1 Running`;
-   k6 keeps an error rate of 0 % while they join, because nginx reaches the backend through the
-   Service and a pod only receives traffic once `/api/health` is ready.
-3. After k6 stops, CPU drops and the replicas return to 1 after the 60 s scale-down window.
+1. Terminal 1: about 1 min in, CPU passes 60 % of the request and `REPLICAS` goes 1 → 2 → 3,
+   then 5 about 2 min in (the scale-up policy adds at most 2 pods per 15 s, capped at 5).
+2. In terminal 2, k6 reports `http_req_failed 0.00%` at the end: new pods receive traffic only
+   once `/api/health` is ready, and a removed pod keeps serving for 10 s (`preStop`) while the
+   Service drops it.
+3. When k6 stops, CPU falls and the replicas return to 1 within about 1.5 min (60 s
+   scale-down window).
 4. Open `k6/report.html` from the results folder for the latency and throughput charts.
 
 ## Clean up

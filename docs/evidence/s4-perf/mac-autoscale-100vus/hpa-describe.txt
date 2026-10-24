@@ -1,0 +1,44 @@
+Name:                                                  backend
+Namespace:                                             spectrace
+Labels:                                                app.kubernetes.io/part-of=spectrace
+Annotations:                                           <none>
+CreationTimestamp:                                     Sat, 24 Oct 2026 10:25:07 +0800
+Reference:                                             Deployment/backend
+Metrics:                                               ( current / target )
+  resource cpu on pods  (as a percentage of request):  0% (4m) / 60%
+Min replicas:                                          1
+Max replicas:                                          5
+Behavior:
+  Scale Up:
+    Stabilization Window: 0 seconds
+    Select Policy: Max
+    Policies:
+      - Type: Pods  Value: 2  Period: 15 seconds
+  Scale Down:
+    Stabilization Window: 60 seconds
+    Select Policy: Max
+    Policies:
+      - Type: Percent  Value: 100  Period: 15 seconds
+Deployment pods:       1 current / 1 desired
+Conditions:
+  Type            Status  Reason            Message
+  ----            ------  ------            -------
+  AbleToScale     True    ReadyForNewScale  recommended size matches current size
+  ScalingActive   True    ValidMetricFound  the HPA was able to successfully calculate a replica count from cpu resource utilization (percentage of request)
+  ScalingLimited  True    TooFewReplicas    the desired replica count is less than the minimum replica count
+Events:
+  Type     Reason                        Age                  From                       Message
+  ----     ------                        ----                 ----                       -------
+  Warning  FailedGetResourceMetric       19m (x4 over 28m)    horizontal-pod-autoscaler  failed to get cpu utilization: unable to get metrics for resource cpu: no metrics returned from resource metrics API
+  Warning  FailedComputeMetricsReplicas  19m (x4 over 28m)    horizontal-pod-autoscaler  invalid metrics (1 invalid out of 1), first error is: failed to get cpu resource metric value: failed to get cpu utilization: unable to get metrics for resource cpu: no metrics returned from resource metrics API
+  Warning  FailedGetResourceMetric       19m (x2 over 28m)    horizontal-pod-autoscaler  failed to get cpu utilization: did not receive metrics for targeted pods (pods might be unready)
+  Warning  FailedComputeMetricsReplicas  19m (x2 over 28m)    horizontal-pod-autoscaler  invalid metrics (1 invalid out of 1), first error is: failed to get cpu resource metric value: failed to get cpu utilization: did not receive metrics for targeted pods (pods might be unready)
+  Normal   SuccessfulRescale             12m                  horizontal-pod-autoscaler  New size: 3; reason: All metrics below target
+  Normal   SuccessfulRescale             7m6s (x2 over 27m)   horizontal-pod-autoscaler  New size: 2; reason: cpu resource utilization (percentage of request) above target
+  Normal   SuccessfulRescale             6m51s (x3 over 27m)  horizontal-pod-autoscaler  New size: 3; reason: cpu resource utilization (percentage of request) above target
+  Normal   SuccessfulRescale             6m6s (x2 over 15m)   horizontal-pod-autoscaler  New size: 5; reason: cpu resource utilization (percentage of request) above target
+  Normal   SuccessfulRescale             113s (x2 over 12m)   horizontal-pod-autoscaler  New size: 4; reason: All metrics below target
+  Normal   SuccessfulRescale             98s (x3 over 25m)    horizontal-pod-autoscaler  New size: 2; reason: All metrics below target
+  Normal   SuccessfulRescale             84s (x3 over 22m)    horizontal-pod-autoscaler  New size: 1; reason: All metrics below target
+scripts/s4-autoscale-demo.sh: line 32: 55252 Terminated: 15          kubectl -n "$NS" port-forward --address 127.0.0.1 svc/frontend "$FORWARD_PORT:80" > "$out/port-forward.log" 2>&1
+scripts/s4-autoscale-demo.sh: line 32: 55271 Terminated: 15          watch_loop > "$out/hpa-timeline.log" 2>&1

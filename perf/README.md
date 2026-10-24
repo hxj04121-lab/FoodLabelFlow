@@ -18,7 +18,7 @@ python3 perf/summarize.py perf/results/*/summary.json   # Markdown table per run
 ```
 
 Profiles (`PROFILE`): `smoke` 2 VUs × 30 s (CI), `baseline` 10 VUs × 2 min with 0.1–0.3 s think time,
-`capacity` 20 VUs × 1 min without think time, `ramp` 0 → `VUS` (40) over 1 min, hold `DURATION` (4 min),
+`capacity` 20 VUs × 1 min without think time, `ramp` 0 → `VUS` (100) over 1 min, hold `DURATION` (4 min),
 used by `scripts/s4-autoscale-demo.sh`.
 
 Each run writes `perf/results/<UTC>-<script>-<sha>/` (git-ignored): `summary.json` (k6 summary export),
